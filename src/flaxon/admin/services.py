@@ -58,6 +58,13 @@ class AdminAuth:
         if self.store:
             self._reset_tokens = self.store.get("auth", "reset_tokens", {}) or {}
             self._verification_tokens = self.store.get("auth", "verification_tokens", {}) or {}
+        # A fixed hash to verify against when a username doesn't exist, so
+        # login response timing doesn't leak which usernames are valid
+        # (CWE-208) -- without this, a nonexistent user returns almost
+        # instantly while a real user with a wrong password takes as long
+        # as a full PBKDF2 verification (tens of milliseconds), which is
+        # trivially measurable and lets an attacker enumerate usernames.
+        self._dummy_password_hash = self.hasher.hash(secrets.token_hex(32))
 
     def _persist_auth_tokens(self) -> None:
         if self.store:
@@ -90,9 +97,14 @@ class AdminAuth:
 
     def verify(self, username: str, password: str) -> User | None:
         record = self.users.get(username)
+        # Always run a hash verification, even for a nonexistent user or
+        # one without a password_hash, using a fixed dummy hash -- so the
+        # time this takes doesn't depend on whether the username is real.
+        password_hash = record["password_hash"] if record and record.get("password_hash") else self._dummy_password_hash
+        password_matches = self.hasher.verify(password, password_hash)
         if not record or record.get("active", True) is False or not record.get("password_hash"):
             return None
-        return self.user(username) if self.hasher.verify(password, record["password_hash"]) else None
+        return self.user(username) if password_matches else None
 
     def validate_password(self, password: str) -> None:
         errors = self.password_validator.validate(password)
