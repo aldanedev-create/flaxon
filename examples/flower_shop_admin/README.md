@@ -15,6 +15,7 @@ python -m flaxon run examples.flower_shop_admin.app:app --reload --port 8000
 Open `http://127.0.0.1:8000/`.
 
 - Admin: `/admin/`
+- Custom Admin shop overview: `/admin/shop-overview`
 - CMS SPA: `/admin/cms/`
 - Chat room: `/chat?user=florist`
 

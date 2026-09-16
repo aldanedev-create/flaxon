@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import uuid
 
 import pytest
 
@@ -30,6 +32,22 @@ def _app():
     token = asyncio.run(dashboard.auth.login("admin", "Admin123!"))
     headers = {"cookie": f"session_id={token}", "x-csrf-token": dashboard.csrf_token()}
     return app, dashboard, TestClient(app), headers
+
+
+def _multipart(fields: dict[str, str], files: dict[str, tuple[str, str, bytes]]) -> tuple[bytes, str]:
+    boundary = "----FlaxonTest" + uuid.uuid4().hex
+    chunks: list[bytes] = []
+    for name, value in fields.items():
+        chunks.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'.encode())
+    for name, (filename, content_type, content) in files.items():
+        chunks.append(
+            f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"; filename="{filename}"\r\n'
+            f"Content-Type: {content_type}\r\n\r\n".encode()
+            + content
+            + b"\r\n"
+        )
+    chunks.append(f"--{boundary}--\r\n".encode())
+    return b"".join(chunks), f"multipart/form-data; boundary={boundary}"
 
 
 def test_cms_workflows_and_sanitization():
@@ -72,6 +90,47 @@ def test_cms_scheduled_content_publishes_when_due():
     assert created.status_code == 201
     listed = client.get("/admin/cms/api/post/items", headers=headers).json()["items"]
     assert listed[0]["status"] == "published"
+
+
+def test_cms_image_upload_uses_admin_media_storage_and_schedule_is_visible(tmp_path):
+    app = Flaxon("cms-media-workflow", debug=True)
+    dashboard = AdminDashboard(
+        app,
+        upload_dir=str(tmp_path / "media"),
+        users=[{"username": "admin", "password": "Admin123!"}],
+    )
+    cms = CMS(app, auth=dashboard.auth)
+    cms.register(ContentType("story", fields=[CMSField("title", required=True), CMSField("hero_image", type="image")]))
+    token = asyncio.run(dashboard.auth.login("admin", "Admin123!"))
+    headers = {"cookie": f"session_id={token}", "x-csrf-token": dashboard.csrf_token()}
+    client = TestClient(app)
+    png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")
+    body, content_type = _multipart(
+        {"title": "Uploaded story", "status": "scheduled", "publish_at": "2099-01-01T00:00:00+00:00"},
+        {"hero_image": ("hero.png", "image/png", png)},
+    )
+
+    created = client.post("/admin/cms/api/story/items", content=body, headers={**headers, "content-type": content_type})
+    assert created.status_code == 201
+    record = created.json()
+    asset = client.get(record["hero_image"])
+    assert asset.status_code == 200
+    assert asset.headers["content-type"].startswith("image/png")
+    assert client.get("/admin/cms/api/media", headers=headers).json()[0]["url"] == record["hero_image"]
+
+    jobs = client.get("/admin/cms/api/scheduler/jobs", headers=headers).json()["items"]
+    assert jobs[0]["id"] == f"story:{record['id']}"
+    cms_page = client.get("/admin/cms/", headers=headers)
+    assert cms_page.status_code == 200
+    assert "cms-content-nav" in cms_page.text
+
+    changed = client.put(
+        f"/admin/cms/api/story/items/{record['id']}",
+        json_data={"status": "draft"},
+        headers=headers,
+    )
+    assert changed.status_code == 200
+    assert client.get("/admin/cms/api/scheduler/jobs", headers=headers).json()["items"][0]["state"] == "canceled"
 
 
 def test_cms_resources_and_import_export():

@@ -1,17 +1,64 @@
 {% extends "admin/base.html" %}
-{% block title %}Roles{% endblock %}
+{% block title %}Groups and permissions{% endblock %}
 {% block content %}
-<div class="space-y-6">
-  <div><h1 class="text-2xl font-bold">Roles & permissions</h1><p class="text-slate-400">Define reusable permission sets for admin users.</p></div>
-  {% if error %}<p class="text-red-400">{{ error }}</p>{% endif %}
-  <form method="post" class="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-    <input type="hidden" name="_csrf" value="{{ dashboard.csrf_token() }}">
-    <input name="name" required placeholder="Role name" class="bg-slate-700 border border-slate-600 rounded px-3 py-2">
-    <input name="permissions" required placeholder="admin:read, product:delete" class="bg-slate-700 border border-slate-600 rounded px-3 py-2 md:col-span-2">
-    <button class="bg-blue-600 rounded px-3 py-2">Save role</button>
-  </form>
-  <table class="w-full text-left"><thead><tr class="border-b border-slate-700"><th class="p-3">Role</th><th class="p-3">Permissions</th></tr></thead><tbody>
-  {% for name, permissions in roles.items() %}<tr class="border-b border-slate-800"><td class="p-3">{{ name }}</td><td class="p-3">{{ permissions|join(', ') }}</td><td class="p-3">{% if name not in ['staff', 'administrator'] %}<form method="post"><input type="hidden" name="_csrf" value="{{ dashboard.csrf_token() }}"><input type="hidden" name="name" value="{{ name }}"><input type="hidden" name="action" value="delete"><button class="text-red-400" type="submit">Delete</button></form>{% endif %}</td></tr>{% endfor %}
-  </tbody></table>
+<div class="corporate-page roles-page">
+  <header class="corporate-header">
+    <div><p class="admin-eyebrow">Access control</p><h1>Groups and permissions</h1><p class="corporate-subtitle">Create reusable role bundles and grant only the capabilities each team needs.</p></div>
+    <div class="corporate-actions"><a class="corporate-button corporate-button-muted" href="{{ dashboard.url_prefix }}/users"><i class="fas fa-users"></i><span>Manage users</span></a><button class="corporate-button corporate-button-primary" type="button" id="open-role-form"><i class="fas fa-plus"></i><span>New group</span></button></div>
+  </header>
+
+  <section class="corporate-stat-grid" aria-label="Permission summary">
+    <article class="corporate-stat"><span class="corporate-stat-label">Groups</span><strong>{{ roles|length }}</strong><small>Reusable access bundles</small></article>
+    <article class="corporate-stat"><span class="corporate-stat-label">Capabilities</span><strong>{{ permission_choices|length }}</strong><small>Application-defined permissions</small></article>
+    <article class="corporate-stat"><span class="corporate-stat-label">Protected groups</span><strong>{{ dashboard.protected_roles|length }}</strong><small>System groups cannot be deleted</small></article>
+    <article class="corporate-stat"><span class="corporate-stat-label">Assignment model</span><strong>Role based</strong><small>Users inherit group capabilities</small></article>
+  </section>
+
+  {% if error %}<div class="corporate-alert corporate-alert-danger" role="alert"><i class="fas fa-circle-exclamation"></i><span>{{ error }}</span></div>{% endif %}
+
+  <section class="corporate-panel role-create-panel" id="role-create-panel" hidden>
+    <div class="corporate-panel-header"><div><p class="corporate-kicker">Create a reusable bundle</p><h2>New group</h2><p class="corporate-muted">Use a clear business name. Permission keys are resolved by the server and do not need to be typed.</p></div><button type="button" class="corporate-icon-button" id="close-role-form" title="Close group form" aria-label="Close group form"><i class="fas fa-xmark"></i></button></div>
+    <form method="post" class="corporate-form">
+      <input type="hidden" name="_csrf" value="{{ dashboard.csrf_token() }}"><input type="hidden" name="action" value="save">
+      <div class="corporate-form-grid"><label class="corporate-field"><span>Group name <b>*</b></span><input name="name" required maxlength="80" placeholder="Content editors" autocomplete="off"><small>Shown to administrators when assigning access.</small></label><label class="corporate-field"><span>Description</span><input name="description" maxlength="500" placeholder="Who should use this group?"><small>Describe the team responsibility, not the implementation.</small></label></div>
+      <div class="permission-editor"><div class="permission-editor-header"><div><h3>Capabilities</h3><p class="corporate-muted">Start with the minimum set and add access as responsibilities change.</p></div><button type="button" class="corporate-button corporate-button-muted" data-check-all="create-permissions">Select all</button></div>
+        {% for category, choices in permission_groups.items() %}<fieldset class="permission-group"><legend>{{ category }}</legend><div class="permission-grid">{% for permission in choices %}<label class="permission-choice"><input type="checkbox" name="permissions" value="{{ permission.key }}" data-permission-group="create-permissions"><span><strong>{{ permission.label }}</strong><small>{{ permission.description }}</small>{% if permission.dangerous %}<em>Privileged</em>{% endif %}</span></label>{% endfor %}</div></fieldset>{% endfor %}
+      </div>
+      <div class="corporate-form-actions"><button class="corporate-button corporate-button-primary" type="submit"><i class="fas fa-check"></i><span>Create group</span></button><button class="corporate-button corporate-button-muted" type="button" id="cancel-role-form">Cancel</button></div>
+    </form>
+  </section>
+
+  <section class="corporate-panel">
+    <div class="corporate-panel-header corporate-panel-header-wrap"><div><p class="corporate-kicker">Role directory</p><h2>Configured groups</h2></div><label class="corporate-search"><i class="fas fa-search"></i><input id="role-search" type="search" placeholder="Search groups" aria-label="Search groups"></label></div>
+    <div class="role-list">
+      {% for name, permissions in roles.items() %}
+      <article class="role-card" data-role="{{ name|lower }} {{ role_descriptions.get(name, '')|lower }}">
+        <form method="post" class="corporate-form"><input type="hidden" name="_csrf" value="{{ dashboard.csrf_token() }}"><input type="hidden" name="name" value="{{ name }}">
+          <div class="role-card-heading"><div><div class="role-title-line"><h3>{{ name|title }}</h3>{% if name in dashboard.protected_roles %}<span class="corporate-badge corporate-badge-neutral">System</span>{% else %}<span class="corporate-badge corporate-badge-success">Custom</span>{% endif %}</div><p class="corporate-muted">{{ role_descriptions.get(name, 'Select the capabilities inherited by this group.') }}</p></div><span class="role-count">{{ permissions|length }} capabilities</span></div>
+          <label class="corporate-field"><span>Description</span><input name="description" maxlength="500" value="{{ role_descriptions.get(name, '') }}"></label>
+          <details class="permission-details" open><summary>Review capabilities</summary><div class="permission-grid compact">{% for category, choices in permission_groups.items() %}{% for permission in choices %}<label class="permission-choice"><input type="checkbox" name="permissions" value="{{ permission.key }}"{% if permission.key in role_permission_keys.get(name, []) %} checked{% endif %}><span><strong>{{ permission.label }}</strong><small>{{ category }} - {{ permission.description }}</small>{% if permission.dangerous %}<em>Privileged</em>{% endif %}</span></label>{% endfor %}{% endfor %}</div></details>
+          <div class="corporate-form-actions"><button name="action" value="save" class="corporate-button corporate-button-primary" type="submit"><i class="fas fa-save"></i><span>Save changes</span></button>{% if name not in dashboard.protected_roles %}<button name="action" value="delete" class="corporate-button corporate-button-danger" type="submit" data-delete data-message="Delete the {{ name|title }} group? Users assigned to it will lose its capabilities."><i class="fas fa-trash"></i><span>Delete group</span></button>{% else %}<span class="corporate-muted role-protected-note"><i class="fas fa-lock"></i> Protected system group</span>{% endif %}</div>
+        </form>
+      </article>
+      {% else %}<div class="corporate-empty"><i class="fas fa-shield-halved"></i><strong>No groups configured</strong><p>Create a group to assign reusable permissions.</p></div>{% endfor %}
+    </div>
+    <p id="role-empty-search" class="corporate-table-empty" hidden>No groups match your search.</p>
+  </section>
 </div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+(() => {
+  const panel = document.getElementById('role-create-panel');
+  const toggle = value => { panel.hidden = !value; if (value) panel.querySelector('input[name="name"]').focus(); };
+  document.getElementById('open-role-form').addEventListener('click', () => toggle(true));
+  document.getElementById('close-role-form').addEventListener('click', () => toggle(false));
+  document.getElementById('cancel-role-form').addEventListener('click', () => toggle(false));
+  document.querySelectorAll('[data-check-all]').forEach(button => button.addEventListener('click', () => {
+    const boxes = document.querySelectorAll(`[data-permission-group="${button.dataset.checkAll}"]`); const checked = [...boxes].every(box => box.checked); boxes.forEach(box => { box.checked = !checked; }); button.textContent = checked ? 'Select all' : 'Clear all';
+  }));
+  const search = document.getElementById('role-search'); const cards = [...document.querySelectorAll('.role-card')]; const empty = document.getElementById('role-empty-search');
+  search.addEventListener('input', () => { const q = search.value.toLowerCase().trim(); let visible = 0; cards.forEach(card => { const show = !q || card.dataset.role.includes(q); card.hidden = !show; if (show) visible++; }); empty.hidden = visible !== 0; });
+})();
+</script>
 {% endblock %}

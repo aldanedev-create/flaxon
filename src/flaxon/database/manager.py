@@ -39,6 +39,13 @@ class DatabaseManager:
     async def _call(self, method: str, query: str, *args: Any) -> Any:
         if self._direct:
             return await getattr(self.pool, method)(query, *args)
+        # Repository calls made inside ``async with db.transaction()`` must
+        # stay on the transaction's leased connection. Acquiring a fresh
+        # pooled connection here would make each statement commit outside the
+        # surrounding transaction and break atomic multi-record writes.
+        active_connection = self._transaction_connection.get()
+        if active_connection is not None:
+            return await getattr(active_connection, method)(query, *args)
         connection = await self.pool.acquire()
         try:
             return await getattr(connection, method)(query, *args)

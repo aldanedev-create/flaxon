@@ -436,7 +436,44 @@ class Dashboard:
 
 # Permissions
 
-Protect admin pages.
+The default compatibility mode accepts legacy keys such as `admin:read`, but
+new deployments should use the Django-style permission matrix:
+
+```python
+from flaxon.admin import AdminDashboard, Registry
+
+admin = AdminDashboard(
+    app,
+    registry=Registry(),
+    strict_permissions=True,
+    users=[{
+        "username": "owner",
+        "password": "Use-a-real-secret-42!",
+        "roles": ["administrator"],
+    }],
+)
+admin.register(Product, name="product")
+```
+
+Each registered model exposes exact `view`, `add`, `change`, and `delete`
+capabilities in the Roles page. Users receive them through groups or direct
+checkbox selections; application code stores the stable keys, while normal
+Admin users never need to type them.
+
+For object-level rules, provide hooks during registration:
+
+```python
+admin.register(
+    Article,
+    can_view=lambda user, obj=None: obj is None or obj.get("author") == user.username,
+    can_change=lambda user, obj=None: obj is None or obj.get("author") == user.username,
+    can_delete=lambda user, obj=None: user.has_role("administrator"),
+)
+```
+
+Legacy broad permissions remain available only when `strict_permissions=False`
+so existing applications can migrate without an outage. They do not grant
+implicit create, change, or delete access in strict mode.
 
 ```python
 @app.middleware
@@ -507,6 +544,31 @@ templates/
 
 Override any template.
 
+## Custom Admin Pages
+
+Register application-owned pages with navigation metadata. The page is
+protected by `admin.view_dashboard` by default:
+
+```python
+from flaxon.http import HTMLResponse
+
+async def reports(request):
+    return HTMLResponse("<h1>Reports</h1>")
+
+admin.add_view(
+    reports,
+    "Reports",
+    url="reports",
+    category="Operations",
+    icon="fa-chart-line",
+)
+```
+
+Use `admin.register_permission(...)` for a dedicated capability and pass it as
+`permission="reports.view_reports"` when the page needs narrower access.
+For POST, PUT, PATCH, and DELETE custom pages, send the dashboard token in an
+`X-CSRF-Token` header.
+
 ---
 
 # Static Files
@@ -562,6 +624,8 @@ class SalesWidget:
             "title": "Sales",
             "value": "$15,230",
         }
+
+admin.register_widget(SalesWidget())
 ```
 
 Possible widgets:
@@ -622,16 +686,11 @@ Update
 
 # Export Data
 
-Future example:
+The model API supports JSON and CSV exports:
 
 ```
-CSV
-
-Excel
-
-JSON
-
-PDF
+GET /admin/product/export?format=json
+GET /admin/product/export?format=csv
 ```
 
 ---
@@ -2289,3 +2348,43 @@ WebAuthn requires an injected provider backed by a maintained WebAuthn library;
 Flaxon stores credential metadata and delegates challenge creation and
 assertion verification to that provider. It never accepts an unverified client
 assertion directly.
+
+Trusted devices and recovery codes are separate from WebAuthn. After a
+successful MFA challenge, issue one opaque device token and store it only in a
+secure device vault:
+
+```python
+token = admin.auth.issue_trusted_device("owner", label="Office laptop")
+devices = admin.auth.list_trusted_devices("owner")
+admin.auth.revoke_all_trusted_devices("owner")
+new_codes = admin.auth.regenerate_mfa_recovery_codes("owner")
+```
+
+The plaintext token and recovery codes are returned once. The Admin stores
+only hashes, expires trusted devices, and revokes all trusted devices when
+recovery codes are rotated or MFA is disabled.
+
+## Optional dependencies
+
+Use the install groups instead of adding security packages blindly:
+
+```shell
+pip install "flaxon[admin,policy,scheduler]"
+```
+
+`nh3` provides parser-based rich-text sanitization, Pillow validates image
+dimensions and removes EXIF data, `python-magic` checks file signatures when
+libmagic is installed, Argon2 is available through
+`PasswordHasher(algorithm="argon2")`, and PyCasbin can be passed through
+`CasbinAuthorizationProvider`. The WebAuthn service intentionally requires an
+application-owned provider so RP ID, origin, challenge storage, and user
+provisioning remain explicit.
+
+## CMS production controls
+
+The CMS SPA exposes reusable media selection, revision before/after changes,
+scheduled-job status and retry, taxonomies, comments, and menu editing. The
+backend remains authoritative: every mutation still requires the session and
+CSRF header, and each content type receives exact model capabilities. A
+publisher worker should run for scheduled releases; Redis locking is required
+when more than one worker can publish the same CMS.

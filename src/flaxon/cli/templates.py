@@ -35,7 +35,7 @@ build-backend = "setuptools.build_meta"
 name = "{package_name}"
 version = "0.1.0"
 requires-python = ">=3.11"
-dependencies = ["flaxon-framework[standard]>=0.1.0"]
+dependencies = ["flaxon-framework[standard]>=0.2.5"]
 """,
             "gitignore": """.venv/
 __pycache__/

@@ -92,4 +92,4 @@ WebSockets: `accept`, `join`, `leave`, `receive_json`, `send_json`, `iter_json`,
 | `flaxon schedule app:app` | Run scheduled tasks |
 | `flaxon test` | Run tests |
 
-Full CLI reference: [`cli.md`](../cli.md).
+Full CLI reference: [CLI Cheatsheet](Cli.md).

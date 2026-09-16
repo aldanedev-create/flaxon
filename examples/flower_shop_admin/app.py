@@ -130,7 +130,7 @@ async def restock(flowers: list[str]) -> None:
 
 
 admin.registry.get("flower").add_action("restock", restock)
-admin.register_widget(lambda: {"title": "Today", "value": "Fresh flowers, fast delivery"})
+admin.register_widget(lambda **_: {"title": "Today", "value": "Fresh flowers, fast delivery"})
 
 
 cms = CMS(app, url_prefix="/admin/cms", title="Petal & Stem Content", auth=admin.auth)
@@ -144,12 +144,43 @@ cms.register(
             CMSField("body", "Body", type="richtext"),
             CMSField("hero_image", "Hero image", type="image"),
             CMSField("published_on", "Published on", type="datetime"),
-            CMSField("status", "Status", type="select", choices=["draft", "review", "published", "archived"]),
+            CMSField("status", "Status", type="select", choices=["draft", "review", "approved", "scheduled", "published", "archived"]),
         ],
         list_display=["title", "status", "updated_at"],
         list_filter=["status"],
         search_fields=["title", "body"],
     )
+)
+
+
+async def shop_overview(request):
+    """Protected custom Admin page for exercising the complete example."""
+
+    media = await admin._media_files()
+    stories = cms.content_types["story"]
+    published = sum(1 for item in stories.items.values() if item.get("status") == "published")
+    return await request.render(
+        "admin_shop_overview.html",
+        {
+            "title": "Shop overview",
+            "flower_count": len(Flower._data),
+            "story_count": len(stories.items),
+            "published_count": published,
+            "media_count": len(media),
+            "order_count": len(orders),
+            "admin_url": "/admin/",
+            "cms_url": "/admin/cms/",
+        },
+    )
+
+
+admin.add_view(
+    shop_overview,
+    "Shop overview",
+    url="shop-overview",
+    category="Commerce",
+    icon="fa-store",
+    permission="admin.view_dashboard",
 )
 
 

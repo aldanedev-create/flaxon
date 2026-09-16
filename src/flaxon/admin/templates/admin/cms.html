@@ -10,7 +10,8 @@
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/admin/css/admin.css?v=20260827-2">
+  <link rel="stylesheet" href="/static/admin/css/admin.css?v=20260916-2">
+  <link rel="stylesheet" href="/static/admin/css/cms.css?v=20260916-1">
 
   <style>
     body { font-family: 'Inter', sans-serif; }
@@ -35,7 +36,18 @@
           <button @click="openResource('comments')" class="hover:text-slate-200 transition"><i class="fa-solid fa-comments mr-1"></i> Comments</button>
           <button @click="openResource('taxonomies')" class="hover:text-slate-200 transition"><i class="fa-solid fa-tags mr-1"></i> Taxonomies</button>
           <button @click="openResource('menu')" class="hover:text-slate-200 transition"><i class="fa-solid fa-list mr-1"></i> Menus</button>
-          <button @click="toggleTheme()" title="Toggle theme" aria-label="Toggle theme" class="hover:text-slate-200 transition"><i class="fa-solid" :class="darkMode ? 'fa-sun' : 'fa-moon'"></i></button>
+          <button @click="openResource('schedule')" class="hover:text-slate-200 transition"><i class="fa-solid fa-calendar-days mr-1"></i> Schedule</button>
+          <button @click="toggleTheme()" title="Toggle theme" aria-label="Toggle theme" class="theme-toggle-button hover:text-slate-200 transition"><span class="theme-icon" x-text="darkMode ? '\u2600' : '\u263E'" aria-hidden="true">&#9728;</span></button>
+        </div>
+      </div>
+      <div class="border-t border-slate-700/40 bg-slate-900/30">
+        <div class="cms-content-nav px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto flex items-center gap-1 overflow-x-auto" aria-label="CMS content navigation">
+          <button type="button" @click="goHome()" class="cms-nav-link shrink-0" :class="view === 'dashboard' ? 'is-active' : ''"><i class="fa-solid fa-table-cells mr-1"></i>Overview</button>
+          <template x-for="ct in types" :key="'nav-' + ct.name">
+            <button type="button" @click="openList(ct.name)" class="cms-nav-link shrink-0" :class="view !== 'resource' && currentType?.name === ct.name ? 'is-active' : ''">
+              <i class="fa-solid mr-1" :class="ct.icon || 'fa-file-lines'"></i><span x-text="ct.label_plural"></span>
+            </button>
+          </template>
         </div>
       </div>
     </nav>
@@ -114,7 +126,7 @@
                 class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-indigo-500"
               >
                 <option value="" x-text="'All ' + filterField.replace('_', ' ')"></option>
-                <template x-for="opt in (currentType.filter_options?.[filterField] || (filterField === 'status' ? (currentType.statuses || ['draft','published']) : []))" :key="opt">
+                <template x-for="opt in ((currentType.filter_options?.[filterField]?.length ? currentType.filter_options[filterField] : (filterField === 'status' ? (currentType.statuses || ['draft','published']) : [])))" :key="opt">
                   <option :value="opt" x-text="opt"></option>
                 </template>
               </select>
@@ -196,6 +208,14 @@
         </div>
       </template>
 
+      <template x-if="view === 'resource' && resource === 'schedule'">
+        <div class="space-y-4">
+          <div class="flex items-center justify-between"><div><button @click="goHome()" class="text-sm text-slate-400 hover:text-white">Back to CMS</button><h1 class="text-2xl font-bold">Publishing schedule</h1></div></div>
+          <p class="text-sm text-slate-400">Scheduled content is persisted and processed by the CMS publisher. Failed jobs remain visible for retry.</p>
+          <div class="grid gap-3"><template x-for="job in resourceItems" :key="job.id"><article class="bg-slate-800/60 border border-slate-700 rounded-lg p-4 flex items-center justify-between gap-4"><div><p class="font-medium" x-text="job.content_type + ' / ' + job.record_id"></p><p class="text-xs text-slate-400" x-text="(job.run_after || 'No date') + ' · ' + (job.state || 'queued') + ' · attempts ' + (job.attempts || 0)"></p></div><div class="flex items-center gap-3"><button x-show="findType(job.content_type) && can('update', findType(job.content_type))" @click="openEdit(job.content_type, job.record_id)" class="text-sm text-slate-300 hover:text-white">Open</button><button x-show="job.state === 'retry'" @click="retrySchedule(job.id)" class="px-3 py-1 bg-indigo-600 rounded text-xs">Retry</button></div></article></template><p x-show="!resourceItems.length" class="text-sm text-slate-500">No scheduled jobs.</p></div>
+        </div>
+      </template>
+
       <template x-if="view === 'form' && currentType">
         <div class="max-w-2xl">
           <button @click="openList(currentType.name)" class="text-sm text-slate-400 hover:text-slate-200 mb-1"><i class="fa-solid fa-arrow-left mr-1"></i> Back to list</button>
@@ -203,7 +223,7 @@
 
           <form @submit.prevent="saveItem()" @input="dirty = true" class="space-y-5 bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
             <template x-for="f in currentType.fields" :key="f.name">
-              <div>
+              <div x-show="!(currentType.has_status && f.name === 'status')">
                 <label class="block text-sm font-medium text-slate-300 mb-1.5">
                   <span x-text="f.label"></span>
                   <span x-show="f.required" class="text-red-400">*</span>
@@ -232,12 +252,27 @@
                   </select>
                 </template>
 
-                <template x-if="!['textarea','richtext','boolean','select','json','repeater','relationship'].includes(f.type)">
-                  <input
-                    :type="f.type === 'number' ? 'number' : (f.type === 'date' ? 'date' : (f.type === 'datetime' ? 'datetime-local' : (f.type === 'email' ? 'email' : (f.type === 'url' ? 'url' : (['file','image'].includes(f.type) ? 'file' : 'text')))))"
+                <template x-if="['file','image'].includes(f.type)">
+                  <div class="space-y-2">
+                    <div class="flex gap-2">
+                      <input type="text" x-model="formData[f.name]" :required="f.required" placeholder="Select an asset or paste its URL"
+                        class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm focus:outline-none focus:border-indigo-500">
+                      <button type="button" @click="openMediaPicker(f.name)" class="shrink-0 px-3 py-2 rounded-lg bg-slate-700 text-sm"><i class="fa-solid fa-photo-film mr-1"></i>Media</button>
+                    </div>
+                    <input type="file" :name="f.name" @change="dirty = true" :accept="f.type === 'image' ? 'image/*' : undefined"
+                      class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm file:mr-3 file:rounded file:border-0 file:bg-slate-700 file:px-3 file:py-1.5 file:text-slate-100">
+                    <template x-if="f.type === 'image' && formData[f.name]">
+                      <img :src="formData[f.name]" :alt="f.label" class="h-28 w-full rounded-lg border border-slate-700 bg-slate-950 object-contain" @error="$event.target.hidden = true">
+                    </template>
+                  </div>
+                </template>
+
+                <template x-if="!['textarea','richtext','boolean','select','json','repeater','relationship','file','image'].includes(f.type)">
+                  <div class="flex gap-2"><input
+                    :type="f.type === 'number' ? 'number' : (f.type === 'date' ? 'date' : (f.type === 'datetime' ? 'datetime-local' : (f.type === 'email' ? 'email' : (f.type === 'url' ? 'url' : 'text'))))"
                     x-model="formData[f.name]" :required="f.required"
                     class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm focus:outline-none focus:border-indigo-500"
-                  >
+                  ><button x-show="f.type === 'url'" type="button" @click="openMediaPicker(f.name)" class="shrink-0 px-3 py-2 rounded-lg bg-slate-700 text-sm"><i class="fa-solid fa-photo-film mr-1"></i>Media</button></div>
                 </template>
 
                 <p x-show="f.help_text" class="text-xs text-slate-500 mt-1" x-text="f.help_text"></p>
@@ -270,13 +305,14 @@
                 Cancel
               </button>
             </div>
-            <div x-show="editingId && formData._history?.items?.length" class="border-t border-slate-700 pt-4"><h2 class="font-medium mb-2">Revision history</h2><template x-for="(revision,index) in (formData._history?.items || [])" :key="index"><div class="flex items-center justify-between text-sm py-1"><span x-text="revision.action + ' · ' + revision.at"></span><button type="button" @click="restoreRevision(currentType.name, editingId, index)" class="text-indigo-400">Restore</button></div></template></div>
+            <div x-show="editingId && formData._history?.items?.length" class="border-t border-slate-700 pt-4"><h2 class="font-medium mb-2">Revision history</h2><template x-for="(revision,index) in (formData._history?.items || [])" :key="index"><div class="flex items-center justify-between text-sm py-1"><span x-text="revision.action + ' / ' + revision.at"></span><div class="flex gap-3"><button type="button" @click="showRevision(revision)" class="text-slate-400">Compare</button><button type="button" @click="restoreRevision(currentType.name, editingId, index)" class="text-indigo-400">Restore</button></div></div></template><div x-show="revisionCompare" class="mt-3 rounded-lg bg-slate-900/60 p-3 text-xs"><template x-for="(change,key) in (revisionCompare?.changes || {})" :key="key"><div class="grid grid-cols-3 gap-2 border-b border-slate-700 py-2"><strong x-text="key"></strong><span x-text="formatCell(change.before)"></span><span x-text="formatCell(change.after)"></span></div></template><p x-show="!Object.keys(revisionCompare?.changes || {}).length" class="text-slate-500">No field changes.</p></div></div>
           </form>
         </div>
       </template>
 
     </div>
   </div>
+      <div x-show="mediaPickerField" x-cloak class="fixed inset-0 z-50 grid place-items-center bg-slate-950/70 p-4"><section class="w-full max-w-3xl max-h-[80vh] overflow-y-auto rounded-xl border border-slate-700 bg-slate-800 p-5 shadow-2xl"><div class="flex items-center justify-between mb-4"><h2 class="font-semibold">Select media</h2><div class="flex items-center gap-3"><button type="button" @click="openMediaPicker(mediaPickerField)" class="text-sm text-slate-300 hover:text-white"><i class="fa-solid fa-rotate mr-1"></i>Refresh</button><button type="button" @click="mediaPickerField = null" aria-label="Close media picker"><i class="fa-solid fa-xmark"></i></button></div></div><div class="grid grid-cols-2 sm:grid-cols-3 gap-3"><template x-for="item in mediaItems" :key="item.relative_name"><button type="button" @click="selectMedia(item)" class="text-left rounded-lg border border-slate-700 p-2 hover:border-indigo-400"><img :src="item.metadata?.thumbnail_url || item.url" :alt="item.name" class="h-24 w-full object-contain bg-slate-900 rounded"><span class="block mt-2 text-xs truncate" x-text="item.name"></span></button></template></div><div x-show="!mediaItems.length" class="py-8 text-center"><p class="text-sm text-slate-500">No media available yet.</p><a href="/admin/media" class="inline-block mt-3 text-sm text-indigo-400 hover:text-indigo-300">Open the Admin media library</a></div></section></div>
  <script>window.FLAXON_CMS_API_BASE = "__CMS_API_BASE__"; window.FLAXON_CMS_CSRF_TOKEN = "__CMS_CSRF_TOKEN__";</script>
   <!-- cms.js-->
  <script src="/static/admin/js/cms.js"></script>

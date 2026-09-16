@@ -77,7 +77,7 @@
 
 ---
 
-## List
+## GraphQL List Type
 
 ::: flaxon.graphql.types.List
     options:

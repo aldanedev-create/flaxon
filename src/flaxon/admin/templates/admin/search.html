@@ -1,1 +1,43 @@
-{% extends "admin/base.html" %}{% block title %}Search{% endblock %}{% block content %}<div class="space-y-6"><form class="flex gap-3"><input name="q" value="{{ query }}" autofocus placeholder="Search all models" class="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-2"><button class="bg-blue-600 rounded px-4 py-2">Search</button></form><div class="space-y-2">{% for item in results %}<a href="{{ dashboard.url_prefix }}/{{ item.model }}/{{ item.id }}" class="block bg-slate-800/50 border border-slate-700 rounded-lg p-4"><p class="font-medium">{{ item.label }} #{{ item.id }}</p><p class="text-slate-400 text-sm">{% for key, value in item.values.items() %}{{ key }}: {{ value }}{% if not loop.last %} | {% endif %}{% endfor %}</p></a>{% else %}{% if query %}<p class="text-slate-400">No results found.</p>{% endif %}{% endfor %}</div></div>{% endblock %}
+{% extends "admin/base.html" %}
+
+{% block title %}Global search{% endblock %}
+
+{% block content %}
+{% set prefix = dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') %}
+<div class="corporate-page search-page">
+  <header class="corporate-header">
+    <div>
+      <p class="admin-eyebrow">Admin search</p>
+      <h1>Search all records</h1>
+      <p class="corporate-subtitle">Search across every model available to your account. Open a result to inspect or edit the record.</p>
+    </div>
+  </header>
+
+  <section class="corporate-panel search-panel">
+    <form method="get" action="{{ prefix }}/search" class="search-form">
+      <label class="corporate-field search-input-field" for="admin-global-search"><span>Search query</span><div class="corporate-search"><i class="fas fa-search" aria-hidden="true"></i><input id="admin-global-search" name="q" value="{{ query }}" autofocus placeholder="Name, ID, email, or any record value" autocomplete="off"></div></label>
+      <button type="submit" class="corporate-button corporate-button-primary"><i class="fas fa-search"></i><span>Search</span></button>
+    </form>
+    {% if query %}<p class="search-summary"><strong>{{ results|length }}</strong> result{% if results|length != 1 %}s{% endif %} for <span>{{ query }}</span></p>{% else %}<p class="search-summary">Enter a term to search the records you can access.</p>{% endif %}
+  </section>
+
+  <section class="corporate-panel">
+    <div class="corporate-panel-header"><div><p class="corporate-kicker">Results</p><h2>Matching records</h2></div>{% if query %}<span class="corporate-badge corporate-badge-neutral">{{ results|length }} found</span>{% endif %}</div>
+    {% if results %}
+    <div class="search-results" role="list">
+      {% for item in results %}
+      <a role="listitem" class="search-result" href="{{ prefix }}/{{ item['model'] }}/{{ item['id'] }}">
+        <span class="model-icon"><i class="fas fa-table" aria-hidden="true"></i></span>
+        <span class="search-result-main"><strong>{{ item['label'] }}{% if item['id'] %} #{{ item['id'] }}{% endif %}</strong><small>{{ item['model']|replace('_', ' ')|title }}</small><span class="search-result-values">{% for key, value in item['values'].items() %}<b>{{ key|replace('_', ' ')|title }}:</b> {{ value }}{% if not loop.last %} <span aria-hidden="true">|</span> {% endif %}{% endfor %}</span></span>
+        <i class="fas fa-arrow-right search-result-arrow" aria-hidden="true"></i>
+      </a>
+      {% endfor %}
+    </div>
+    {% elif query %}
+    <div class="corporate-empty"><i class="fas fa-magnifying-glass"></i><strong>No results found</strong><p>Try a different term or clear the query to search again.</p></div>
+    {% else %}
+    <div class="corporate-empty"><i class="fas fa-magnifying-glass"></i><strong>Search your Admin data</strong><p>Results from all accessible models will appear here.</p></div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

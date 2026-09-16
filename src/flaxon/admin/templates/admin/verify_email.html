@@ -1,1 +1,28 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ title }} - Verify email</title><link rel="stylesheet" href="/static/admin/css/admin.css"></head><body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center"><main class="w-full max-w-sm bg-slate-800 border border-slate-700 rounded-lg p-6 space-y-4"><h1 class="text-xl font-semibold">Email verification</h1>{% if message %}<p class="text-emerald-400">{{ message }}</p><a href="{{ login_url }}" class="block text-center text-sm text-slate-400">Continue to login</a>{% else %}{% if error %}<p class="text-red-400">{{ error }}</p>{% endif %}<form method="post" class="space-y-3"><input type="hidden" name="_csrf" value="{{ csrf_token }}"><input name="token" required placeholder="Verification token" class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2"><button class="w-full bg-blue-600 rounded px-3 py-2">Verify email</button></form><a href="{{ login_url }}" class="block text-center text-sm text-slate-400">Back to login</a>{% endif %}</main></body></html>
+<!doctype html>
+<html lang="en" class="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ title }} - Verify email</title>
+  <link rel="stylesheet" href="/static/admin/css/admin.css">
+</head>
+<body class="admin-auth-page bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center">
+  <main class="auth-panel w-full max-w-sm bg-slate-800 border border-slate-700 rounded-lg p-6 space-y-4">
+    <button type="button" class="theme-button auth-theme-button" onclick="toggleAuthTheme()" aria-label="Toggle theme" title="Toggle theme">Theme</button>
+    <h1 class="text-xl font-semibold">Email verification</h1>
+    {% if message %}
+      <p class="text-emerald-400">{{ message }}</p>
+      <a href="{{ login_url }}" class="block text-center text-sm text-slate-400">Continue to login</a>
+    {% else %}
+      {% if error %}<p class="text-red-400">{{ error }}</p>{% endif %}
+      <form method="post" class="space-y-3">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <input name="token" required placeholder="Verification token" class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2">
+        <button class="w-full bg-blue-600 rounded px-3 py-2">Verify email</button>
+      </form>
+      <a href="{{ login_url }}" class="block text-center text-sm text-slate-400">Back to login</a>
+    {% endif %}
+  </main>
+  <script>function toggleAuthTheme(){const dark=document.documentElement.classList.toggle('dark');document.documentElement.classList.toggle('light',!dark);document.documentElement.dataset.theme=dark?'dark':'light';document.body.classList.toggle('theme-dark',dark);document.body.classList.toggle('theme-light',!dark);localStorage.setItem('admin-dark-mode',String(dark));}if(localStorage.getItem('admin-dark-mode')==='true')toggleAuthTheme();</script>
+</body>
+</html>

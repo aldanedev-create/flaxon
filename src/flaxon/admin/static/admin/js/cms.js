@@ -33,6 +33,10 @@
         taxonomyTerm: "",
         dirty: false,
         autosaveTimer: null,
+        schedulerJobs: [],
+        revisionCompare: null,
+        mediaItems: [],
+        mediaPickerField: null,
 
         async init() {
           this.applyTheme();
@@ -64,8 +68,11 @@
         applyTheme() {
           document.documentElement.classList.toggle("dark", this.darkMode);
           document.documentElement.classList.toggle("light", !this.darkMode);
+          document.documentElement.dataset.theme = this.darkMode ? "dark" : "light";
           document.body.classList.toggle("theme-dark", this.darkMode);
           document.body.classList.toggle("theme-light", !this.darkMode);
+          document.body.dataset.theme = this.darkMode ? "dark" : "light";
+          document.documentElement.style.colorScheme = this.darkMode ? "dark" : "light";
         },
 
         async api(path, options = {}) {
@@ -104,6 +111,8 @@
           }
           const stats = await this.api("/stats");
           if (stats) this.stats = stats;
+          const scheduler = await this.api("/scheduler/jobs");
+          if (scheduler) this.schedulerJobs = scheduler.items || [];
         },
 
         route() {
@@ -134,6 +143,10 @@
           if (name === "comments") this.resourceItems = await this.api("/comments") || [];
           if (name === "taxonomies") this.resourceItems = await this.api("/taxonomies") || {};
           if (name === "menu") this.resourceItems = (await this.api("/menus/main") || {}).items || [];
+          if (name === "schedule") {
+            const scheduler = await this.api("/scheduler/jobs");
+            this.resourceItems = scheduler?.items || [];
+          }
         },
 
         async moderateComment(id, status) {
@@ -144,6 +157,39 @@
         async restoreRevision(typeName, itemId, revision) {
           const result = await this.api(`/${typeName}/items/${itemId}/restore/${revision}`, { method: "POST" });
           if (result) await this.openEdit(typeName, itemId);
+        },
+
+        showRevision(revision) {
+          this.revisionCompare = revision;
+        },
+
+        async retrySchedule(jobId) {
+          const result = await this.api(`/scheduler/jobs/${encodeURIComponent(jobId)}/retry`, { method: "POST", body: "{}" });
+          if (result) await this.openResource("schedule", false);
+        },
+
+        async openMediaPicker(fieldName) {
+          this.mediaPickerField = fieldName;
+          this.mediaItems = await this.api("/media") || [];
+        },
+
+        selectMedia(item) {
+          if (this.mediaPickerField) this.formData[this.mediaPickerField] = item.url;
+          this.mediaPickerField = null;
+        },
+
+        toDateTimeLocal(value) {
+          if (!value) return "";
+          const date = new Date(value);
+          if (Number.isNaN(date.getTime())) return String(value).slice(0, 16);
+          const pad = (part) => String(part).padStart(2, "0");
+          return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+        },
+
+        scheduleValue(value) {
+          if (!value) return "";
+          const date = new Date(value);
+          return Number.isNaN(date.getTime()) ? "" : date.toISOString();
         },
 
         async saveMenu() {
@@ -252,6 +298,7 @@
           this.currentType = this.findType(typeName);
           if (!this.currentType || !this.can("create", this.currentType)) return;
           this.editingId = null;
+          this.revisionCompare = null;
           this.formData = { status: "draft", slug: "" };
           this.currentType.fields.forEach((f) => {
             this.formData[f.name] = f.default !== undefined && f.default !== null
@@ -271,8 +318,10 @@
           const item = await this.api(`/${typeName}/items/${itemId}`);
           if (!item) return;
           this.editingId = itemId;
+          this.revisionCompare = null;
           this.formData = { ...item };
           this.currentType.fields.filter((f) => ['json','repeater','relationship'].includes(f.type)).forEach((f) => { if (this.formData[f.name] !== undefined && typeof this.formData[f.name] !== 'string') this.formData[f.name] = JSON.stringify(this.formData[f.name], null, 2); });
+          if (this.formData.publish_at) this.formData.publish_at = this.toDateTimeLocal(this.formData.publish_at);
           this.formData._history = await this.api(`/${typeName}/items/${itemId}/history`) || { items: [] };
           this.view = "form";
           this.dirty = false;
@@ -286,6 +335,15 @@
           const typeName = this.currentType.name;
           const payload = { ...this.formData };
           delete payload._history;
+          if (payload.status === "scheduled") {
+            payload.publish_at = this.scheduleValue(payload.publish_at);
+            if (!payload.publish_at) {
+              this.error = "Choose a valid publish date and time before scheduling this item.";
+              return;
+            }
+          } else {
+            delete payload.publish_at;
+          }
           const hasUpload = this.currentType.fields.some((field) => ["file", "image"].includes(field.type));
           let body = JSON.stringify(payload);
           let headers = { "Content-Type": "application/json", "X-CSRF-Token": csrfToken() };

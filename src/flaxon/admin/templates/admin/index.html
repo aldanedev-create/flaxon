@@ -1,73 +1,17 @@
-<!-- templates/admin/index.html -->
 {% extends "admin/base.html" %}
-
 {% block title %}{{ config.site_title }}{% endblock %}
-
 {% block content %}
-<div class="space-y-6">
-    <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-            <h1 class="text-2xl sm:text-3xl font-bold text-white">{{ config.index_title }}</h1>
-            <p class="text-slate-400 text-sm mt-1">Manage your application data</p>
-        </div>
-        <div class="flex gap-2">
-            <button type="button" onclick="location.reload()" title="Refresh dashboard" class="px-4 py-2 bg-slate-700/50 hover:bg-slate-600/50 rounded-lg text-sm transition flex items-center gap-2">
-                <i class="fas fa-sync-alt"></i>
-                <span class="hidden sm:inline">Refresh</span>
-            </button>
-            {% if models %}<a href="{{ dashboard.url_prefix }}/{{ models[0].get_name() }}/add" title="Create a new record" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-400 hover:from-blue-600 hover:to-cyan-500 rounded-lg text-sm font-medium transition text-white flex items-center gap-2">
-                <i class="fas fa-plus"></i>
-                <span class="hidden sm:inline">New</span>
-            </a>{% endif %}
-        </div>
-    </div>
+<div class="corporate-page dashboard-page">
+  <header class="corporate-header dashboard-hero"><div><p class="admin-eyebrow">{{ config.site_header }}</p><h1>{{ config.index_title }}</h1><p class="corporate-subtitle">A focused control center for content, access, and application operations.</p></div><div class="corporate-actions"><button type="button" class="corporate-button corporate-button-muted" onclick="location.reload()" title="Refresh dashboard"><i class="fas fa-rotate"></i><span>Refresh</span></button>{% if models and dashboard.can_access_model(user, models[0].get_name(), 'create') %}<a class="corporate-button corporate-button-primary" href="{{ dashboard.url_prefix }}/{{ models[0].get_name() }}/add"><i class="fas fa-plus"></i><span>New {{ models[0].get_verbose_name()|lower }}</span></a>{% endif %}</div></header>
+  <section class="corporate-stat-grid" aria-label="Dashboard summary"><article class="corporate-stat"><span class="corporate-stat-label">Registered models</span><strong>{{ models|length }}</strong><small>Available to your account</small></article><article class="corporate-stat"><span class="corporate-stat-label">Total records</span><strong>{{ total_records }}</strong><small>Across accessible models</small></article><article class="corporate-stat"><span class="corporate-stat-label">Activity events</span><strong>{{ recent_changes }}</strong><small>Recorded in the audit stream</small></article><article class="corporate-stat"><span class="corporate-stat-label">Unread alerts</span><strong>{{ unread_notifications }}</strong><small><a href="{{ dashboard.url_prefix }}/activity">Review activity</a></small></article></section>
 
-    <!-- Stats -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-        <div class="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl p-4 sm:p-6">
-            <p class="text-slate-400 text-xs uppercase tracking-wider">Models</p>
-            <p class="text-2xl font-bold text-white">{{ models|length }}</p>
-        </div>
-        <div class="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl p-4 sm:p-6">
-            <p class="text-slate-400 text-xs uppercase tracking-wider">Total Records</p>
-            <p class="text-2xl font-bold text-white">{{ total_records }}</p>
-        </div>
-        <div class="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl p-4 sm:p-6">
-            <p class="text-slate-400 text-xs uppercase tracking-wider">Recent Changes</p>
-            <p class="text-2xl font-bold text-white">{{ recent_changes }}</p>
-        </div>
-        <div class="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl p-4 sm:p-6">
-            <p class="text-slate-400 text-xs uppercase tracking-wider">Users</p>
-            <p class="text-2xl font-bold text-white">{{ user_count }}</p>
-        </div>
-    </div>
+  <div class="corporate-two-column dashboard-main-grid">
+    <section class="corporate-panel"><div class="corporate-panel-header"><div><p class="corporate-kicker">Your workspace</p><h2>Content models</h2><p class="corporate-muted">Open a model to search, filter, add, edit, export, or review records.</p></div><i class="fas fa-table corporate-panel-icon"></i></div><div class="model-directory">{% for model in models %}<a class="model-directory-item" href="{{ dashboard.url_prefix }}/{{ model.get_name() }}"><span class="model-icon"><i class="fas fa-table"></i></span><span><strong>{{ model.get_verbose_name_plural() }}</strong><small>{{ counts.get(model.get_name(), 0) }} records - {{ model.get_name() }}</small></span><i class="fas fa-arrow-right model-arrow"></i></a>{% else %}<div class="corporate-empty"><i class="fas fa-table"></i><strong>No models registered</strong><p>Register an Admin model in your application to begin.</p></div>{% endfor %}</div></section>
+    <section class="corporate-panel"><div class="corporate-panel-header"><div><p class="corporate-kicker">Security and operations</p><h2>Quick access</h2></div><i class="fas fa-compass corporate-panel-icon"></i></div><div class="quick-link-list"><a href="{{ dashboard.url_prefix }}/users"><i class="fas fa-users"></i><span><strong>Users</strong><small>Manage accounts and access</small></span><i class="fas fa-arrow-right"></i></a><a href="{{ dashboard.url_prefix }}/roles"><i class="fas fa-shield-halved"></i><span><strong>Roles</strong><small>Configure permission bundles</small></span><i class="fas fa-arrow-right"></i></a><a href="{{ dashboard.url_prefix }}/media"><i class="fas fa-photo-film"></i><span><strong>Media library</strong><small>Upload and reuse assets</small></span><i class="fas fa-arrow-right"></i></a><a href="{{ dashboard.url_prefix }}/operations"><i class="fas fa-heart-pulse"></i><span><strong>Operations</strong><small>Health checks and background tasks</small></span><i class="fas fa-arrow-right"></i></a><a href="{{ dashboard.url_prefix }}/settings"><i class="fas fa-gear"></i><span><strong>Settings</strong><small>Identity and declared configuration</small></span><i class="fas fa-arrow-right"></i></a></div></section>
+  </div>
 
-    <!-- Model List -->
-    <div class="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl overflow-hidden">
-        <div class="px-4 sm:px-6 py-4 border-b border-slate-700/50">
-            <h2 class="font-semibold text-white">Registered Models</h2>
-        </div>
-        <div class="p-4 sm:p-6">
-            {% if models %}
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {% for model in models %}
-                <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/{{ model.get_name() }}" class="flex items-center gap-3 p-3 rounded-lg bg-slate-700/30 hover:bg-slate-700/50 transition border border-slate-700/30 hover:border-slate-600/50">
-                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500/20 to-cyan-400/20 flex items-center justify-center text-blue-400">
-                        <i class="fas fa-table"></i>
-                    </div>
-                    <div>
-                        <p class="text-white font-medium text-sm">{{ model.get_verbose_name_plural() }}</p>
-                        <p class="text-slate-400 text-xs">{{ model.get_name() }}</p>
-                    </div>
-                    <i class="fas fa-chevron-right ml-auto text-slate-500"></i>
-                </a>
-                {% endfor %}
-            </div>
-            {% else %}
-            <p class="text-slate-400 text-center py-8">No models registered yet.</p>
-            {% endif %}
-        </div>
-    </div>
+  {% if widgets %}<section class="corporate-panel"><div class="corporate-panel-header"><div><p class="corporate-kicker">Application extensions</p><h2>Custom widgets</h2></div></div><div class="widget-grid">{% for widget in widgets %}<article class="custom-widget"><strong>{{ widget.title if widget.title is defined else 'Widget' }}</strong><b>{{ widget.value if widget.value is defined else widget }}</b>{% if widget.description is defined %}<small>{{ widget.description }}</small>{% endif %}</article>{% endfor %}</div></section>{% endif %}
+
+  <section class="corporate-panel"><div class="corporate-panel-header"><div><p class="corporate-kicker">Audit stream</p><h2>Recent activity</h2></div><a class="corporate-button corporate-button-muted" href="{{ dashboard.url_prefix }}/activity"><i class="fas fa-list"></i><span>View all</span></a></div><div class="activity-list">{% for entry in activities %}<a class="activity-row" href="{% if entry.record_id %}{{ dashboard.url_prefix }}/{{ entry.resource }}/{{ entry.record_id }}/history{% else %}{{ dashboard.url_prefix }}/activity{% endif %}"><span class="activity-icon"><i class="fas fa-{{ 'plus' if 'created' in entry.action else 'pen' if 'updated' in entry.action else 'trash' if 'deleted' in entry.action else 'bolt' }}"></i></span><span><strong>{{ entry.action|replace('_', ' ')|title }}</strong><small>{{ entry.resource }}{% if entry.record_id %} #{{ entry.record_id }}{% endif %} - {{ entry.username }}</small></span><time>{{ entry.timestamp }}</time></a>{% else %}<div class="corporate-empty compact"><i class="fas fa-clock-rotate-left"></i><strong>No activity recorded</strong><p>Changes made in Admin will appear here.</p></div>{% endfor %}</div></section>
 </div>
 {% endblock %}

@@ -141,7 +141,6 @@ plugins:
             unwrap_annotated: true
             merge_init_into_class: true
             signature_crossrefs: true
-  - social
   - minify:
       minify_html: true
       minify_js: true
@@ -154,6 +153,8 @@ nav:
       - Installation: installation.md
       - Quick Start: quickstart.md
       - Philosophy: philosophy.md
+      - Configuration: configuration.md
+      - Getting Started Reference: "getting Starting.md"
   - User Guide:
       - Routing: guides/routing.md
       - Requests: guides/requests.md
@@ -168,12 +169,15 @@ nav:
       - Authorization: guides/authorization.md
       - Admin and CMS: guides/admin-cms.md
       - Admin Production Guide: guides/admin-production.md
-      - Admin Model Reference: guides/admin.md
+      - Admin Guide: admin-guide.md
       - Testing: guides/testing.md
       - Debugging: guides/debugging.md
       - Plugins: guides/plugins.md
       - Growing a Large Application: guides/scaling.md
       - Mobile Backends: guides/mobile-developement.md
+      - Tasks and Workers: guides/tasks.md
+      - GraphQL: guides/graphql.md
+      - Modules: guides/Modules.md
   - API Reference:
       - Application: api/application.md
       - Routing: api/routing.md
@@ -186,6 +190,7 @@ nav:
       - Jinax: api/jinax.md
       - Testing: api/testing.md
       - Tasks: api/tasks.md
+      - GraphQL: api/graphql.md
   - Examples:
       - Basic API: examples/basic-api.md
       - React Backend: examples/react-backend.md
@@ -193,8 +198,37 @@ nav:
       - WebSocket Chat: examples/websocket-chat.md
       - Jinax Website: examples/jinax-website.md
       - Large Application: examples/large-application.md
+      - Frontend Integration: examples/frontend-integration.md
+      - CMS Example: examples/cms/admin-cms/example-cms.md
+      - Full Admin and CMS: examples/cms/full_admin_cms/README.md
+      - Mail Example: examples/mail/readme.md
+      - Modules Example: examples/Modules/readme.md
+      - React Backend Project: examples/react_backend/README.md
+      - WhatsApp Chat Example: examples/whatsapp_chat/README.md
+  - Lessons:
+      - Admin Cheatsheet: "lessons/Admin cheatsheet.md"
+      - Flaxon Cheatsheet: "lessons/Flaxon Cheat Sheet.md"
+      - Features: "lessons/Features.md"
+      - Industrial Admin Customization: "lessons/Industrial Admin Customization.md"
+      - Production App Guide: "lessons/production-app-guide.md"
+      - Platform Deployment: "lessons/Platform-Deployment.md"
+      - Building Plugins: "lessons/Building Flaxon Plugins.md"
+      - CLI Cheatsheet: "lessons/Cli.md"
+      - VS Code Cheatsheet: "lessons/vscode Cheatsheet.md"
+  - VS Code Extension:
+      - Getting Started: "vs Code (Extension)/getting-started.md"
+      - Features: "vs Code (Extension)/features.md"
+      - Advanced: "vs Code (Extension)/advanced.md"
+      - Quick Cheatsheet: "vs Code (Extension)/Quick Cheat Sheet.md"
   - Deployment:
       - Overview: deployment.md
+  - Reference:
+      - Architecture: architecture.md
+      - CMS Reference: cms.md
+      - GraphQL Reference: graphql.md
+      - Cheatsheet: cheatsheet.md
+      - Technical Passport: tech-passport.md
+      - Maintenance: maintenance.md
   - Ecosystem: ecosystem.md
   - Performance: performance.md
   - Security: security.md

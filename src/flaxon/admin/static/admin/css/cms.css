@@ -1,0 +1,82 @@
+/* CMS workspace refinements. The shared admin.css owns theme tokens. */
+.cms-shell {
+    min-height: 100vh;
+    background: var(--admin-bg) !important;
+}
+.cms-shell > [x-data] {
+    min-height: 100vh;
+}
+.cms-shell nav {
+    box-shadow: 0 1px 0 var(--admin-border);
+}
+.cms-shell nav > div {
+    min-height: 4rem;
+}
+.cms-content-nav {
+    min-height: 2.9rem;
+    scrollbar-width: thin;
+}
+.cms-nav-link {
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: var(--admin-muted);
+    font-size: .82rem;
+    font-weight: 600;
+    padding: .72rem .75rem .62rem;
+    white-space: nowrap;
+}
+.cms-nav-link:hover,
+.cms-nav-link.is-active {
+    color: var(--admin-text);
+    border-bottom-color: var(--admin-accent);
+}
+.cms-nav-link.is-active {
+    background: color-mix(in srgb, var(--admin-accent) 10%, transparent);
+}
+.cms-shell code {
+    color: var(--admin-accent);
+}
+.cms-shell article,
+.cms-shell section.bg-slate-800\/60,
+.cms-shell form.bg-slate-800\/50,
+.cms-shell .rounded-xl.border {
+    box-shadow: 0 8px 24px rgba(15, 23, 42, .05);
+}
+.cms-shell button:disabled {
+    cursor: not-allowed;
+    opacity: .5;
+}
+.cms-shell [draggable="true"] {
+    cursor: grab;
+}
+.cms-shell [draggable="true"]:active {
+    cursor: grabbing;
+}
+.cms-shell .cms-status-bar {
+    min-height: 1.25rem;
+    color: var(--admin-muted);
+    font-size: .8rem;
+}
+@media (max-width: 767px) {
+    .cms-shell nav > div {
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: .6rem;
+        height: auto;
+        padding-top: .75rem;
+        padding-bottom: .75rem;
+    }
+    .cms-shell nav > div > div:last-child {
+        width: 100%;
+        justify-content: space-between;
+        overflow-x: auto;
+        padding-bottom: .15rem;
+    }
+    .cms-shell .px-4.sm\:px-6.lg\:px-8.py-8 {
+        padding: 1.1rem .9rem 2rem !important;
+    }
+    .cms-shell table {
+        min-width: 680px;
+    }
+}

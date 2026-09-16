@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{{ title }} - Sign in</title>
-  <link rel="stylesheet" href="/static/admin/css/admin.css?v=20260827-2">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link rel="stylesheet" href="/static/admin/css/admin.css?v=20260916-1">
 </head>
 <body class="admin-login">
   <main class="login-layout">
@@ -15,28 +16,40 @@
     </section>
     <section class="login-form-panel">
       <div class="login-heading"><div><p class="login-kicker login-kicker-blue">Welcome back</p><h2>Sign in to continue</h2></div>
-      <button type="button" onclick="toggleLoginTheme()" class="theme-button" title="Toggle theme" aria-label="Toggle theme"><i id="theme-icon" class="fa-solid fa-moon"></i></button></div>
+      <button type="button" onclick="toggleLoginTheme()" class="theme-button" title="Toggle light and dark theme" aria-label="Toggle light and dark theme" aria-pressed="false"><span id="theme-icon" class="theme-icon" aria-hidden="true">&#9790;</span><span class="theme-button-text">Theme</span></button></div>
       {% if error %}<div role="alert" class="login-alert">{{ error }}</div>{% endif %}
       <form method="post" class="login-form">
         <input type="hidden" name="_csrf" value="{{ csrf_token }}">
         <label>Username<input name="username" required autofocus autocomplete="username"></label>
         <label>Password<input name="password" type="password" required autocomplete="current-password"></label>
         <label>Authenticator code <span>required when MFA is enabled</span><input name="otp" inputmode="numeric" pattern="[0-9]{6}" autocomplete="one-time-code"></label>
+        <label class="login-remember"><input name="remember" type="checkbox" value="1"{% if remember %} checked{% endif %}><span>Keep me signed in on this device <small>for 30 days</small></span></label>
         <button class="login-submit">Sign in</button>
       </form>
       <a href="{{ reset_url }}" class="login-recovery">Forgot your password?</a>
     </section>
   </main>
   <script>
-    function toggleLoginTheme() {
-      const dark = document.documentElement.classList.toggle('dark');
+    function applyLoginTheme(dark) {
+      document.documentElement.classList.toggle('dark', dark);
       document.documentElement.classList.toggle('light', !dark);
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
       document.body.classList.toggle('theme-dark', dark);
       document.body.classList.toggle('theme-light', !dark);
-      localStorage.setItem('admin-dark-mode', dark);
-      document.getElementById('theme-icon').className = dark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+      document.body.dataset.theme = dark ? 'dark' : 'light';
+      document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+      const icon = document.getElementById('theme-icon');
+      const button = document.querySelector('.theme-button');
+      if (icon) icon.textContent = dark ? '\u2600' : '\u263E';
+      if (button) button.setAttribute('aria-pressed', String(dark));
     }
-    if (localStorage.getItem('admin-dark-mode') === 'true') toggleLoginTheme();
+    function toggleLoginTheme() {
+      applyLoginTheme(!document.documentElement.classList.contains('dark'));
+      try { localStorage.setItem('admin-dark-mode', document.documentElement.classList.contains('dark')); } catch (_) {}
+    }
+    let savedTheme = null;
+    try { savedTheme = localStorage.getItem('admin-dark-mode'); } catch (_) {}
+    applyLoginTheme(savedTheme !== 'false');
   </script>
 </body>
 </html>

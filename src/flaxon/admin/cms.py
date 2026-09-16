@@ -35,7 +35,9 @@ import uuid
 import csv
 import io
 import json
+import hashlib
 import secrets
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -44,6 +46,7 @@ from typing import Any, Callable
 from flaxon.exceptions import BadRequest, Forbidden, NotFound
 from flaxon.http import HTMLResponse, JSONResponse, Request, Response
 from flaxon.security import Sanitizer
+from .authorization import canonical_model_permission
 from .services import AdminAuth
 
 _PACKAGE_DIR = Path(__file__).parent
@@ -398,11 +401,13 @@ class CMS:
         self.taxonomies: dict[str, dict[str, list[str]]] = {}
         self.comments: list[dict[str, Any]] = []
         self.menus: dict[str, list[dict[str, Any]]] = {}
+        self.scheduler_jobs: dict[str, dict[str, Any]] = {}
         self.hooks: dict[str, list[Callable[..., Any]]] = {}
         if self.store:
             self.taxonomies = self.store.get("cms", "taxonomies", {})
             self.comments = self.store.get("cms", "comments", [])
             self.menus = self.store.get("cms", "menus", {})
+            self.scheduler_jobs = self.store.get("cms", "scheduler_jobs", {}) or {}
         self._mount_static()
         self._register_routes()
         if hasattr(self.app, "on_startup"):
@@ -410,7 +415,8 @@ class CMS:
             self.app.on_shutdown(self._stop_publisher)
 
     async def _start_publisher(self) -> None:
-        self._publish_task = __import__("asyncio").create_task(self._publish_loop())
+        if self._publish_task is None:
+            self._publish_task = __import__("asyncio").create_task(self._publish_loop())
 
     async def _stop_publisher(self) -> None:
         if self._publish_task is not None:
@@ -444,13 +450,33 @@ class CMS:
             lock = await self._publisher_lock()
             if not self.redis_url or lock is not None:
                 try:
-                    changed = False
                     for content_type in self.content_types.values():
-                        if content_type.publish_due():
-                            changed = True
-                            await self._save_content(content_type)
-                    if changed:
-                        await asyncio.sleep(0)
+                        due = [
+                            record for record in content_type.items.values()
+                            if content_type.has_status and record.get("status") == "scheduled" and record.get("publish_at")
+                        ]
+                        try:
+                            published = content_type.publish_due()
+                            for record in published:
+                                self._record_scheduler_event(
+                                    f"{content_type.name}:{record['id']}",
+                                    "completed",
+                                    published_at=record.get("updated_at"),
+                                )
+                            if published:
+                                await self._save_content(content_type)
+                        except Exception as exc:  # noqa: BLE001
+                            for record in due:
+                                job_id = f"{content_type.name}:{record['id']}"
+                                attempts = int(self.scheduler_jobs.get(job_id, {}).get("attempts", 0))
+                                self._record_scheduler_event(
+                                    job_id,
+                                    "retry",
+                                    error=str(exc),
+                                    next_attempt=time.time() + min(3600, 5 * max(1, attempts + 1)),
+                                )
+                            await self._save_scheduler_jobs()
+                    await asyncio.sleep(0)
                 finally:
                     await self._release_publisher_lock(lock)
             await asyncio.sleep(self.publish_interval)
@@ -467,6 +493,9 @@ class CMS:
                 content_type.items.update({key: value for key, value in stored.items() if key != "__revisions__"})
                 content_type.revisions.extend(stored.get("__revisions__", []))
         self.content_types[content_type.name] = content_type
+        dashboard = getattr(self.app, "_flaxon_admin_dashboard", None)
+        if dashboard is not None and hasattr(dashboard, "permission_catalog"):
+            dashboard.permission_catalog.register_model(content_type.name, content_type.label_plural)
         return content_type
 
     def add_hook(self, name: str, callback: Callable[..., Any]) -> Callable[..., Any]:
@@ -493,12 +522,66 @@ class CMS:
             self.store.set("cms", "menus", self.menus)
 
     async def _save_content(self, content_type: ContentType) -> None:
+        for record in content_type.items.values():
+            self._sync_scheduler_job(content_type, record)
         await self._save_database(f"cms:{content_type.name}", "items", {**content_type.items, "__revisions__": content_type.revisions})
+        await self._save_scheduler_jobs()
 
     async def _save_all_resources(self) -> None:
-        await self._save_database("cms", "taxonomies", self.taxonomies)
-        await self._save_database("cms", "comments", self.comments)
-        await self._save_database("cms", "menus", self.menus)
+        values = {"taxonomies": self.taxonomies, "comments": self.comments, "menus": self.menus}
+        if self.database is not None and hasattr(self.database, "transaction"):
+            async with self.database.transaction() as transaction:
+                for key, value in values.items():
+                    await transaction.execute(
+                        "INSERT INTO flaxon_admin_store(namespace, key, value) VALUES ($1, $2, $3) "
+                        "ON CONFLICT(namespace, key) DO UPDATE SET value = excluded.value",
+                        "cms",
+                        key,
+                        json.dumps(value, default=str),
+                    )
+            return
+        for key, value in values.items():
+            await self._save_database("cms", key, value)
+
+    def _sync_scheduler_job(self, content_type: ContentType, record: dict[str, Any]) -> None:
+        """Keep a durable scheduler record for every scheduled item."""
+
+        job_id = f"{content_type.name}:{record['id']}"
+        if not content_type.has_status or record.get("status") != "scheduled" or not record.get("publish_at"):
+            existing = self.scheduler_jobs.get(job_id)
+            if existing and existing.get("state") not in {"completed", "canceled"}:
+                self._record_scheduler_event(job_id, "canceled", reason="content is no longer scheduled")
+            return
+        job = self.scheduler_jobs.setdefault(
+            job_id,
+            {
+                "id": job_id,
+                "content_type": content_type.name,
+                "record_id": record["id"],
+                "attempts": 0,
+                "state": "queued",
+                "history": [],
+            },
+        )
+        job.update(run_after=record["publish_at"], updated_at=time.time())
+        if job.get("state") in {"completed", "canceled"}:
+            job["state"] = "queued"
+            job["attempts"] = 0
+            job.setdefault("history", []).append({"state": "queued", "at": time.time(), "reason": "schedule updated"})
+
+    def _record_scheduler_event(self, job_id: str, state: str, **details: Any) -> None:
+        job = self.scheduler_jobs.setdefault(job_id, {"id": job_id, "attempts": 0, "history": []})
+        job["state"] = state
+        job["updated_at"] = time.time()
+        if state == "retry":
+            job["attempts"] = int(job.get("attempts", 0)) + 1
+        job.setdefault("history", []).append({"state": state, "at": time.time(), **details})
+        del job["history"][:-100]
+
+    async def _save_scheduler_jobs(self) -> None:
+        if self.store:
+            self.store.set("cms", "scheduler_jobs", self.scheduler_jobs)
+        await self._save_database("cms", "scheduler_jobs", self.scheduler_jobs)
 
     def _get_type(self, name: str) -> ContentType:
         ct = self.content_types.get(name)
@@ -509,15 +592,6 @@ class CMS:
     # -- routing -------------------------------------------------------
 
     def _register_routes(self) -> None:
-        # Inserted at the front of the router's route list (rather than
-        # appended) so these specific paths always match before a more
-        # generic catch-all pattern that might also be registered under
-        # the same prefix — e.g. AdminDashboard's `/admin/<model_name>`
-        # would otherwise swallow `/admin/cms` if AdminDashboard happens
-        # to be created first. This makes CMS safe to mount under an
-        # AdminDashboard's url_prefix in either registration order.
-        from flaxon.routing.route import Route
-
         router = self.app.router
         prefix = self.url_prefix
 
@@ -536,6 +610,9 @@ class CMS:
             (f"{prefix}/api/<type_name>/actions/<action_name>", {"POST"}, self.api_action),
             (f"{prefix}/api/export/<type_name>", {"GET"}, self.api_export),
             (f"{prefix}/api/import/<type_name>", {"POST"}, self.api_import),
+            (f"{prefix}/api/scheduler/jobs", {"GET"}, self.api_scheduler_jobs),
+            (f"{prefix}/api/scheduler/jobs/<job_id>/retry", {"POST"}, self.api_scheduler_retry),
+            (f"{prefix}/api/media", {"GET"}, self.api_media),
             (f"{prefix}/api/taxonomies", {"GET", "POST"}, self.api_taxonomies),
             (f"{prefix}/api/taxonomies/<taxonomy_name>", {"POST", "PATCH", "DELETE"}, self.api_taxonomy),
             (f"{prefix}/api/comments", {"GET", "POST"}, self.api_comments),
@@ -548,7 +625,7 @@ class CMS:
     # -- handlers --------------------------------------------------------
 
     async def spa(self, request: Request) -> Response:
-        await self._require_user(request, "admin:read")
+        await self._require_user(request, "admin.view_dashboard")
         html = self.template_path.read_text(encoding="utf-8")
         html = html.replace("__CMS_API_BASE__", f"{self.url_prefix}/api")
         html = html.replace("__CMS_TITLE__", self.title)
@@ -557,25 +634,25 @@ class CMS:
         return HTMLResponse(html)
 
     async def api_config(self, request: Request) -> Response:
-        user = await self._require_user(request, "admin:read")
+        user = await self._require_user(request, "admin.view_dashboard")
         types = []
         for content_type in self.content_types.values():
             schema = content_type.schema()
             schema["filter_options"] = {
-                field: sorted({str(item.get(field, "")) for item in content_type.items.values() if item.get(field, "") != ""})[:100]
+                field: (
+                    list(content_type.statuses)
+                    if field == "status" and content_type.has_status
+                    else sorted({str(item.get(field, "")) for item in content_type.items.values() if item.get(field, "") != ""})[:100]
+                )
                 for field in content_type.list_filter
             }
             capabilities = {}
             for action in ("read", "create", "update", "delete"):
                 try:
-                    self.auth.authorize(user, f"{content_type.name}:{action}")
+                    self.auth.authorize(user, canonical_model_permission(content_type.name, action))
                     capabilities[action] = True
                 except Forbidden:
-                    try:
-                        self.auth.authorize(user, "admin:read" if action == "read" else "admin:write")
-                        capabilities[action] = True
-                    except Forbidden:
-                        capabilities[action] = False
+                    capabilities[action] = False
             schema["capabilities"] = capabilities
             types.append(schema)
         return JSONResponse({
@@ -584,12 +661,95 @@ class CMS:
         })
 
     async def api_stats(self, request: Request) -> Response:
-        await self._require_user(request, "admin:read")
+        await self._require_user(request, "admin.view_dashboard")
         return JSONResponse({name: ct.stats() for name, ct in self.content_types.items()})
+
+    async def _save_admin_upload(self, upload: Any, request: Request) -> str:
+        """Store a CMS file field through the configured Admin media pipeline.
+
+        CMS mutations and the Admin media library must use the same storage
+        root.  Saving through a new default ``uploads`` directory makes the
+        returned URL look valid while leaving the mounted Admin directory
+        empty.  Reusing the dashboard pipeline also preserves validation,
+        scanner, metadata, and thumbnail behavior.
+        """
+
+        dashboard = getattr(self.app, "_flaxon_admin_dashboard", None)
+        if dashboard is None:
+            raise BadRequest("CMS file fields require an AdminDashboard media configuration.")
+
+        content_type = str(getattr(upload, "content_type", "application/octet-stream")).lower().split(";", 1)[0]
+        size = int(getattr(upload, "size", 0) or 0)
+        if size > dashboard.max_upload_size:
+            raise BadRequest("Uploaded file exceeds the configured size limit.")
+        if content_type not in dashboard.allowed_upload_types:
+            raise BadRequest("This file type is not allowed.")
+
+        content = await upload.read()
+        if len(content) > dashboard.max_upload_size:
+            raise BadRequest("Uploaded file exceeds the configured size limit.")
+        content = await dashboard._validate_media_bytes(content, content_type)
+        filename = dashboard.media.generate_filename(str(getattr(upload, "filename", "upload.bin")))
+
+        if dashboard.media_storage is not None:
+            relative = filename
+            await dashboard._storage_write(relative, content, content_type)
+            url = dashboard.media_storage.get_url(relative)
+        else:
+            path = dashboard.media.save_bytes(content, filename)
+            relative = str(Path(path).relative_to(dashboard.media.base_path)).replace("\\", "/")
+            url = dashboard.media.get_url(path)
+
+        metadata = dashboard.media_metadata.setdefault(relative, {})
+        metadata.update({
+            "original_name": str(getattr(upload, "filename", filename)),
+            "content_type": content_type,
+            "size": len(content),
+            "sha256": hashlib.sha256(content).hexdigest(),
+        })
+        if content_type.startswith("image/"):
+            metadata["thumbnail_status"] = "pending"
+            try:
+                from PIL import Image
+
+                with Image.open(io.BytesIO(content)) as image:
+                    metadata["width"], metadata["height"] = image.size
+            except ImportError:
+                pass
+            dashboard._schedule_thumbnail(relative, content if dashboard.media_storage is not None else None)
+        if dashboard.store:
+            dashboard.store.set("media", "metadata", dashboard.media_metadata)
+        dashboard.record_activity(
+            "media_uploaded",
+            "media",
+            request,
+            details={"filename": metadata["original_name"], "source": "cms"},
+        )
+        await dashboard._persist_database()
+        return url
+
+    async def _prepare_uploads(self, request: Request, data: dict[str, Any], content_type: ContentType) -> dict[str, Any]:
+        for field in content_type.fields:
+            if field.type not in {"file", "image"}:
+                continue
+            upload = data.get(field.name)
+            if hasattr(upload, "filename"):
+                data[field.name] = await self._save_admin_upload(upload, request)
+        return data
 
     async def api_list(self, request: Request, type_name: str) -> Response:
         await self._require_content_user(request, type_name, "read")
         ct = self._get_type(type_name)
+        published = ct.publish_due()
+        if published:
+            for record in published:
+                self._record_scheduler_event(
+                    f"{ct.name}:{record['id']}",
+                    "completed",
+                    published_at=record.get("updated_at"),
+                )
+            self._save(ct)
+            await self._save_content(ct)
         query = request.query
         filters = {key[len("filter_"):]: value for key, value in query.items() if key.startswith("filter_")}
         result = ct.query(
@@ -606,12 +766,7 @@ class CMS:
         ct = self._get_type(type_name)
         data = await self._body_data(request)
         if isinstance(data, dict):
-            for field in ct.fields:
-                upload = data.get(field.name)
-                if field.type in {"file", "image"} and hasattr(upload, "filename"):
-                    from flaxon.http.uploads import FileStorage
-                    path = FileStorage().save(upload)
-                    data[field.name] = f"/uploads/{Path(path).name}"
+            data = await self._prepare_uploads(request, data, ct)
         record = self.run_hook("before_create", data or {})
         record = ct.create(record)
         record = self.run_hook("after_create", record)
@@ -628,6 +783,8 @@ class CMS:
         await self._require_content_user(request, type_name, "update")
         ct = self._get_type(type_name)
         data = await self._body_data(request)
+        if isinstance(data, dict):
+            data = await self._prepare_uploads(request, data, ct)
         record = ct.update(item_id, self.run_hook("before_update", data or {}))
         record = self.run_hook("after_update", record)
         self._save(ct)
@@ -646,7 +803,7 @@ class CMS:
         return JSONResponse({"deleted": True})
 
     async def api_action(self, request: Request, type_name: str, action_name: str) -> Response:
-        await self._require_content_user(request, type_name, "update")
+        await self._require_content_user(request, type_name, "publish" if action_name == "publish" else "update")
         ct = self._get_type(type_name)
         body = await request.json() or {}
         ids = body.get("ids", [])
@@ -701,8 +858,35 @@ class CMS:
         await self._save_content(ct)
         return JSONResponse({"imported": len(created), "items": created, "errors": errors}, status_code=201 if created else 422)
 
+    async def api_scheduler_jobs(self, request: Request) -> Response:
+        await self._require_user(request, "admin.view_dashboard")
+        return JSONResponse({"items": sorted(self.scheduler_jobs.values(), key=lambda item: item.get("run_after", ""))})
+
+    async def api_scheduler_retry(self, request: Request, job_id: str) -> Response:
+        await self._require_user(request, "cms.publish_content")
+        job = self.scheduler_jobs.get(job_id)
+        if job is None:
+            raise NotFound("Scheduler job not found.")
+        content_type = self._get_type(str(job.get("content_type", "")))
+        record = content_type.get(str(job.get("record_id", "")))
+        if record.get("status") != "scheduled":
+            raise BadRequest("Only scheduled content can be retried.")
+        self._record_scheduler_event(job_id, "queued", manual=True)
+        await self._save_scheduler_jobs()
+        return JSONResponse(job)
+
+    async def api_media(self, request: Request) -> Response:
+        """Expose reusable Admin media to CMS fields without duplicating storage."""
+
+        dashboard = getattr(self.app, "_flaxon_admin_dashboard", None)
+        if dashboard is None:
+            return JSONResponse([])
+        user = await self._require_user(request, "admin.view_dashboard")
+        dashboard.auth.authorize(user, "media.manage_library")
+        return JSONResponse(await dashboard._media_files())
+
     async def api_taxonomies(self, request: Request) -> Response:
-        await self._require_user(request, "admin:read" if request.method == "GET" else "admin:write")
+        await self._require_user(request, "admin.view_dashboard" if request.method == "GET" else "cms.manage_taxonomies")
         if request.method == "POST":
             body = await request.json() or {}
             name = str(body.get("name", "")).strip()
@@ -715,7 +899,7 @@ class CMS:
         return JSONResponse(self.taxonomies)
 
     async def api_taxonomy(self, request: Request, taxonomy_name: str) -> Response:
-        await self._require_user(request, "admin:write")
+        await self._require_user(request, "cms.manage_taxonomies")
         if taxonomy_name not in self.taxonomies:
             raise NotFound("Taxonomy not found.")
         if request.method == "DELETE":
@@ -734,7 +918,7 @@ class CMS:
         return JSONResponse(self.taxonomies)
 
     async def api_comments(self, request: Request) -> Response:
-        await self._require_user(request, "admin:read" if request.method == "GET" else "admin:write")
+        await self._require_user(request, "admin.view_dashboard" if request.method == "GET" else "cms.moderate_comments")
         if request.method == "POST":
             body = await request.json() or {}
             text = str(body.get("body", "")).strip()
@@ -757,7 +941,7 @@ class CMS:
         return JSONResponse(self.comments)
 
     async def api_comment(self, request: Request, comment_id: str) -> Response:
-        await self._require_user(request, "admin:write")
+        await self._require_user(request, "cms.moderate_comments")
         comment = next((item for item in self.comments if item["id"] == comment_id), None)
         if comment is None:
             raise NotFound("Comment not found.")
@@ -783,7 +967,7 @@ class CMS:
         return JSONResponse(comment)
 
     async def api_menu(self, request: Request, menu_name: str) -> Response:
-        await self._require_user(request, "admin:read" if request.method == "GET" else "admin:write")
+        await self._require_user(request, "admin.view_dashboard" if request.method == "GET" else "cms.manage_menus")
         if request.method == "PUT":
             items = await request.json()
             if not isinstance(items, list):
@@ -843,10 +1027,12 @@ class CMS:
         if self.auth is None:
             return None
         user = await self.auth.current_user(request)
-        try:
-            self.auth.authorize(user, f"{type_name}:{action}")
-        except Forbidden:
-            self.auth.authorize(user, "admin:read" if action == "read" else "admin:write")
+        permission = canonical_model_permission(type_name, action)
+        if action == "publish":
+            permission = "cms.publish_content"
+        elif action == "restore":
+            permission = "cms.restore_revision"
+        self.auth.authorize(user, permission)
         if request.method not in {"GET", "HEAD", "OPTIONS"}:
             dashboard = getattr(self.app, "_flaxon_admin_dashboard", None)
             if dashboard and not dashboard.csrf.verify_token(request.headers.get("x-csrf-token", "")):
@@ -879,6 +1065,8 @@ class CMS:
                 self.comments = value or []
             elif namespace == "cms" and key == "menus":
                 self.menus = value or {}
+            elif namespace == "cms" and key == "scheduler_jobs":
+                self.scheduler_jobs = value or {}
         self._database_loaded = True
 
     async def _save_database(self, namespace: str, key: str, value: Any) -> None:
@@ -897,4 +1085,7 @@ class CMS:
         if "multipart/form-data" in content_type or "application/x-www-form-urlencoded" in content_type:
             form = await request.form()
             return form.to_dict() if hasattr(form, "to_dict") else dict(form)
-        return await request.json()
+        try:
+            return await request.json()
+        except (TypeError, ValueError) as exc:
+            raise BadRequest("Request body must contain valid JSON.") from exc

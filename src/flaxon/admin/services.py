@@ -8,6 +8,7 @@ import uuid
 import base64
 import hashlib
 import hmac
+from inspect import isawaitable
 from urllib.parse import quote
 from dataclasses import dataclass, field
 from typing import Any
@@ -17,6 +18,8 @@ from flaxon.http import Request, Response
 from flaxon.security import PasswordHasher, PasswordValidator, SessionBackend, User
 from flaxon.security import RateLimiter
 from flaxon.security.rate_limit import DistributedRateLimiter
+
+from .authorization import AuthorizationProvider, DefaultAuthorizationProvider
 
 
 @dataclass
@@ -42,22 +45,38 @@ class AdminActivity:
 class AdminAuth:
     """Small injectable admin auth service backed by Flaxon's token backend."""
 
-    def __init__(self, users: list[dict[str, Any]] | None = None, backend: SessionBackend | None = None, store: Any | None = None, session_idle_timeout: int | None = None) -> None:
+    def __init__(
+        self,
+        users: list[dict[str, Any]] | None = None,
+        backend: SessionBackend | None = None,
+        store: Any | None = None,
+        session_idle_timeout: int | None = None,
+        permission_provider: AuthorizationProvider | None = None,
+        strict_permissions: bool = False,
+        password_hasher: PasswordHasher | None = None,
+    ) -> None:
         self.backend = backend or SessionBackend()
-        self.hasher = PasswordHasher()
+        self.hasher = password_hasher or PasswordHasher()
         self.password_validator = PasswordValidator()
+        self.strict_permissions = strict_permissions
         self.users: dict[str, dict[str, Any]] = {}
+        self.role_permissions: dict[str, list[str]] = {}
+        self.permission_provider = permission_provider or DefaultAuthorizationProvider(
+            lambda: self.role_permissions,
+            strict=strict_permissions,
+        )
         for raw in users or []:
             self.add_user(raw)
         self._login_failures: dict[str, list[float]] = {}
-        self.role_permissions: dict[str, list[str]] = {}
         self._reset_tokens: dict[str, tuple[str, float]] = {}
         self._verification_tokens: dict[str, tuple[str, float]] = {}
+        self._trusted_devices: dict[str, list[dict[str, Any]]] = {}
         self.store = store
         self.session_idle_timeout = session_idle_timeout
         if self.store:
             self._reset_tokens = self.store.get("auth", "reset_tokens", {}) or {}
             self._verification_tokens = self.store.get("auth", "verification_tokens", {}) or {}
+            self._trusted_devices = self.store.get("auth", "trusted_devices", {}) or {}
         # A fixed hash to verify against when a username doesn't exist, so
         # login response timing doesn't leak which usernames are valid
         # (CWE-208) -- without this, a nonexistent user returns almost
@@ -70,6 +89,7 @@ class AdminAuth:
         if self.store:
             self.store.set("auth", "reset_tokens", self._reset_tokens)
             self.store.set("auth", "verification_tokens", self._verification_tokens)
+            self.store.set("auth", "trusted_devices", self._trusted_devices)
 
     def add_user(self, raw: dict[str, Any]) -> dict[str, Any]:
         username = str(raw.get("username", "")).strip()
@@ -78,7 +98,14 @@ class AdminAuth:
         record = dict(raw)
         record["id"] = str(record.get("id") or secrets.token_hex(8))
         record["roles"] = list(record["roles"]) if "roles" in record else ["staff"]
-        record["permissions"] = list(record["permissions"]) if "permissions" in record else ["admin:read", "admin:write", "admin:users", "admin:settings", "admin:media"]
+        if "permissions" in record:
+            record["permissions"] = list(record["permissions"])
+        else:
+            # Keep the legacy default for existing applications. New
+            # deployments can opt into exact, least-privilege defaults.
+            record["permissions"] = ["admin.view_dashboard", "admin.manage_profile"] if self.strict_permissions else [
+                "admin:read", "admin:write", "admin:users", "admin:settings", "admin:media",
+            ]
         if record.get("password") and not record.get("password_hash"):
             password = str(record.pop("password"))
             errors = self.password_validator.validate(password)
@@ -89,7 +116,7 @@ class AdminAuth:
         return record
 
     def public(self, record: dict[str, Any]) -> dict[str, Any]:
-        return {k: v for k, v in record.items() if k not in {"password", "password_hash", "mfa_secret", "mfa_pending_secret", "mfa_pending_recovery_codes", "mfa_recovery_codes"}}
+        return {k: v for k, v in record.items() if k not in {"password", "password_hash", "mfa_secret", "mfa_pending_secret", "mfa_pending_recovery_codes", "mfa_recovery_codes", "trusted_devices"}}
 
     def user(self, username: str) -> User | None:
         record = self.users.get(username)
@@ -111,7 +138,15 @@ class AdminAuth:
         if errors:
             raise ValueError(errors[0])
 
-    async def login(self, username: str, password: str, otp: str | None = None, client_key: str | None = None) -> str | None:
+    async def login(
+        self,
+        username: str,
+        password: str,
+        otp: str | None = None,
+        client_key: str | None = None,
+        trusted_device: str | None = None,
+        expires_in: int | None = None,
+    ) -> str | None:
         keys = {username.strip().lower(), f"ip:{client_key}" if client_key else ""}
         keys.discard("")
         now = time.time()
@@ -130,11 +165,12 @@ class AdminAuth:
         record = self.users[username]
         if record.get("mfa_secret"):
             code = otp or ""
-            if not self.verify_otp(record["mfa_secret"], code) and not self.consume_recovery_code(username, code):
+            trusted = self.consume_trusted_device(username, trusted_device) if trusted_device else False
+            if not trusted and not self.verify_otp(record["mfa_secret"], code) and not self.consume_recovery_code(username, code):
                 return None
         for key in keys:
             self._login_failures.pop(key, None)
-        return await self.backend.create_token(user)
+        return await self.backend.create_token(user, expires_in=expires_in)
 
     @staticmethod
     def generate_mfa_secret() -> str:
@@ -192,9 +228,109 @@ class AdminAuth:
                 return True
         return False
 
-    def authorize(self, user: User, permission: str) -> None:
-        assigned = {item for role in user.roles for item in self.role_permissions.get(role, [])}
-        if user.has_permission("admin:superuser") or user.has_permission(permission) or permission in assigned:
+    def issue_trusted_device(self, username: str, label: str = "Browser", expires_in: int = 30 * 24 * 3600) -> str:
+        """Issue an opaque trusted-device token after a successful MFA check."""
+
+        if username not in self.users or not self.users[username].get("mfa_secret"):
+            raise ValueError("MFA must be enabled before issuing a trusted device")
+        token = secrets.token_urlsafe(32)
+        devices = self._trusted_devices.setdefault(username, [])
+        devices.append({"id": secrets.token_hex(8), "label": str(label)[:120], "hash": hashlib.sha256(token.encode()).hexdigest(), "created_at": time.time(), "expires_at": time.time() + max(60, expires_in), "last_used_at": None})
+        self._trusted_devices[username] = devices[-10:]
+        self._persist_auth_tokens()
+        return token
+
+    def consume_trusted_device(self, username: str, token: str | None) -> bool:
+        if not token:
+            return False
+        digest = hashlib.sha256(token.encode()).hexdigest()
+        now = time.time()
+        matched = False
+        devices = []
+        for device in self._trusted_devices.get(username, []):
+            if device.get("expires_at", 0) < now:
+                continue
+            if hmac.compare_digest(str(device.get("hash", "")), digest):
+                device["last_used_at"] = now
+                matched = True
+            devices.append(device)
+        self._trusted_devices[username] = devices
+        if matched:
+            self._persist_auth_tokens()
+        return matched
+
+    def list_trusted_devices(self, username: str) -> list[dict[str, Any]]:
+        now = time.time()
+        return [{key: value for key, value in item.items() if key != "hash"} for item in self._trusted_devices.get(username, []) if item.get("expires_at", 0) >= now]
+
+    def revoke_trusted_device(self, username: str, device_id: str) -> bool:
+        devices = self._trusted_devices.get(username, [])
+        kept = [item for item in devices if item.get("id") != device_id]
+        changed = len(kept) != len(devices)
+        self._trusted_devices[username] = kept
+        if changed:
+            self._persist_auth_tokens()
+        return changed
+
+    def revoke_all_trusted_devices(self, username: str) -> int:
+        removed = len(self._trusted_devices.get(username, []))
+        self._trusted_devices[username] = []
+        if removed:
+            self._persist_auth_tokens()
+        return removed
+
+    def regenerate_mfa_recovery_codes(self, username: str, count: int = 10) -> list[str]:
+        record = self.users.get(username)
+        if record is None or not record.get("mfa_secret"):
+            raise ValueError("MFA is not enabled")
+        codes = [secrets.token_urlsafe(9) for _ in range(max(1, min(count, 20)))]
+        record["mfa_recovery_codes"] = [self.hasher.hash(code) for code in codes]
+        self.revoke_all_trusted_devices(username)
+        return codes
+
+    def disable_mfa(self, username: str) -> None:
+        record = self.users.get(username)
+        if record is None:
+            raise ValueError("User not found")
+        for key in ("mfa_secret", "mfa_pending_secret", "mfa_pending_recovery_codes", "mfa_recovery_codes"):
+            record.pop(key, None)
+        self.revoke_all_trusted_devices(username)
+
+    def has_permission(self, user: User | None, permission: str, resource: Any = None) -> bool:
+        """Return whether a user has a capability through the provider."""
+
+        if not user:
+            return False
+        result = self.permission_provider.has_permission(user, permission, resource)
+        # Async providers are enforced by ``has_permission_async`` at request
+        # boundaries. A coroutine must never be treated as truthy by a sync
+        # template/helper call.
+        if isawaitable(result):
+            close = getattr(result, "close", None)
+            if close:
+                close()
+            return False
+        return bool(result)
+
+    async def has_permission_async(self, user: User | None, permission: str, resource: Any = None) -> bool:
+        """Evaluate sync or async authorization providers consistently."""
+
+        if not user:
+            return False
+        result = self.permission_provider.has_permission(user, permission, resource)
+        return bool(await result) if isawaitable(result) else bool(result)
+
+    def authorize(self, user: User, permission: str, resource: Any = None) -> None:
+        """Require a capability without exposing storage or policy details."""
+
+        if self.has_permission(user, permission, resource):
+            return
+        raise Forbidden("Insufficient admin permissions")
+
+    async def authorize_async(self, user: User, permission: str, resource: Any = None) -> None:
+        """Require a capability when the provider may perform I/O."""
+
+        if await self.has_permission_async(user, permission, resource):
             return
         raise Forbidden("Insufficient admin permissions")
 
@@ -295,6 +431,21 @@ class AdminStore:
         with self._connect() as db:
             db.execute("INSERT INTO flaxon_admin_store(namespace,key,value) VALUES(?,?,?) ON CONFLICT(namespace,key) DO UPDATE SET value=excluded.value", (namespace, key, encoded))
 
+    def mutate(self, namespace: str, key: str, callback: Any, default: Any = None) -> Any:
+        """Atomically read, transform, and persist one JSON value."""
+
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("SELECT value FROM flaxon_admin_store WHERE namespace=? AND key=?", (namespace, key)).fetchone()
+            value = json.loads(row[0]) if row else default
+            result = callback(value)
+            db.execute(
+                "INSERT INTO flaxon_admin_store(namespace,key,value) VALUES(?,?,?) "
+                "ON CONFLICT(namespace,key) DO UPDATE SET value=excluded.value",
+                (namespace, key, json.dumps(value, default=str)),
+            )
+            return result
+
     def delete(self, namespace: str, key: str) -> None:
         with self._connect() as db:
             db.execute("DELETE FROM flaxon_admin_store WHERE namespace=? AND key=?", (namespace, key))
@@ -372,6 +523,23 @@ class PostgreSQLAdminStore:
                 "ON CONFLICT(namespace, key) DO UPDATE SET value=excluded.value",
                 (namespace, key, json.dumps(value, default=str)),
             )
+
+    def mutate(self, namespace: str, key: str, callback: Any, default: Any = None) -> Any:
+        """Atomically transform one JSON value in a PostgreSQL transaction."""
+
+        with self._db.transaction():
+            row = self._db.execute(
+                "SELECT value FROM flaxon_admin_store WHERE namespace=%s AND key=%s FOR UPDATE",
+                (namespace, key),
+            ).fetchone()
+            value = json.loads(row[0]) if row else default
+            result = callback(value)
+            self._db.execute(
+                "INSERT INTO flaxon_admin_store(namespace, key, value) VALUES(%s, %s, %s) "
+                "ON CONFLICT(namespace, key) DO UPDATE SET value=excluded.value",
+                (namespace, key, json.dumps(value, default=str)),
+            )
+            return result
 
     def delete(self, namespace: str, key: str) -> None:
         db = self._connect()

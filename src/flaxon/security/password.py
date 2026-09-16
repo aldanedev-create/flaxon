@@ -10,12 +10,38 @@ class PasswordHasher:
     def __init__(self, algorithm: str = "pbkdf2_sha256", iterations: int = 100000) -> None:
         self.algorithm = algorithm
         self.iterations = iterations
+        self._argon2 = None
+        if algorithm == "argon2":
+            try:
+                from argon2 import PasswordHasher as Argon2Hasher
+            except ImportError as exc:  # pragma: no cover - optional dependency
+                raise RuntimeError("PasswordHasher(algorithm='argon2') requires argon2-cffi.") from exc
+            self._argon2 = Argon2Hasher()
 
     def hash(self, password: str) -> str:
+        if self._argon2 is not None:
+            return self._argon2.hash(password)
         salt = self._generate_salt()
         return self._hash_with_salt(password, salt)
 
     def verify(self, password: str, hashed: str) -> bool:
+        if hashed.startswith("$argon2"):
+            if self._argon2 is None:
+                try:
+                    from argon2 import PasswordHasher as Argon2Hasher
+                    from argon2.exceptions import VerificationError
+                except ImportError:
+                    return False
+                self._argon2 = Argon2Hasher()
+            else:
+                try:
+                    from argon2.exceptions import VerificationError
+                except ImportError:  # pragma: no cover - defensive
+                    VerificationError = ValueError
+            try:
+                return bool(self._argon2.verify(hashed, password))
+            except (VerificationError, ValueError, TypeError):
+                return False
         try:
             algorithm, iterations, salt, hash_value = hashed.split("$")
             if algorithm != self.algorithm:
@@ -27,6 +53,10 @@ class PasswordHasher:
             return False
 
     def needs_rehash(self, hashed: str) -> bool:
+        if hashed.startswith("$argon2"):
+            if self._argon2 is None:
+                return self.algorithm != "argon2"
+            return bool(self._argon2.check_needs_rehash(hashed))
         try:
             algorithm, iterations, salt, hash_value = hashed.split("$")
             return algorithm != self.algorithm or int(iterations) < self.iterations

@@ -353,3 +353,82 @@ Reference](../api/admin.md) for paths and CSRF requirements.
 Do not claim that WebAuthn or antivirus scanning is enabled merely because the
 Flaxon adapters are present. Inject a maintained WebAuthn provider and a real
 scanner service, then test their ceremonies and failure behavior in staging.
+
+## How Admin and CMS Work Together
+
+Admin is the authenticated operations surface. It owns users, groups,
+permissions, settings, activity, notifications, operations, media, and
+registered application models. CMS is an authenticated editorial surface
+mounted on the same application. It owns content types, records, revisions,
+taxonomies, comments, menus, publishing status, and scheduled publishing.
+
+The request flow is:
+
+1. The browser signs in at `/admin/login` and receives the configured session
+   cookie.
+2. Admin and CMS resolve the current user through the shared auth backend.
+3. The route checks the exact capability, such as
+   `post.view_post`, `post.change_post`, or `cms.publish_content`.
+4. Browser mutations include the rendered CSRF token in the form or the
+   `X-CSRF-Token` header.
+5. The model or content adapter validates and writes the record, then records
+   activity, audit data, revisions, and notifications where applicable.
+6. The response updates the Admin page or the CMS SPA; public applications
+   consume their own public routes or APIs and never use Admin credentials.
+
+Use Admin when a person manages the application or infrastructure. Use CMS
+when an editor creates and publishes site content. A user may have both roles,
+but the exact permission matrix remains the authority for every action.
+
+## Media Library Workflow
+
+Open `/admin/media` to use the production media workspace. The page supports:
+
+- Search across filename, original filename, title, and alt text.
+- Filtering by folder and image/document/other type.
+- Newest, oldest, name, and size sorting with server-side pagination.
+- Grid and list layouts stored in the browser for the operator.
+- Multi-select bulk deletion with CSRF protection.
+- Upload dialog with drag-and-drop, folder selection, and upload progress.
+- Image previews, dimensions, thumbnail status, file size, and content type.
+- Metadata editing for alt text, title, caption, description, and credit.
+- Rename with path sanitization and collision protection.
+- Folder creation and folder deletion.
+- Open, copy, and signed-object URL actions.
+
+The browser UI is not the security boundary. The backend rechecks the user,
+CSRF token, filename, storage path, allowed content type, size, image
+dimensions, antivirus result, and object existence for every mutation. CMS
+image/file fields use the reusable media picker, which stores the selected
+asset URL or identifier instead of accepting an unchecked path.
+
+For local development, use `storage_path` and `upload_dir`. For production,
+inject an S3-compatible adapter with `list`, `read`, `write`, `delete`,
+`exists`, `size`, `get_url`, and preferably `get_signed_url`. Configure an
+antivirus scanner and a shared AdminStore before enabling multiple workers.
+
+## Capability Setup
+
+New installations expose named groups in `/admin/roles`: Administrator,
+Content Editor, Publisher, Media Manager, Warehouse Staff, Support Agent, and
+Read Only. The screen presents descriptions and checkboxes; developers do not
+need to make operators type permission keys. Applications can add capabilities
+with `admin.register_permission(...)` and protect custom Jinax pages with
+`admin.add_view(..., permission="your.capability")`.
+
+Model capabilities are generated when a model is registered. In strict mode,
+the four standard capabilities are `view`, `add`, `change`, and `delete` in
+the stable `<model>.<action>_<model>` form. Legacy keys remain readable during
+migration, but new deployments should use strict permissions and least
+privilege groups.
+
+## What 100% Means in Production
+
+The bundled Admin/CMS workflows are functional when their required services
+are configured. “Complete” does not mean external services are silently
+invented: Redis must be supplied for shared sessions, limits, locks, and
+events; object storage must be supplied for S3 assets; a mail sender must be
+supplied for reset and verification delivery; a WebAuthn provider must be
+supplied for passkeys; and an antivirus scanner must be supplied for malware
+inspection. Without those integrations, Flaxon returns an explicit capability
+or configuration error rather than pretending the feature is active.

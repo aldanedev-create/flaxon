@@ -8,9 +8,37 @@ from typing import Any
 class Sanitizer:
     @staticmethod
     def allow_html(value: str, tags: set[str] | None = None, attributes: set[str] | None = None) -> str:
-        """Keep a conservative formatting allowlist and remove active attributes."""
+        """Keep a conservative formatting allowlist and remove active attributes.
+
+        ``nh3`` is used when installed because it parses HTML rather than
+        relying on regular expressions. The small fallback keeps Flaxon
+        usable without optional dependencies, but production deployments
+        should install ``flaxon[admin]``.
+        """
         tags = tags or {"p", "br", "strong", "em", "b", "i", "u", "ul", "ol", "li", "blockquote", "a"}
         attributes = attributes or {"href", "title"}
+        try:
+            import nh3
+        except ImportError:
+            nh3 = None
+        if nh3 is not None:
+            allowed_attributes = {tag: set(attributes) for tag in tags}
+            # Keep the historical Flaxon behavior of removing active markup
+            # while retaining its text content (``<script>bad()</script>``
+            # becomes ``bad()``), which is useful for editorial previews.
+            value = re.sub(r"</?\s*(script|style|iframe|object|embed)\b[^>]*>", "", str(value), flags=re.IGNORECASE)
+            try:
+                return nh3.clean(
+                    str(value),
+                    tags=set(tags),
+                    attributes=allowed_attributes,
+                    url_schemes={"http", "https", "mailto"},
+                )
+            except TypeError:
+                # Older nh3 releases expose the same sanitizer with a
+                # narrower keyword signature. Keep the allowlist explicit.
+                return nh3.clean(str(value), tags=set(tags), attributes=allowed_attributes)
+
         def clean_tag(match: re.Match[str]) -> str:
             closing, name, raw_attrs = match.group(1), match.group(2).lower(), match.group(3) or ""
             if name not in tags:

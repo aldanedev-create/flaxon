@@ -1,8 +1,92 @@
 {% extends "admin/base.html" %}
 {% block title %}Operations{% endblock %}
 {% block content %}
-<div class="space-y-6"><div><h1 class="text-2xl font-bold">Operations</h1><p class="text-slate-400">Application health, metrics, and background work.</p></div>
-<section class="bg-slate-800/50 border border-slate-700 rounded-lg p-5"><h2 class="font-semibold mb-3">Registered health checks</h2>{% for check in checks %}<p class="text-emerald-400">{{ check }}</p>{% else %}<p class="text-slate-400">No health checks registered.</p>{% endfor %}</section>
-<section class="bg-slate-800/50 border border-slate-700 rounded-lg p-5"><h2 class="font-semibold mb-3">Background tasks</h2><div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr class="border-b border-slate-700"><th class="p-2">Task</th><th class="p-2">Queue</th><th class="p-2">Status</th><th class="p-2">Error</th></tr></thead><tbody>{% for task in tasks %}<tr class="border-b border-slate-800"><td class="p-2">{{ task.name }}</td><td class="p-2">{{ task.queue }}</td><td class="p-2">{{ task.status }}</td><td class="p-2 text-red-300">{{ task.error or '' }}</td></tr>{% else %}<tr><td colspan="4" class="p-3 text-slate-400">No task queue is configured.</td></tr>{% endfor %}</tbody></table></div></section>
-<section class="bg-slate-800/50 border border-slate-700 rounded-lg p-5"><h2 class="font-semibold mb-3">Metrics</h2><pre class="text-slate-400 text-sm whitespace-pre-wrap">{{ metrics }}</pre></section></div>
+<div class="corporate-page operations-page">
+  <header class="corporate-header">
+    <div>
+      <p class="admin-eyebrow">System operations</p>
+      <h1>Operations center</h1>
+      <p class="corporate-subtitle">Monitor application health, queued work, and durable operational events from one place.</p>
+    </div>
+    <div class="corporate-actions">
+      <button type="button" class="corporate-button corporate-button-muted" id="refresh-operations" title="Refresh operational data"><i class="fas fa-rotate"></i><span>Refresh</span></button>
+      <a class="corporate-button corporate-button-muted" href="{{ dashboard.url_prefix }}/activity"><i class="fas fa-clock-rotate-left"></i><span>Audit activity</span></a>
+    </div>
+  </header>
+
+  <section class="corporate-stat-grid" aria-label="Operations summary">
+    <article class="corporate-stat"><span class="corporate-stat-label">Health checks</span><strong>{{ operation_summary.checks }}</strong><small>{{ operation_summary.healthy_checks }} currently healthy</small></article>
+    <article class="corporate-stat"><span class="corporate-stat-label">Failed tasks</span><strong class="{% if operation_summary.failed_tasks %}corporate-value-danger{% endif %}">{{ operation_summary.failed_tasks }}</strong><small>Requires operator review</small></article>
+    <article class="corporate-stat"><span class="corporate-stat-label">Recorded events</span><strong>{{ operation_summary.operations }}</strong><small>Last {{ operations|length }} shown below</small></article>
+    <article class="corporate-stat"><span class="corporate-stat-label">Service state</span><strong id="operations-state">{% if operation_summary.failed_tasks %}Review{% else %}Healthy{% endif %}</strong><small>Based on current checks and tasks</small></article>
+  </section>
+
+  <div class="corporate-two-column">
+    <section class="corporate-panel">
+      <div class="corporate-panel-header"><div><p class="corporate-kicker">Live checks</p><h2>Application health</h2></div><span class="corporate-badge corporate-badge-neutral">{{ checks|length }} checks</span></div>
+      <div class="health-list">
+        {% for check in checks %}
+        <div class="health-row"><span class="health-indicator {% if check.status|lower in ['ok', 'healthy', 'registered'] %}is-good{% else %}is-bad{% endif %}"></span><div><strong>{{ check.name }}</strong><small>{{ check.status|title }}</small></div><span class="corporate-badge {% if check.status|lower in ['ok', 'healthy', 'registered'] %}corporate-badge-success{% else %}corporate-badge-danger{% endif %}">{{ check.status|title }}</span></div>
+        {% else %}<div class="corporate-empty"><i class="fas fa-heart-pulse"></i><strong>No health checks registered</strong><p>Register application checks to make service health visible here.</p></div>{% endfor %}
+      </div>
+    </section>
+
+    <section class="corporate-panel">
+      <div class="corporate-panel-header"><div><p class="corporate-kicker">Event volume</p><h2>Operational breakdown</h2></div><i class="fas fa-chart-simple corporate-panel-icon"></i></div>
+      <div class="operations-breakdown">
+        {% for kind, count in operation_summary.operation_kinds.items() %}<div class="breakdown-row"><span>{{ kind|replace('_', ' ')|title }}</span><strong>{{ count }}</strong></div>{% else %}<div class="corporate-empty"><i class="fas fa-chart-line"></i><strong>No operational events yet</strong><p>Health checks and task failures will be recorded as they occur.</p></div>{% endfor %}
+      </div>
+      <details class="corporate-details"><summary>View metrics payload</summary><pre class="corporate-code">{{ metrics if metrics else 'No metrics provider is configured.' }}</pre></details>
+    </section>
+  </div>
+
+  <section class="corporate-panel">
+    <div class="corporate-panel-header corporate-panel-header-wrap"><div><p class="corporate-kicker">Background work</p><h2>Task queue</h2><p class="corporate-muted">Failed and timed-out tasks are surfaced for operator review. Refresh uses the live task endpoint.</p></div><div class="corporate-toolbar"><input id="task-search" type="search" placeholder="Find a task" aria-label="Find a task"><select id="task-status" aria-label="Filter tasks"><option value="">All statuses</option><option value="pending">Pending</option><option value="running">Running</option><option value="completed">Completed</option><option value="failed">Failed</option><option value="timeout">Timeout</option></select></div></div>
+    <div class="corporate-table-wrap">
+      <table class="corporate-table" id="task-table"><thead><tr><th>Task</th><th>Queue</th><th>Status</th><th>Created</th><th>Error</th></tr></thead><tbody id="task-rows">
+        {% for task in tasks %}<tr data-task="{{ task.name|lower }}" data-status="{{ task.status|lower }}"><td><strong>{{ task.name }}</strong><small>{{ task.id }}</small></td><td>{{ task.queue }}</td><td><span class="corporate-badge {% if task.status|lower in ['failed', 'timeout'] %}corporate-badge-danger{% elif task.status|lower in ['completed', 'success'] %}corporate-badge-success{% else %}corporate-badge-neutral{% endif %}">{{ task.status|title }}</span></td><td>{{ task.created_at }}</td><td class="corporate-error">{{ task.error or '-' }}</td></tr>{% else %}<tr id="no-tasks"><td colspan="5" class="corporate-table-empty">No task queue is configured.</td></tr>{% endfor %}
+      </tbody></table>
+    </div>
+    <p id="task-status-message" class="corporate-form-message" role="status" aria-live="polite"></p>
+  </section>
+
+  <section class="corporate-panel">
+    <div class="corporate-panel-header"><div><p class="corporate-kicker">Durable records</p><h2>Recent operational events</h2></div><span class="corporate-badge corporate-badge-neutral">{{ operations|length }} shown</span></div>
+    <div class="corporate-table-wrap"><table class="corporate-table"><thead><tr><th>Event</th><th>Recorded</th><th>Details</th></tr></thead><tbody>{% for operation in operations %}<tr><td><strong>{{ operation.kind|replace('_', ' ')|title }}</strong><small>{{ operation.id }}</small></td><td>{{ operation.timestamp }}</td><td><details><summary>Inspect</summary><pre class="corporate-code">{{ operation|tojson(indent=2) }}</pre></details></td></tr>{% else %}<tr><td colspan="3" class="corporate-table-empty">No operational events have been recorded.</td></tr>{% endfor %}</tbody></table></div>
+  </section>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+(() => {
+  const prefix = '{{ dashboard.url_prefix }}';
+  const search = document.getElementById('task-search');
+  const status = document.getElementById('task-status');
+  const rows = () => [...document.querySelectorAll('#task-rows tr[data-task]')];
+  const filter = () => {
+    const needle = (search.value || '').toLowerCase().trim();
+    const selected = (status.value || '').toLowerCase();
+    rows().forEach(row => { row.hidden = Boolean((needle && !row.dataset.task.includes(needle)) || (selected && row.dataset.status !== selected)); });
+  };
+  search.addEventListener('input', filter); status.addEventListener('change', filter);
+  document.getElementById('refresh-operations').addEventListener('click', async () => {
+    const message = document.getElementById('task-status-message');
+    message.textContent = 'Refreshing task data...';
+    try {
+      const response = await fetch(prefix + '/operations/tasks', {credentials: 'same-origin'});
+      if (!response.ok) throw new Error('Unable to load task data');
+      const data = await response.json();
+      const tbody = document.getElementById('task-rows');
+      tbody.innerHTML = '';
+      if (!data.tasks || !data.tasks.length) { tbody.innerHTML = '<tr><td colspan="5" class="corporate-table-empty">No task queue is configured.</td></tr>'; }
+      else data.tasks.forEach(task => {
+        const row = document.createElement('tr'); row.dataset.task = String(task.name || '').toLowerCase(); row.dataset.status = String(task.status || '').toLowerCase();
+        row.innerHTML = '<td><strong></strong><small></small></td><td></td><td><span class="corporate-badge corporate-badge-neutral"></span></td><td></td><td class="corporate-error"></td>';
+        row.querySelector('strong').textContent = task.name || '-'; row.querySelector('small').textContent = task.id || '-'; row.children[1].textContent = task.queue || '-'; row.children[2].firstElementChild.textContent = task.status || '-'; row.children[3].textContent = task.created_at || '-'; row.children[4].textContent = task.error || '-'; tbody.appendChild(row);
+      });
+      filter(); message.textContent = 'Task data refreshed.';
+    } catch (error) { message.textContent = error.message; }
+  });
+})();
+</script>
 {% endblock %}

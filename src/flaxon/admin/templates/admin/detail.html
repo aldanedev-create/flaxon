@@ -17,10 +17,10 @@
                 <i class="fas fa-arrow-left"></i>
                 Back to list
             </a>
-            <a href="{{ prefix }}/{{ model.get_name() }}/{{ object_id }}/edit" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-400 hover:from-blue-600 hover:to-cyan-500 rounded-lg text-sm font-medium transition text-white flex items-center gap-2">
+            {% if can_change %}<a href="{{ prefix }}/{{ model.get_name() }}/{{ object_id }}/edit" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-400 hover:from-blue-600 hover:to-cyan-500 rounded-lg text-sm font-medium transition text-white flex items-center gap-2">
                 <i class="fas fa-edit"></i>
                 Edit
-            </a>
+            </a>{% endif %}
             <a href="{{ prefix }}/{{ model.get_name() }}/{{ object_id }}/history" class="px-4 py-2 bg-slate-700/50 rounded-lg text-sm text-white">History</a>
         </div>
     </div>

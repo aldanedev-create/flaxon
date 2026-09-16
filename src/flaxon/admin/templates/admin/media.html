@@ -1,34 +1,130 @@
 {% extends "admin/base.html" %}
-{% block title %}Media{% endblock %}
+{% block title %}Media library{% endblock %}
 {% block content %}
-<div class="space-y-6">
-  <h1 class="text-2xl font-bold">Media library</h1>
-  <div class="flex flex-wrap gap-3">
-    <form method="post" enctype="multipart/form-data" class="flex flex-wrap gap-3"><input type="hidden" name="_csrf" value="{{ dashboard.csrf_token() }}"><input name="folder" placeholder="Folder (optional)" class="bg-slate-800 border border-slate-700 rounded px-3 py-2"><input type="file" name="file" required class="bg-slate-800 border border-slate-700 rounded px-3 py-2"><button class="bg-blue-600 rounded px-4 py-2">Upload</button></form>
-    <button type="button" id="new-folder" class="bg-slate-700 rounded px-4 py-2">New folder</button>
-  </div>
-  {% if message %}<p class="text-emerald-400">Uploaded: {{ message }}</p>{% endif %}
-  {% if folders %}<p class="text-slate-400 text-sm">Folders: {{ folders|join(', ') }}</p>{% endif %}
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-    {% for file in files %}
-    <article class="bg-slate-800/50 border border-slate-700 rounded-lg p-4" data-media="{{ file.relative_name }}">
-      <p class="font-medium break-all">{{ file.name }}</p><p class="text-slate-500 text-xs break-all">{{ file.relative_name }}</p>
-      {% if file.name.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')) %}<img src="{{ file.metadata.get('thumbnail_url', file.url) }}" alt="{{ file.metadata.get('alt', file.name) }}" class="mt-3 max-h-40 w-full object-contain bg-slate-900 rounded">{% endif %}
-      <p class="text-slate-400 text-sm">{{ file.size }} bytes{% if file.metadata.get('content_type') %} · {{ file.metadata.content_type }}{% endif %}</p><a class="text-blue-400 text-sm break-all" href="{{ file.url }}">{{ file.url }}</a>
-      <div class="mt-3 flex flex-wrap gap-2"><button type="button" class="rename-media bg-slate-700 rounded px-2 py-1 text-xs">Rename</button><button type="button" class="edit-media bg-slate-700 rounded px-2 py-1 text-xs">Metadata</button><button type="button" class="delete-media bg-red-700 rounded px-2 py-1 text-xs">Delete</button></div>
-    </article>
-    {% else %}<p class="text-slate-400">No media uploaded.</p>{% endfor %}
+<div class="media-workspace" data-media-workspace>
+  <header class="media-header">
+    <div>
+      <p class="admin-eyebrow">Content assets</p>
+      <h1>Media library</h1>
+      <p class="media-subtitle">Upload, organize, inspect, and reuse files across your Admin and CMS.</p>
+    </div>
+    <div class="media-header-actions">
+      <button type="button" class="media-button media-button-muted" data-view-toggle title="Switch layout"><i class="fas fa-table-cells-large"></i><span>Grid</span></button>
+      <button type="button" class="media-button media-button-primary" data-open-upload><i class="fas fa-upload"></i><span>Upload media</span></button>
+    </div>
+  </header>
+
+  {% if message %}<div class="media-alert media-alert-success"><i class="fas fa-circle-check"></i><span>Upload complete: {{ message }}</span></div>{% endif %}
+  <div class="media-layout">
+    <aside class="media-sidebar" aria-label="Media folders">
+      <div class="media-sidebar-heading"><strong>Library</strong><span>{{ total_files }}</span></div>
+      <a class="media-folder-link{% if not selected_folder %} is-active{% endif %}" href="{{ dashboard.url_prefix }}/media"><i class="fas fa-photo-film"></i><span>All media</span><small>{{ total_files }}</small></a>
+      <div class="media-sidebar-heading media-sidebar-subheading"><strong>Folders</strong><button type="button" data-new-folder title="Create folder" aria-label="Create folder"><i class="fas fa-plus"></i></button></div>
+      <nav class="media-folder-list">
+        {% for folder in folders %}<a class="media-folder-link{% if selected_folder == folder %} is-active{% endif %}" href="{{ dashboard.url_prefix }}/media?folder={{ folder|urlencode }}"><i class="fas fa-folder"></i><span>{{ folder }}</span><small>{{ folder_counts.get(folder, 0) }}</small></a>{% else %}<p class="media-empty-small">No folders yet.</p>{% endfor %}
+      </nav>
+      <div class="media-sidebar-note"><i class="fas fa-shield-halved"></i><span>Uploads are checked against your configured type, size, image, and antivirus policies.</span></div>
+    </aside>
+
+    <section class="media-main">
+      <form method="get" class="media-toolbar" aria-label="Filter media">
+        <label class="media-search"><i class="fas fa-search"></i><span class="sr-only">Search media</span><input name="q" value="{{ query }}" placeholder="Search filename, title, alt text..." autocomplete="off"></label>
+        {% if selected_folder %}<input type="hidden" name="folder" value="{{ selected_folder }}">{% endif %}
+        <label class="media-select"><span class="sr-only">File type</span><select name="kind"><option value="all"{% if selected_kind == 'all' %} selected{% endif %}>All types</option><option value="images"{% if selected_kind == 'images' %} selected{% endif %}>Images</option><option value="documents"{% if selected_kind == 'documents' %} selected{% endif %}>Documents</option><option value="other"{% if selected_kind == 'other' %} selected{% endif %}>Other</option></select></label>
+        <label class="media-select"><span class="sr-only">Sort media</span><select name="sort"><option value="-modified"{% if selected_sort == '-modified' %} selected{% endif %}>Newest first</option><option value="modified"{% if selected_sort == 'modified' %} selected{% endif %}>Oldest first</option><option value="name"{% if selected_sort == 'name' %} selected{% endif %}>Name A-Z</option><option value="-name"{% if selected_sort == '-name' %} selected{% endif %}>Name Z-A</option><option value="-size"{% if selected_sort == '-size' %} selected{% endif %}>Largest first</option></select></label>
+        <button class="media-button media-button-muted" type="submit"><i class="fas fa-filter"></i><span>Filter</span></button>
+        {% if query or selected_folder or selected_kind != 'all' %}<a class="media-clear" href="{{ dashboard.url_prefix }}/media">Clear</a>{% endif %}
+      </form>
+
+      <form id="media-bulk-form" class="media-bulkbar" data-bulk-form>
+        <label class="media-check"><input type="checkbox" data-select-all><span>Select page</span></label>
+        <span class="media-selection-count" data-selection-count>0 selected</span>
+        <button type="button" class="media-button media-button-danger" data-bulk-delete disabled><i class="fas fa-trash"></i><span>Delete selected</span></button>
+        <span class="media-bulk-spacer"></span><span class="media-result-count">{{ pagination.total }} result{% if pagination.total != 1 %}s{% endif %}</span>
+      </form>
+
+      <div class="media-grid" data-media-grid>
+        {% for file in files %}
+        <article class="media-card" data-media-card data-name="{{ file.relative_name }}" data-url="{{ file.url }}">
+          <div class="media-card-check"><input type="checkbox" name="media" value="{{ file.relative_name }}" data-media-check aria-label="Select {{ file.name }}"></div>
+          <div class="media-preview{% if not file.is_image %} media-preview-file{% endif %}">
+            {% if file.is_image %}<img src="{{ file.metadata.get('thumbnail_url') or file.url }}" data-original-url="{{ file.url }}" alt="{{ file.metadata.get('alt', file.name) }}" loading="lazy" onerror="this.onerror=null;this.src=this.dataset.originalUrl">{% else %}<i class="fas {% if file.metadata.get('content_type') == 'application/pdf' %}fa-file-pdf{% else %}fa-file-lines{% endif %}"></i>{% endif %}
+            <span class="media-type-badge">{{ file.metadata.get('content_type', file.extension|default('file')) }}</span>
+          </div>
+          <div class="media-card-body">
+            <h2 title="{{ file.name }}">{{ file.name }}</h2>
+            <p class="media-card-path" title="{{ file.relative_name }}">{{ file.relative_name }}</p>
+            <dl class="media-card-meta"><div><dt>Size</dt><dd>{{ file.size|filesizeformat }}</dd></div>{% if file.metadata.get('width') %}<div><dt>Dimensions</dt><dd>{{ file.metadata.width }} x {{ file.metadata.height }}</dd></div>{% endif %}<div><dt>Status</dt><dd class="media-status-{{ file.metadata.get('thumbnail_status', 'ready') }}">{{ file.metadata.get('thumbnail_status', 'ready')|title }}</dd></div></dl>
+            {% if file.metadata.get('alt') or file.metadata.get('title') %}<p class="media-card-caption">{{ file.metadata.get('title') or file.metadata.get('alt') }}</p>{% endif %}
+            <div class="media-card-actions"><button type="button" class="media-icon-button" data-edit-media title="Edit metadata" aria-label="Edit metadata for {{ file.name }}"><i class="fas fa-pen"></i></button><button type="button" class="media-icon-button" data-rename-media title="Rename file" aria-label="Rename {{ file.name }}"><i class="fas fa-i-cursor"></i></button><button type="button" class="media-icon-button" data-copy-url title="Copy URL" aria-label="Copy URL for {{ file.name }}"><i class="fas fa-link"></i></button><a class="media-icon-button" href="{{ file.url }}" target="_blank" rel="noopener" title="Open file" aria-label="Open {{ file.name }}"><i class="fas fa-arrow-up-right-from-square"></i></a><button type="button" class="media-icon-button media-icon-danger" data-delete-media title="Delete file" aria-label="Delete {{ file.name }}"><i class="fas fa-trash"></i></button></div>
+          </div>
+        </article>
+        {% else %}<div class="media-empty"><i class="fas fa-photo-film"></i><h2>No media found</h2><p>Upload a file or change your filters to see assets here.</p><button type="button" class="media-button media-button-primary" data-open-upload><i class="fas fa-upload"></i>Upload media</button></div>{% endfor %}
+      </div>
+
+      {% if pagination.pages > 1 %}<nav class="media-pagination" aria-label="Media pages">{% for number in range(1, pagination.pages + 1) %}<a class="{% if number == pagination.page %}is-active{% endif %}" href="{{ dashboard.url_prefix }}/media?q={{ query|urlencode }}&folder={{ selected_folder|urlencode }}&kind={{ selected_kind }}&sort={{ selected_sort }}&page={{ number }}">{{ number }}</a>{% endfor %}</nav>{% endif %}
+    </section>
   </div>
 </div>
+
+<dialog class="media-dialog" data-upload-dialog>
+  <form method="post" enctype="multipart/form-data" class="media-dialog-panel" data-upload-form>
+    <input type="hidden" name="_csrf" value="{{ dashboard.csrf_token() }}">
+    <div class="media-dialog-header"><div><p class="admin-eyebrow">Add asset</p><h2>Upload media</h2></div><button type="button" class="media-close" data-close-dialog aria-label="Close upload dialog"><i class="fas fa-xmark"></i></button></div>
+    <label class="media-dropzone" data-dropzone><input type="file" name="file" required data-upload-input><i class="fas fa-cloud-arrow-up"></i><strong>Choose a file or drop it here</strong><span>Configured file type and size limits are enforced by the server.</span><b data-upload-name></b></label>
+    <label class="media-field"><span>Folder <small>optional</small></span><input name="folder" list="media-folders" placeholder="marketing/2026"><datalist id="media-folders">{% for folder in folders %}<option value="{{ folder }}">{% endfor %}</datalist></label>
+    <div class="media-upload-progress" data-upload-progress hidden><span></span></div><p class="media-upload-status" data-upload-status></p>
+    <div class="media-dialog-actions"><button type="button" class="media-button media-button-muted" data-close-dialog>Cancel</button><button class="media-button media-button-primary" type="submit"><i class="fas fa-upload"></i>Upload</button></div>
+  </form>
+</dialog>
+
+<dialog class="media-dialog" data-edit-dialog>
+  <form class="media-dialog-panel" data-edit-form>
+    <div class="media-dialog-header"><div><p class="admin-eyebrow">Asset details</p><h2>Edit media</h2><p data-edit-filename class="media-dialog-subtitle"></p></div><button type="button" class="media-close" data-close-dialog aria-label="Close editor"><i class="fas fa-xmark"></i></button></div>
+    <label class="media-field"><span>Alt text</span><input name="alt" maxlength="1000"></label><label class="media-field"><span>Title</span><input name="title" maxlength="1000"></label><label class="media-field"><span>Caption</span><textarea name="caption" rows="3" maxlength="1000"></textarea></label><label class="media-field"><span>Description</span><textarea name="description" rows="4" maxlength="1000"></textarea></label><label class="media-field"><span>Credit</span><input name="credit" maxlength="1000"></label>
+    <div class="media-dialog-actions"><button type="button" class="media-button media-button-muted" data-close-dialog>Cancel</button><button class="media-button media-button-primary" type="submit"><i class="fas fa-check"></i>Save details</button></div>
+  </form>
+</dialog>
+
+<dialog class="media-dialog" data-rename-dialog><form class="media-dialog-panel" data-rename-form><div class="media-dialog-header"><div><p class="admin-eyebrow">Asset name</p><h2>Rename media</h2><p data-rename-current class="media-dialog-subtitle"></p></div><button type="button" class="media-close" data-close-dialog aria-label="Close rename dialog"><i class="fas fa-xmark"></i></button></div><label class="media-field"><span>Filename or folder path</span><input name="name" required maxlength="240"></label><p class="media-form-error" data-rename-error></p><div class="media-dialog-actions"><button type="button" class="media-button media-button-muted" data-close-dialog>Cancel</button><button class="media-button media-button-primary" type="submit"><i class="fas fa-check"></i>Save name</button></div></form></dialog>
+
 <script>
-const mediaCsrf = '{{ dashboard.csrf_token() }}';
-const mediaPath = name => '{{ dashboard.url_prefix }}/media/' + name.split('/').map(encodeURIComponent).join('/');
-document.getElementById('new-folder').onclick = async () => { const name = prompt('Folder name'); if (!name) return; const response = await fetch('{{ dashboard.url_prefix }}/media/folders', {method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':mediaCsrf}, body:JSON.stringify({name})}); if (response.ok) location.reload(); };
-document.querySelectorAll('[data-media]').forEach(card => {
-  const oldName = () => card.dataset.media;
-  card.querySelector('.rename-media').onclick = async () => { const name = prompt('New filename or folder/path', oldName()); if (!name || name === oldName()) return; const response = await fetch(mediaPath(oldName()), {method:'PATCH', headers:{'Content-Type':'application/json','X-CSRF-Token':mediaCsrf}, body:JSON.stringify({name})}); if (response.ok) location.reload(); };
-  card.querySelector('.edit-media').onclick = async () => { const alt = prompt('Alt text', card.dataset.alt || ''); const title = prompt('Title', ''); const response = await fetch(mediaPath(oldName()), {method:'PATCH', headers:{'Content-Type':'application/json','X-CSRF-Token':mediaCsrf}, body:JSON.stringify({name:oldName(), metadata:{alt, title}})}); if (response.ok) location.reload(); };
-  card.querySelector('.delete-media').onclick = async () => { if (!confirm('Delete this media file?')) return; const response = await fetch(mediaPath(oldName()), {method:'DELETE', headers:{'X-CSRF-Token':mediaCsrf}}); if (response.ok) card.remove(); };
-});
+(() => {
+  const csrf = '{{ dashboard.csrf_token() }}';
+  const prefix = '{{ dashboard.url_prefix }}';
+  const uploadDialog = document.querySelector('[data-upload-dialog]');
+  const editDialog = document.querySelector('[data-edit-dialog]');
+  const renameDialog = document.querySelector('[data-rename-dialog]');
+  const mediaGrid = document.querySelector('[data-media-grid]');
+  const selected = () => [...document.querySelectorAll('[data-media-check]:checked')].map(input => input.value);
+  const jsonRequest = (url, method, body) => fetch(url, {method, headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf}, body: JSON.stringify(body)});
+  const closeDialogs = () => [uploadDialog, editDialog, renameDialog].forEach(dialog => dialog?.close());
+  document.querySelectorAll('[data-open-upload]').forEach(button => button.addEventListener('click', () => uploadDialog?.showModal()));
+  document.querySelectorAll('[data-close-dialog]').forEach(button => button.addEventListener('click', closeDialogs));
+  const viewToggle = document.querySelector('[data-view-toggle]');
+  const setView = view => { mediaGrid?.classList.toggle('is-list', view === 'list'); if (viewToggle) viewToggle.innerHTML = view === 'list' ? '<i class="fas fa-table-cells-large"></i><span>Grid</span>' : '<i class="fas fa-list"></i><span>List</span>'; localStorage.setItem('flaxon-media-view', view); };
+  setView(localStorage.getItem('flaxon-media-view') || 'grid');
+  viewToggle?.addEventListener('click', () => setView(mediaGrid?.classList.contains('is-list') ? 'grid' : 'list'));
+  document.querySelector('[data-new-folder]')?.addEventListener('click', async () => { const name = prompt('Folder name'); if (!name) return; const response = await jsonRequest(`${prefix}/media/folders`, 'POST', {name}); if (response.ok) location.reload(); else alert('Folder could not be created.'); });
+  document.querySelector('[data-select-all]')?.addEventListener('change', event => { document.querySelectorAll('[data-media-check]').forEach(input => input.checked = event.target.checked); updateSelection(); });
+  document.querySelectorAll('[data-media-check]').forEach(input => input.addEventListener('change', updateSelection));
+  function updateSelection() { const values = selected(); const button = document.querySelector('[data-bulk-delete]'); const count = document.querySelector('[data-selection-count]'); if (button) button.disabled = !values.length; if (count) count.textContent = `${values.length} selected`; }
+  document.querySelector('[data-bulk-delete]')?.addEventListener('click', async () => { const values = selected(); if (!values.length || !confirm(`Delete ${values.length} selected file${values.length === 1 ? '' : 's'}?`)) return; const response = await jsonRequest(`${prefix}/media/bulk`, 'POST', {action: 'delete', names: values}); if (response.ok) location.reload(); else alert('The selected files could not be deleted.'); });
+  document.querySelector('[data-upload-input]')?.addEventListener('change', event => { const file = event.target.files[0]; document.querySelector('[data-upload-name]').textContent = file ? `${file.name} · ${(file.size / 1024 / 1024).toFixed(2)} MB` : ''; });
+  const dropzone = document.querySelector('[data-dropzone]'); dropzone?.addEventListener('dragover', event => { event.preventDefault(); dropzone.classList.add('is-dragging'); }); dropzone?.addEventListener('dragleave', () => dropzone.classList.remove('is-dragging')); dropzone?.addEventListener('drop', event => { event.preventDefault(); dropzone.classList.remove('is-dragging'); const input = dropzone.querySelector('input'); if (event.dataTransfer.files.length) { input.files = event.dataTransfer.files; input.dispatchEvent(new Event('change')); } });
+  document.querySelector('[data-upload-form]')?.addEventListener('submit', event => { event.preventDefault(); const form = event.currentTarget; const file = form.querySelector('[data-upload-input]')?.files?.[0]; const progress = document.querySelector('[data-upload-progress]'); const progressBar = progress?.querySelector('span'); const status = document.querySelector('[data-upload-status]'); if (!file) return; if (progress && status) { progress.hidden = false; status.textContent = 'Uploading...'; } const xhr = new XMLHttpRequest(); xhr.open('POST', form.action || `${prefix}/media`); xhr.upload.onprogress = event => { if (event.lengthComputable && progressBar) progressBar.style.width = `${Math.round(event.loaded / event.total * 100)}%`; }; xhr.onload = () => { if (xhr.status >= 200 && xhr.status < 400) location.reload(); else if (status) status.textContent = 'Upload failed. Check the file type and size limits.'; }; xhr.onerror = () => { if (status) status.textContent = 'Upload failed. Check your connection and try again.'; }; xhr.send(new FormData(form)); });
+  document.querySelectorAll('[data-media-card]').forEach(card => {
+    const name = card.dataset.name;
+    card.querySelector('[data-copy-url]')?.addEventListener('click', async () => { try { const response = await fetch(`${prefix}/media/${name.split('/').map(encodeURIComponent).join('/')}/signed-url`); const data = await response.json(); await navigator.clipboard.writeText(data.url); card.querySelector('[data-copy-url]').title = 'Copied'; } catch { alert('The URL could not be copied.'); } });
+    card.querySelector('[data-delete-media]')?.addEventListener('click', async () => { if (!confirm(`Delete ${name}?`)) return; const response = await fetch(`${prefix}/media/${name.split('/').map(encodeURIComponent).join('/')}`, {method: 'DELETE', headers: {'X-CSRF-Token': csrf}}); if (response.ok) card.remove(); else alert('The file could not be deleted.'); });
+    card.querySelector('[data-edit-media]')?.addEventListener('click', () => openEdit(card));
+    card.querySelector('[data-rename-media]')?.addEventListener('click', () => openRename(card));
+  });
+  const fileMetadata = {{ files|tojson }};
+  function openEdit(card) { const form = document.querySelector('[data-edit-form]'); const item = fileMetadata.find(file => file.relative_name === card.dataset.name); const metadata = item?.metadata || {}; form.dataset.name = card.dataset.name; document.querySelector('[data-edit-filename]').textContent = card.dataset.name; ['alt','title','caption','description','credit'].forEach(key => form.elements[key].value = metadata[key] || ''); editDialog?.showModal(); }
+  document.querySelector('[data-edit-form]')?.addEventListener('submit', async event => { event.preventDefault(); const form = event.currentTarget; const values = Object.fromEntries(['alt','title','caption','description','credit'].map(key => [key, form.elements[key].value])); const response = await jsonRequest(`${prefix}/media/${form.dataset.name.split('/').map(encodeURIComponent).join('/')}`, 'PATCH', {name: form.dataset.name, metadata: values}); if (response.ok) location.reload(); else alert('Metadata could not be saved.'); });
+  function openRename(card) { const form = document.querySelector('[data-rename-form]'); form.dataset.name = card.dataset.name; form.elements.name.value = card.dataset.name; document.querySelector('[data-rename-current]').textContent = card.dataset.name; document.querySelector('[data-rename-error]').textContent = ''; renameDialog?.showModal(); }
+  document.querySelector('[data-rename-form]')?.addEventListener('submit', async event => { event.preventDefault(); const form = event.currentTarget; const response = await jsonRequest(`${prefix}/media/${form.dataset.name.split('/').map(encodeURIComponent).join('/')}`, 'PATCH', {name: form.elements.name.value}); if (response.ok) location.reload(); else document.querySelector('[data-rename-error]').textContent = 'That name is invalid or already exists.'; });
+})();
 </script>
 {% endblock %}

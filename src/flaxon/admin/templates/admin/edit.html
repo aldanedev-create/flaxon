@@ -1,65 +1,176 @@
-<!-- templates/admin/edit.html -->
 {% extends "admin/base.html" %}
 
 {% block title %}Edit {{ verbose_name }}{% endblock %}
 
 {% block content %}
 {% set prefix = dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') %}
-<div class="space-y-4 sm:space-y-6">
-    <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-            <h1 class="text-2xl font-bold text-white">Edit {{ verbose_name }}</h1>
-            <p class="text-slate-400 text-sm mt-1">Editing {{ verbose_name|lower }} #{{ object_id }}</p>
+{% set form_fields = fields or ['name', 'description', 'status'] %}
+{% set readonly = readonly_fields if readonly_fields is defined else [] %}
+<div class="corporate-page edit-record-page">
+  <nav class="edit-breadcrumbs" aria-label="Breadcrumb">
+    <a href="{{ prefix }}/">Admin</a><i class="fas fa-chevron-right"></i>
+    <a href="{{ prefix }}/{{ model.get_name() }}">{{ verbose_name_plural|title }}</a><i class="fas fa-chevron-right"></i>
+    <span>Editing {{ record_label }}</span>
+  </nav>
+
+  <header class="corporate-header edit-record-header">
+    <div>
+      <p class="admin-eyebrow">{{ verbose_name|title }} workspace</p>
+      <h1>Edit {{ verbose_name|lower }}</h1>
+      <p class="corporate-subtitle">Update this record, review its current state, and save without leaving the Admin workflow.</p>
+    </div>
+    <div class="corporate-actions">
+      <a class="corporate-button corporate-button-muted" href="{{ prefix }}/{{ model.get_name() }}"><i class="fas fa-arrow-left"></i><span>Back to {{ verbose_name_plural|title }}</span></a>
+      <a class="corporate-button corporate-button-muted" href="{{ prefix }}/{{ model.get_name() }}/{{ object_id }}"><i class="fas fa-eye"></i><span>View</span></a>
+      <a class="corporate-button corporate-button-muted" href="{{ prefix }}/{{ model.get_name() }}/{{ object_id }}/history"><i class="fas fa-clock-rotate-left"></i><span>History{% if history_count %} ({{ history_count }}){% endif %}</span></a>
+      {% if can_delete %}<a class="corporate-button corporate-button-danger" href="{{ prefix }}/{{ model.get_name() }}/{{ object_id }}/delete"><i class="fas fa-trash"></i><span>Delete</span></a>{% endif %}
+    </div>
+  </header>
+
+  <form method="post" class="edit-record-layout" data-edit-form>
+    <input type="hidden" name="_csrf" value="{{ dashboard.csrf_token() }}">
+    <input type="hidden" name="_version" value="{{ version }}">
+
+    <div class="edit-record-main">
+      <section class="corporate-panel">
+        <div class="corporate-panel-header edit-panel-heading">
+          <div><p class="corporate-kicker">Record details</p><h2>Editable fields</h2><p class="corporate-muted">Changes are checked again by the server before they are saved.</p></div>
+          <span class="corporate-badge corporate-badge-neutral">ID {{ object_id }}</span>
         </div>
-        <div class="flex gap-2">
-            <a href="{{ prefix }}/{{ model.get_name() }}" class="px-4 py-2 bg-slate-700/50 hover:bg-slate-600/50 rounded-lg text-sm transition text-white flex items-center gap-2">
-                <i class="fas fa-arrow-left"></i>
-                Back to list
-            </a>
-            <a href="{{ prefix }}/{{ model.get_name() }}/{{ object_id }}" class="px-4 py-2 bg-slate-700/50 hover:bg-slate-600/50 rounded-lg text-sm transition text-white flex items-center gap-2">
-                <i class="fas fa-eye"></i>
-                View
-            </a>
+        <div class="record-fields">
+          {% for field in form_fields %}
+          {% set field_name = field|string %}
+          {% set field_key = field_name|lower %}
+          {% set current_value = field_values.get(field_name, '') %}
+          {% set raw_value = field_raw_values.get(field_name) %}
+          {% set is_readonly = field_name in readonly or field_key == 'id' %}
+          {% set is_long = field_key in ['description', 'content', 'body', 'notes', 'excerpt', 'summary', 'address'] %}
+          {% set is_json = raw_value is mapping or (raw_value is sequence and raw_value is not string) or 'json' in field_key or field_key in ['metadata', 'settings', 'relationship', 'relationships', 'repeater', 'items'] %}
+          {% set is_boolean = raw_value is boolean or field_key in ['active', 'enabled', 'is_active', 'published', 'featured', 'visible', 'verified'] %}
+          {% set is_number = field_key in ['price', 'amount', 'cost', 'stock', 'quantity', 'count', 'sort_order', 'position', 'priority', 'rate'] %}
+          {% set is_datetime = 'datetime' in field_key or field_key.endswith('_at') or field_key.endswith('_on') %}
+          {% set is_date = field_key == 'date' or field_key.endswith('_date') %}
+          <div class="corporate-field record-field {% if is_long or is_json %}record-field-wide{% endif %}{% if is_readonly %} is-readonly{% endif %}">
+            <div class="edit-field-label"><label for="edit-{{ field_key }}">{{ field_name|replace('_', ' ')|title }}</label>{% if is_readonly %}<span class="corporate-badge corporate-badge-neutral">Read-only</span>{% endif %}</div>
+
+            {% if is_readonly %}
+            <div class="edit-readonly-value" id="edit-{{ field_key }}">{{ current_value or 'Not set' }}</div>
+            {% elif is_boolean %}
+            <input type="hidden" name="{{ field_name }}" value="false" data-boolean-fallback="{{ field_name }}">
+            <label class="corporate-checkbox edit-boolean-control" for="edit-{{ field_key }}"><input id="edit-{{ field_key }}" type="checkbox" name="{{ field_name }}" value="true" data-boolean-field="{{ field_name }}"{% if raw_value is true or raw_value in [1, '1', 'true', 'True', 'yes', 'on'] %} checked{% endif %}><span>{% if raw_value is true or raw_value in [1, 'true', 'True', 'yes', 'on'] %}Enabled{% else %}Disabled{% endif %}</span></label>
+            {% elif is_long or is_json %}
+            <textarea id="edit-{{ field_key }}" name="{{ field_name }}" rows="8" data-editor-field{% if is_json %} data-json-field{% endif %} placeholder="Enter {{ field_name|replace('_', ' ') }}...">{{ current_value }}</textarea>
+            {% if is_json %}<small>Enter valid JSON. Structured values are validated in the browser and again by your application.</small>{% else %}<small data-counter-for="{{ field_name }}">{{ current_value|length }} characters</small>{% endif %}
+            {% elif is_number %}
+            <input id="edit-{{ field_key }}" name="{{ field_name }}" type="number" value="{{ current_value }}" step="{% if field_key in ['price', 'amount', 'cost', 'rate'] %}0.01{% else %}1{% endif %}" inputmode="decimal">
+            <small>Use a numeric value. The model adapter remains authoritative for business validation.</small>
+            {% elif is_datetime %}
+            <input id="edit-{{ field_key }}" name="{{ field_name }}" type="datetime-local" value="{{ current_value[:16] }}">
+            <small>Stored value: {{ current_value or 'Not set' }}</small>
+            {% elif is_date %}
+            <input id="edit-{{ field_key }}" name="{{ field_name }}" type="date" value="{{ current_value[:10] }}">
+            {% elif 'email' in field_key %}
+            <input id="edit-{{ field_key }}" name="{{ field_name }}" type="email" value="{{ current_value }}" autocomplete="email">
+            {% elif 'url' in field_key or 'link' in field_key %}
+            <input id="edit-{{ field_key }}" name="{{ field_name }}" type="url" value="{{ current_value }}" inputmode="url">
+            {% if current_value %}<a class="edit-field-link" href="{{ current_value }}" target="_blank" rel="noreferrer">Open current URL <i class="fas fa-arrow-up-right-from-square"></i></a>{% endif %}
+            {% else %}
+            <input id="edit-{{ field_key }}" name="{{ field_name }}" type="text" value="{{ current_value }}">
+            {% endif %}
+
+            {% if not is_readonly and field_key in ['image', 'image_url', 'hero_image', 'thumbnail', 'avatar'] and current_value %}<div class="edit-image-preview"><img src="{{ current_value }}" alt="Current {{ field_name|replace('_', ' ') }}" loading="lazy"><span>Current media</span></div>{% endif %}
+          </div>
+          {% endfor %}
         </div>
+      </section>
+
+      <div class="edit-save-bar">
+        <div><strong>Ready to save?</strong><span data-dirty-indicator>No unsaved changes</span></div>
+        <div class="corporate-form-actions">
+          <button type="submit" name="_save" value="continue" class="corporate-button corporate-button-muted"><i class="fas fa-check-double"></i><span>Save and continue</span></button>
+          <button type="submit" name="_save" value="add" class="corporate-button corporate-button-muted"><i class="fas fa-plus"></i><span>Save and add another</span></button>
+          <button type="submit" name="_save" value="list" class="corporate-button corporate-button-primary"><i class="fas fa-save"></i><span>Save changes</span></button>
+        </div>
+      </div>
     </div>
 
-    <!-- Edit Form -->
-    <form method="POST" class="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl overflow-hidden"><input type="hidden" name="_csrf" value="{{ dashboard.csrf_token() }}"><input type="hidden" name="_version" value="{{ version }}">
-        <div class="p-4 sm:p-6 space-y-4">
-            {% for field in fields or ['name', 'description', 'status'] %}
-            {% set is_readonly = (readonly_fields is defined and field in readonly_fields) or field == 'id' %}
-            <div>
-                <label class="block text-sm font-medium text-slate-300 mb-1.5">
-                    {{ field|replace('_', ' ')|title }}
-                    {% if field in ['name'] %}<span class="text-red-400">*</span>{% endif %}
-                </label>
+    <aside class="edit-record-aside">
+      <section class="corporate-panel">
+        <div class="corporate-panel-header"><div><p class="corporate-kicker">Record status</p><h2>{{ record_label }}</h2></div><i class="corporate-panel-icon fas fa-file-pen"></i></div>
+        <dl class="edit-meta-list">
+          <div><dt>Identifier</dt><dd>#{{ object_id }}</dd></div>
+          {% if last_modified %}<div><dt>Last modified</dt><dd>{{ last_modified }}</dd></div>{% endif %}
+          <div><dt>Access</dt><dd><span class="corporate-badge corporate-badge-success">Can change</span></dd></div>
+          <div><dt>Concurrency</dt><dd>Version checked on save</dd></div>
+        </dl>
+      </section>
 
-                {% if field in ['description'] %}
-                <textarea name="{{ field }}" rows="4" {% if is_readonly %}readonly{% endif %} class="w-full rounded-lg px-4 py-2 text-sm transition resize-y {% if is_readonly %}bg-slate-700/30 border border-slate-600/50 text-slate-400 cursor-not-allowed{% else %}bg-slate-700/50 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50{% endif %}">{{ object[field] if object and field in object else '' }}</textarea>
+      <section class="corporate-panel">
+        <div class="corporate-panel-header"><div><p class="corporate-kicker">Change history</p><h2>Recent activity</h2></div><a class="edit-panel-link" href="{{ prefix }}/{{ model.get_name() }}/{{ object_id }}/history">View all</a></div>
+        {% if history_entries %}<div class="edit-history-list">{% for entry in history_entries[:4] %}<div class="edit-history-item"><span class="activity-icon"><i class="fas fa-{{ 'plus' if 'created' in entry.action else 'pen' if 'updated' in entry.action else 'trash' if 'deleted' in entry.action else 'bolt' }}"></i></span><div><strong>{{ entry.action|replace('_', ' ')|title }}</strong><small>{{ entry.username }} - {{ entry.timestamp }}</small></div></div>{% endfor %}</div>{% else %}<div class="corporate-empty compact"><i class="fas fa-clock-rotate-left"></i><strong>No history yet</strong><p>Save a change and it will appear here.</p></div>{% endif %}
+      </section>
 
-                {% else %}
-                <input type="text" name="{{ field }}" value="{{ object[field] if object and field in object else (object_id if field == 'id' else '') }}"
-                       {% if is_readonly %}readonly{% endif %}
-                       class="w-full rounded-lg px-4 py-2 text-sm transition {% if is_readonly %}bg-slate-700/30 border border-slate-600/50 text-slate-400 cursor-not-allowed{% else %}bg-slate-700/50 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50{% endif %}">
-                {% endif %}
-
-                {% if is_readonly %}
-                <p class="text-xs text-slate-500 mt-1">This field is read-only.</p>
-                {% endif %}
-            </div>
-            {% endfor %}
-        </div>
-
-        <!-- Form Actions -->
-        <div class="px-4 sm:px-6 py-4 border-t border-slate-700/50 flex flex-col sm:flex-row gap-3">
-            <button type="submit" class="px-6 py-2 bg-gradient-to-r from-blue-500 to-cyan-400 hover:from-blue-600 hover:to-cyan-500 rounded-lg text-sm font-medium transition text-white">
-                <i class="fas fa-save mr-2"></i> Save Changes
-            </button>
-            <a href="{{ prefix }}/{{ model.get_name() }}" class="px-6 py-2 bg-slate-700/50 hover:bg-slate-600/50 rounded-lg text-sm transition text-white text-center">
-                Cancel
-            </a>
-        </div>
-    </form>
+      <section class="corporate-panel">
+        <p class="corporate-kicker">Editing guidance</p>
+        <h2>Keep records consistent</h2>
+        <ul class="corporate-checklist"><li><i class="fas fa-check"></i>Use the record's existing format.</li><li><i class="fas fa-check"></i>Validate structured JSON before saving.</li><li><i class="fas fa-check"></i>Review the history after important changes.</li></ul>
+        <div class="corporate-note"><i class="fas fa-shield-halved"></i><span>Your session token and record version are verified on every save.</span></div>
+      </section>
+    </aside>
+  </form>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  const form = document.querySelector('[data-edit-form]');
+  if (!form) return;
+  const indicator = form.querySelector('[data-dirty-indicator]');
+  const initial = new FormData(form);
+  const initialValues = new Map();
+  initial.forEach((value, key) => { if (key !== '_csrf' && key !== '_save') initialValues.set(key, String(value)); });
+
+  function updateDirtyState() {
+    const current = new FormData(form);
+    let dirty = false;
+    current.forEach((value, key) => { if (key !== '_csrf' && key !== '_save' && initialValues.get(key) !== String(value)) dirty = true; });
+    initialValues.forEach((value, key) => { if (!current.has(key)) dirty = true; });
+    if (indicator) indicator.textContent = dirty ? 'Unsaved changes' : 'No unsaved changes';
+    if (indicator) indicator.classList.toggle('is-dirty', dirty);
+    return dirty;
+  }
+
+  form.addEventListener('input', updateDirtyState);
+  form.addEventListener('change', updateDirtyState);
+  form.querySelectorAll('[data-boolean-field]').forEach(function (checkbox) {
+    checkbox.addEventListener('change', function () {
+      const label = checkbox.closest('.edit-boolean-control');
+      const text = label && label.querySelector('span');
+      if (text) text.textContent = checkbox.checked ? 'Enabled' : 'Disabled';
+    });
+  });
+  form.addEventListener('submit', function () {
+    form.querySelectorAll('[data-boolean-field]').forEach(function (checkbox) {
+      const fallback = form.querySelector('[data-boolean-fallback="' + CSS.escape(checkbox.name) + '"]');
+      if (checkbox.checked && fallback) fallback.remove();
+    });
+    window.removeEventListener('beforeunload', warnBeforeLeave);
+  });
+  function warnBeforeLeave(event) { if (updateDirtyState()) { event.preventDefault(); event.returnValue = ''; } }
+  window.addEventListener('beforeunload', warnBeforeLeave);
+  form.querySelectorAll('[data-json-field]').forEach(function (field) {
+    field.addEventListener('blur', function () {
+      if (!field.value.trim()) { field.setCustomValidity(''); return; }
+      try { JSON.parse(field.value); field.setCustomValidity(''); } catch (_) { field.setCustomValidity('Enter valid JSON before saving.'); }
+    });
+  });
+  form.querySelectorAll('[data-editor-field]').forEach(function (field) {
+    field.addEventListener('input', function () {
+      const counter = form.querySelector('[data-counter-for="' + CSS.escape(field.name) + '"]');
+      if (counter) counter.textContent = field.value.length + ' characters';
+    });
+  });
+}());
+</script>
 {% endblock %}

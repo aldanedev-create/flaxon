@@ -14,14 +14,23 @@
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-000000.svg" alt="Code style: ruff"></a>
 </p>
 
-Author: Aldane Hutchinson
+Principal Author: Aldane Hutchinson
 
 
 Flaxon is an async-first ASGI framework for JSON APIs, WebSockets, and
 server-rendered applications. It provides the HTTP boundary; you choose the
 database, frontend, queue, and deployment platform.
 
+i Would love for other Developers to help me  maintain this codebase 
+
+Run full test suite well make sure if add or change something it not broken and benchmarks as well .
+
+
 > Status: Production/stable. 
+
+it says Stable but am adding things still and api may change a little but not alot.
+
+check out Teloce-py it complier that complies .vel single components to vanilla js for browser serving. is works well with flaxon or flask or any.
 
 ## Install
 
@@ -141,6 +150,8 @@ it has been produced by a trusted sanitizer.
 - Jinax templates, caching helpers, database adapters/transactions,
   background tasks, plugins, OpenAPI, GraphQL, health checks, and metrics.
 - `TestClient` and `AsyncWebSocketClient` for application tests.
+- Built in admin and Cms and Plugins there some not alot   search flaxon and find some plugins.
+
 
 ## Documentation and examples
 

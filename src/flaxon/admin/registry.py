@@ -16,6 +16,12 @@ class AdminModel:
         ordering: list[str] | None = None,
         name: str | None = None,
         icon: str | None = None,
+        actions: dict[str, Any] | list[Any] | tuple[Any, ...] | None = None,
+        can_view: Any | None = None,
+        can_add: Any | None = None,
+        can_change: Any | None = None,
+        can_delete: Any | None = None,
+        validate_import: Any | None = None,
     ) -> None:
         self.model = model
         self.list_display = list_display or ["__str__"]
@@ -27,6 +33,14 @@ class AdminModel:
         self._name = name or model.__name__.lower()
         self.icon = icon
         self.actions = {}
+        self.permission_hooks = {"read": can_view, "create": can_add, "update": can_change, "delete": can_delete}
+        self.validate_import = validate_import
+        if isinstance(actions, dict):
+            self.actions.update(actions)
+        elif actions:
+            for action in actions:
+                action_name = getattr(action, "_admin_action", None) or getattr(action, "__name__", "action")
+                self.actions[action_name] = action
 
     def get_name(self) -> str:
         return self._name
@@ -42,6 +56,23 @@ class AdminModel:
 
     def get_actions(self) -> dict[str, Any]:
         return self.actions
+
+    def get_permission_hook(self, action: str) -> Any | None:
+        return self.permission_hooks.get(action)
+
+    @staticmethod
+    def display_value(obj: Any, field: Any) -> Any:
+        """Resolve a list column like Flask-Admin's ``column_formatters``."""
+
+        if callable(field):
+            return field(obj)
+        if field == "__str__":
+            return str(obj)
+        if isinstance(obj, dict):
+            value = obj.get(field, "")
+        else:
+            value = getattr(obj, field, "")
+        return value() if callable(value) else value
 
 
 class Registry:

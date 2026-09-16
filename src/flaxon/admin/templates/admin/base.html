@@ -19,14 +19,15 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
     <!-- Admin CSS -->
-    <link rel="stylesheet" href="/static/admin/css/admin.css?v=20260830-1">
+    <link rel="stylesheet" href="/static/admin/css/admin.css?v=20260916-2">
+    {% if dashboard and dashboard.config.custom_styles %}<link rel="stylesheet" href="{{ dashboard.config.custom_styles }}">{% endif %}
 
     {% block extra_head %}{% endblock %}
 </head>
-<body>
+<body class="admin-shell">
 
     <!-- Admin Layout -->
-    <div class="min-h-screen bg-slate-900/90 backdrop-blur-sm text-slate-100" x-data="adminApp()" x-init="init()">
+    <div class="admin-app-shell min-h-screen bg-slate-900/90 backdrop-blur-sm text-slate-100" x-data="adminApp()" x-init="init()">
         <!-- Top Navigation -->
         <nav class="bg-slate-800/80 backdrop-blur-sm border-b border-slate-700/50 sticky top-0 z-50">
             <div class="px-4 sm:px-6 lg:px-8">
@@ -59,7 +60,7 @@
                             <span x-show="notifications.length" x-text="notifications.length > 9 ? '9+' : notifications.length" class="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-red-500 rounded-full text-[10px] leading-4 text-white"></span>
                         </button>
                         <button @click="toggleDarkMode()" title="Toggle theme" aria-label="Toggle theme" class="p-2 rounded-lg hover:bg-slate-700/50 transition text-slate-400 hover:text-white">
-                            <i class="fas" :class="darkMode ? 'fa-sun' : 'fa-moon'"></i>
+                            <span class="theme-icon" x-text="darkMode ? '\u2600' : '\u263E'" aria-hidden="true">&#9728;</span>
                         </button>
                         <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/profile" title="Profile" class="p-2 rounded-lg hover:bg-slate-700/50 transition text-slate-400 hover:text-white">
                             <i class="fas fa-user-circle text-xl"></i>
@@ -79,8 +80,9 @@
                 <div class="flex items-center justify-between border-b border-slate-700 px-5 py-4"><strong>Admin navigation</strong><button @click="mobileMenuOpen = false" title="Close navigation" aria-label="Close navigation" class="p-2 text-slate-400 hover:text-white"><i class="fas fa-xmark"></i></button></div>
                 <nav class="space-y-1 p-4" aria-label="Mobile Admin navigation">
                     <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/" class="mobile-menu-link"><i class="fas fa-th-large"></i>Dashboard</a>
-                    {% set mobile_models = models if models else (dashboard.registry.get_all() if dashboard else []) %}
+                    {% set mobile_models = models if models is defined and models else (dashboard.registry.get_all() if dashboard else []) %}
                     {% for model_item in mobile_models %}<a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/{{ model_item.get_name() }}" class="mobile-menu-link"><i class="fas fa-table"></i>{{ model_item.get_verbose_name_plural() }}</a>{% endfor %}
+                    {% if dashboard %}{% for custom_view in dashboard.custom_views %}<a href="{{ custom_view.url }}" class="mobile-menu-link"><i class="fas {{ custom_view.icon }}"></i>{{ custom_view.name }}</a>{% endfor %}{% endif %}
                     <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/users" class="mobile-menu-link"><i class="fas fa-users"></i>Users</a>
                     <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/roles" class="mobile-menu-link"><i class="fas fa-shield-halved"></i>Roles &amp; permissions</a>
                     <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/media" class="mobile-menu-link"><i class="fas fa-photo-film"></i>Media</a>
@@ -123,13 +125,14 @@
                             <i class="fas fa-th-large w-5"></i>
                             <span>Dashboard</span>
                         </a>
-                        {% set active_models = models if models else (dashboard.registry.get_all() if dashboard else []) %}
+                        {% set active_models = models if models is defined and models else (dashboard.registry.get_all() if dashboard else []) %}
                         {% for model_item in active_models %}
                         <a href="{{ base_prefix }}/{{ model_item.get_name() }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition">
                             <i class="fas fa-table w-5"></i>
                             <span>{{ model_item.get_verbose_name_plural() }}</span>
                         </a>
                         {% endfor %}
+                        {% if dashboard %}{% for custom_view in dashboard.custom_views %}<a href="{{ custom_view.url }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas {{ custom_view.icon }} w-5"></i><span>{{ custom_view.name }}</span></a>{% endfor %}{% endif %}
                         <a href="{{ base_prefix }}/users" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas fa-users w-5"></i><span>Users</span></a>
                         <a href="{{ base_prefix }}/roles" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas fa-shield-halved w-5"></i><span>Roles</span></a>
                         <a href="{{ base_prefix }}/media" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas fa-photo-film w-5"></i><span>Media</span></a>
@@ -150,6 +153,7 @@
 
     <!-- Admin JS -->
     <script src="/static/admin/js/admin.js"></script>
+    {% if dashboard and dashboard.config.custom_scripts %}<script src="{{ dashboard.config.custom_scripts }}" defer></script>{% endif %}
     {% block extra_scripts %}{% endblock %}
 
     <script>

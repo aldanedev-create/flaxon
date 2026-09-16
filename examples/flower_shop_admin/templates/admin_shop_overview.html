@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }} - Petal &amp; Stem</title><link rel="stylesheet" href="/shop-static/shop.css">
+</head>
+<body>
+  <main class="shell shop-admin-shell">
+    <header class="site-header">
+      <div><a class="brand" href="{{ admin_url }}">Petal &amp; Stem</a><p class="eyebrow">PROTECTED ADMIN EXTENSION</p></div>
+      <nav aria-label="Shop administration"><a href="{{ admin_url }}">Admin dashboard</a><a href="{{ cms_url }}">CMS editor</a><a href="/">Public site</a></nav>
+    </header>
+    <p class="eyebrow">COMMERCE WORKSPACE</p>
+    <h1>Shop overview</h1>
+    <p class="lede">A custom Jinax Admin page mounted beside the standard Admin tools. Use it to verify how a real business can extend the back office without changing Flaxon core.</p>
+    <section class="ops-grid" aria-label="Shop metrics">
+      <article class="ops-stat"><span>Flowers</span><strong>{{ flower_count }}</strong><small>Catalog records</small></article>
+      <article class="ops-stat"><span>Stories</span><strong>{{ story_count }}</strong><small>{{ published_count }} published</small></article>
+      <article class="ops-stat"><span>Media</span><strong>{{ media_count }}</strong><small>Reusable assets</small></article>
+      <article class="ops-stat"><span>Orders</span><strong>{{ order_count }}</strong><small>Demo checkout orders</small></article>
+    </section>
+    <section class="launch-panel">
+      <div><p class="eyebrow">TEST WORKFLOWS</p><h2>Open an area</h2><p class="status">Each link goes to a working route in this example.</p></div>
+      <div class="launch-grid">
+        <a href="{{ admin_url }}flower"><strong>Flower catalog</strong><span>Search, filter, add, edit, delete, bulk actions, and history.</span></a>
+        <a href="{{ admin_url }}media"><strong>Media library</strong><span>Upload an image, edit metadata, copy its URL, and reuse it in CMS content.</span></a>
+        <a href="{{ admin_url }}users"><strong>Users and roles</strong><span>Test account lifecycle, permissions, and MFA enrollment from Profile.</span></a>
+        <a href="{{ admin_url }}operations"><strong>Operations</strong><span>Inspect health checks, task status, and audit activity.</span></a>
+        <a href="{{ cms_url }}"><strong>CMS editor</strong><span>Create a story, edit rich text, schedule it, and inspect revisions.</span></a>
+        <a href="/cms-lab"><strong>CMS feature lab</strong><span>See how the public Jinax page reads the same CMS records.</span></a>
+        <a href="/catalog"><strong>Public catalog</strong><span>Verify that Admin-managed flowers and media render on the site.</span></a>
+        <a href="/chat?user=owner"><strong>Team chat</strong><span>Exercise the WebSocket shop-floor room.</span></a>
+      </div>
+    </section>
+    <p class="hint">Development users: <code>owner / Owner123!</code> and <code>florist / Florist123!</code>. Change these values before deployment.</p>
+  </main>
+</body>
+</html>

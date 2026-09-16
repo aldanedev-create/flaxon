@@ -12,11 +12,13 @@
             <h1 class="text-2xl font-bold text-white">{{ verbose_name_plural }}</h1>
             <p class="text-slate-400 text-sm mt-1">Manage your {{ verbose_name_plural|lower }}</p>
         </div>
-        <div class="flex gap-2">
-            <a href="{{ prefix }}/{{ model.get_name() }}/add" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-400 hover:from-blue-600 hover:to-cyan-500 rounded-lg text-sm font-medium transition text-white flex items-center gap-2">
+        <div class="flex flex-wrap gap-2">
+            {% if can_export %}<a href="{{ prefix }}/{{ model.get_name() }}/export?format=json" class="px-3 py-2 bg-slate-700 rounded-lg text-sm" title="Export JSON"><i class="fas fa-download mr-1"></i>Export</a>{% endif %}
+            {% if can_import %}<form method="post" action="{{ prefix }}/{{ model.get_name() }}/import" enctype="multipart/form-data" class="flex items-center gap-2"><input type="hidden" name="_csrf" value="{{ dashboard.csrf_token() }}"><label class="px-3 py-2 bg-slate-700 rounded-lg text-sm cursor-pointer"><i class="fas fa-upload mr-1"></i>Import<input type="file" name="file" accept=".json,.csv,application/json,text/csv" class="sr-only" onchange="this.form.submit()"></label></form>{% endif %}
+            {% if can_add %}<a href="{{ prefix }}/{{ model.get_name() }}/add" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-400 hover:from-blue-600 hover:to-cyan-500 rounded-lg text-sm font-medium transition text-white flex items-center gap-2">
                 <i class="fas fa-plus"></i>
                 Add {{ verbose_name|lower }}
-            </a>
+            </a>{% endif %}
         </div>
     </div>
 
@@ -32,7 +34,7 @@
         </div>
     </div>
 
-    <form id="bulk-form" method="post" action="{{ prefix }}/{{ model.get_name() }}/actions/delete" onsubmit="return confirm('Apply this action to the selected records?')" class="flex items-center gap-2"><input type="hidden" name="_csrf" value="{{ dashboard.csrf_token() }}"><select name="action" onchange="this.form.action='{{ prefix }}/{{ model.get_name() }}/actions/' + this.value" class="bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm"><option value="delete">Delete selected</option>{% for name, action in actions.items() %}{% if name != 'delete' %}<option value="{{ name }}">{{ name|title }}</option>{% endif %}{% endfor %}</select><button class="px-3 py-2 bg-slate-700 rounded text-sm">Apply</button></form>
+    {% if can_delete or actions %}<form id="bulk-form" method="post" action="{{ prefix }}/{{ model.get_name() }}/actions/delete" onsubmit="return confirm('Apply this action to the selected records?')" class="flex items-center gap-2"><input type="hidden" name="_csrf" value="{{ dashboard.csrf_token() }}"><select name="action" onchange="this.form.action='{{ prefix }}/{{ model.get_name() }}/actions/' + this.value" class="bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm">{% if can_delete %}<option value="delete">Delete selected</option>{% endif %}{% for name, action in actions.items() %}<option value="{{ name }}">{{ name|title }}</option>{% endfor %}</select><button class="px-3 py-2 bg-slate-700 rounded text-sm">Apply</button></form>{% endif %}
 
     <!-- Table -->
     <div class="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl overflow-hidden">
@@ -56,7 +58,7 @@
                         <td class="px-4 py-3"><input type="checkbox" name="ids" value="{{ item_id }}" form="bulk-form"></td>
                         {% for field in list_display %}
                         <td class="px-4 py-3 text-sm text-white">
-                            {{ item[field] if (item is mapping and field in item) else (item.__dict__[field] if (item.__dict__ is defined and field in item.__dict__) else '') }}
+                            {{ model.display_value(item, field) }}
                         </td>
                         {% endfor %}
                         <td class="px-4 py-3 text-sm text-right">
@@ -64,14 +66,14 @@
                                 <a href="{{ prefix }}/{{ model.get_name() }}/{{ item_id }}" class="p-1.5 rounded-lg hover:bg-slate-700/50 transition text-slate-400 hover:text-white">
                                     <i class="fas fa-eye text-xs"></i>
                                 </a>
-                                <a href="{{ prefix }}/{{ model.get_name() }}/{{ item_id }}/edit" class="p-1.5 rounded-lg hover:bg-slate-700/50 transition text-slate-400 hover:text-white">
+                                {% if can_change %}<a href="{{ prefix }}/{{ model.get_name() }}/{{ item_id }}/edit" class="p-1.5 rounded-lg hover:bg-slate-700/50 transition text-slate-400 hover:text-white">
                                     <i class="fas fa-edit text-xs"></i>
-                                </a>
-                                <form action="{{ prefix }}/{{ model.get_name() }}/{{ item_id }}/delete" method="POST" class="inline"><input type="hidden" name="_csrf" value="{{ dashboard.csrf_token() }}">
+                                </a>{% endif %}
+                                {% if can_delete %}<form action="{{ prefix }}/{{ model.get_name() }}/{{ item_id }}/delete" method="POST" class="inline"><input type="hidden" name="_csrf" value="{{ dashboard.csrf_token() }}">
                                     <button type="submit" data-delete data-message="Delete this {{ verbose_name|lower }}?" class="p-1.5 rounded-lg hover:bg-red-500/20 transition text-red-400">
                                         <i class="fas fa-trash text-xs"></i>
                                     </button>
-                                </form>
+                                </form>{% endif %}
                             </div>
                         </td>
                     </tr>
