@@ -612,6 +612,7 @@ class CMS:
             (f"{prefix}/api/import/<type_name>", {"POST"}, self.api_import),
             (f"{prefix}/api/scheduler/jobs", {"GET"}, self.api_scheduler_jobs),
             (f"{prefix}/api/scheduler/jobs/<job_id>/retry", {"POST"}, self.api_scheduler_retry),
+            (f"{prefix}/api/workspace/<section>", {"GET"}, self.api_workspace),
             (f"{prefix}/api/media", {"GET"}, self.api_media),
             (f"{prefix}/api/taxonomies", {"GET", "POST"}, self.api_taxonomies),
             (f"{prefix}/api/taxonomies/<taxonomy_name>", {"POST", "PATCH", "DELETE"}, self.api_taxonomy),
@@ -663,6 +664,70 @@ class CMS:
     async def api_stats(self, request: Request) -> Response:
         await self._require_user(request, "admin.view_dashboard")
         return JSONResponse({name: ct.stats() for name, ct in self.content_types.items()})
+
+    async def api_workspace(self, request: Request, section: str) -> Response:
+        """Return persistent data for the CMS editorial workspaces.
+
+        The SPA uses one stable endpoint so new workspace views do not need a
+        second API contract. Each response is derived from CMS resources or
+        the configured Admin services; empty sections are explicit rather than
+        pretending that an integration exists.
+        """
+
+        user = await self._require_user(request, "admin.view_dashboard")
+        section = section.strip().lower().replace("_", "-")
+        records = [record | {"content_type": name} for name, content_type in self.content_types.items() for record in content_type.items.values()]
+        if section == "media":
+            dashboard = getattr(self.app, "_flaxon_admin_dashboard", None)
+            if dashboard is None:
+                return JSONResponse({"section": section, "items": [], "stats": {}})
+            dashboard.auth.authorize(user, "media.manage_library")
+            items = await dashboard._media_files()
+            return JSONResponse({"section": section, "items": items, "stats": {"total": len(items)}})
+        if section in {"calendar", "publishing"}:
+            items = sorted(self.scheduler_jobs.values(), key=lambda item: item.get("run_after", ""))
+            return JSONResponse({"section": section, "items": items, "stats": {"scheduled": len(items), "failed": sum(item.get("state") == "retry" for item in items)}})
+        if section in {"board", "review"}:
+            statuses = {status: [item for item in records if item.get("status") == status] for status in ("draft", "review", "approved", "published", "archived", "scheduled")}
+            items = records if section == "board" else statuses.get("review", []) + statuses.get("pending", [])
+            return JSONResponse({"section": section, "items": items, "columns": statuses, "stats": {key: len(value) for key, value in statuses.items()}})
+        if section in {"comments", "moderation"}:
+            return JSONResponse({"section": section, "items": self.comments, "stats": {status: sum(item.get("status") == status for item in self.comments) for status in _COMMENT_STATUSES}})
+        if section in {"taxonomies", "categories", "tags"}:
+            return JSONResponse({"section": section, "items": self.taxonomies, "stats": {"taxonomies": len(self.taxonomies)}})
+        if section in {"menus", "menu"}:
+            return JSONResponse({"section": section, "items": self.menus, "stats": {"menus": len(self.menus)}})
+        if section in {"models", "model-builder", "model-versions"}:
+            items = [{"name": ct.name, "label": ct.label, "fields": [field.to_dict() for field in ct.fields], "records": len(ct.items), "revisions": len(ct.revisions)} for ct in self.content_types.values()]
+            return JSONResponse({"section": section, "items": items, "stats": {"models": len(items)}})
+        if section in {"seo", "search-index"}:
+            items = [{"content_type": item["content_type"], "id": item["id"], "title": item.get("title", ""), "slug": item.get("slug", ""), "indexed": True} for item in records]
+            return JSONResponse({"section": section, "items": items, "stats": {"indexed": len(items)}})
+        if section == "audit":
+            dashboard = getattr(self.app, "_flaxon_admin_dashboard", None)
+            items = dashboard.store.get("audit", "entries", []) if dashboard and dashboard.store and dashboard.audit_log else []
+            return JSONResponse({"section": section, "items": items, "stats": {"total": len(items)}})
+        if section == "references":
+            references = []
+            for item in records:
+                for key, value in item.items():
+                    if isinstance(value, str) and key.endswith(("_id", "_ids")):
+                        references.append({"content_type": item["content_type"], "record_id": item["id"], "field": key, "value": value})
+            return JSONResponse({"section": section, "items": references, "stats": {"total": len(references)}})
+        if section == "trash":
+            items = [item for item in records if item.get("status") in {"trash", "deleted", "archived"}]
+            return JSONResponse({"section": section, "items": items, "stats": {"total": len(items)}})
+        if section in {"sites", "locales", "previews", "integrations", "transfers"}:
+            dashboard = getattr(self.app, "_flaxon_admin_dashboard", None)
+            stored = self.store.get("cms", section, []) if self.store else []
+            if section == "locales" and not stored:
+                stored = [{"code": "en", "label": "English", "default": True}]
+            if section == "integrations":
+                stored = [{"name": name, "handlers": len(callbacks)} for name, callbacks in self.hooks.items()]
+            if section == "transfers" and dashboard and dashboard.job_store:
+                stored = [job.to_dict() for job in dashboard.job_store.list()]
+            return JSONResponse({"section": section, "items": stored or [], "stats": {"total": len(stored or [])}})
+        raise NotFound(f"Unknown CMS workspace '{section}'.")
 
     async def _save_admin_upload(self, upload: Any, request: Request) -> str:
         """Store a CMS file field through the configured Admin media pipeline.

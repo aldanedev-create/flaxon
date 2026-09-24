@@ -159,8 +159,10 @@ nav:
       - Routing: guides/routing.md
       - Requests: guides/requests.md
       - Responses: guides/responses.md
+      - OpenAPI and Interactive Docs: guides/openapi.md
       - Middleware: guides/middleware.md
       - Validation: guides/validation.md
+      - Pydantic: guides/pydantic.md
       - WebSockets: guides/websockets.md
       - Templates (Jinax): guides/jinax.md
       - Email: mail.md
@@ -169,6 +171,7 @@ nav:
       - Authorization: guides/authorization.md
       - Admin and CMS: guides/admin-cms.md
       - Admin Production Guide: guides/admin-production.md
+      - Admin and CMS Microservices: guides/microservices.md
       - Admin Guide: admin-guide.md
       - Testing: guides/testing.md
       - Debugging: guides/debugging.md
@@ -177,9 +180,11 @@ nav:
       - Mobile Backends: guides/mobile-developement.md
       - Tasks and Workers: guides/tasks.md
       - GraphQL: guides/graphql.md
+      - FastMCP: guides/fastmcp.md
       - Modules: guides/Modules.md
   - API Reference:
       - Application: api/application.md
+      - OpenAPI: guides/openapi.md
       - Routing: api/routing.md
       - HTTP: api/http.md
       - WebSocket: api/websocket.md
@@ -193,6 +198,7 @@ nav:
       - GraphQL: api/graphql.md
   - Examples:
       - Basic API: examples/basic-api.md
+      - OpenAPI API: examples/openapi.md
       - React Backend: examples/react-backend.md
       - Android Backend: examples/android-Development.md
       - WebSocket Chat: examples/websocket-chat.md
@@ -202,7 +208,10 @@ nav:
       - CMS Example: examples/cms/admin-cms/example-cms.md
       - Full Admin and CMS: examples/cms/full_admin_cms/README.md
       - Mail Example: examples/mail/readme.md
+      - GraphQL Example: examples/grahql/readme.md
       - Modules Example: examples/Modules/readme.md
+      - Pydantic API Example: examples/pydantic-api.md
+      - FastMCP Example: examples/fastmcp-app.md
       - React Backend Project: examples/react_backend/README.md
       - WhatsApp Chat Example: examples/whatsapp_chat/README.md
   - Lessons:

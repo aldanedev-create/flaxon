@@ -1,39 +1,43 @@
 from __future__ import annotations
 
+import html
+
 from flaxon.http import HTMLResponse
 
 
 class ReDoc:
-    def __init__(self, openapi_url: str = "/openapi.json", title: str = "Flaxon API") -> None:
+    """Render a ReDoc shell for an OpenAPI endpoint."""
+
+    def __init__(
+        self,
+        openapi_url: str = "/openapi.json",
+        title: str = "Flaxon API",
+        *,
+        asset_url: str = "https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js",
+    ) -> None:
         self.openapi_url = openapi_url
         self.title = title
+        self.asset_url = asset_url
 
     def render(self) -> HTMLResponse:
-        html = f"""<!DOCTYPE html>
+        title = html.escape(self.title, quote=True)
+        openapi_url = html.escape(self.openapi_url, quote=True)
+        asset_url = html.escape(self.asset_url, quote=True)
+        html_text = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{self.title} - ReDoc</title>
-    <style>
-        body {{
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        }}
-        redoc {{
-            display: block;
-        }}
-    </style>
+    <title>{title} - ReDoc</title>
+    <style>body {{ margin: 0; }} redoc {{ display: block; }}</style>
 </head>
 <body>
-    <redoc spec-url="{self.openapi_url}"></redoc>
-    <script src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"></script>
+    <redoc spec-url="{openapi_url}"></redoc>
+    <script src="{asset_url}"></script>
 </body>
 </html>"""
-        return HTMLResponse(html)
+        return HTMLResponse(html_text)
 
 
 def create_redoc(openapi_url: str = "/openapi.json", title: str = "Flaxon API") -> HTMLResponse:
-    doc = ReDoc(openapi_url, title)
-    return doc.render()
+    return ReDoc(openapi_url, title).render()

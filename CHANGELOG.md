@@ -5,6 +5,44 @@ All notable changes to Flaxon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Updated the root README with the current production boundary, optional
+  integrations, Admin/CMS capabilities, modules, and microservice guidance.
+- Added documentation for the Admin control plane, service-owned databases,
+  remote model adapters, service accounts, events, and Flaxon modules.
+
+## [0.2.5] - 2026-09-24
+
+This release consolidates the Admin/CMS, module, router, OpenAPI, and testing
+work completed after 0.2.4. It is the current development baseline for the
+framework.
+
+### Added
+
+- Admin control plane routes and pages for service registration, health,
+  metrics, logs, traces, queues, events, deployments, API keys, audit, storage,
+  backups, and status.
+- `ServiceRegistry`, `RemoteServiceClient`, and `RemoteModelAdapter` for
+  integrating service-owned APIs without direct cross-service database access.
+- `AdminDashboard.mount_module()` for custom Admin pages and extensions built
+  with `FlaxonModule` and Jinax.
+- CMS workspace APIs for calendar, editorial review, publishing, models,
+  media, SEO, comments, menus, transfers, and audit data.
+- OpenAPI, Swagger UI, ReDoc, Pydantic, FastMCP, GraphQL, and module examples
+  with runnable documentation coverage.
+
+### Changed
+
+- Admin control-plane routes are enabled by default. Pass
+  `microservices=False` to `AdminDashboard` when an application does not want
+  those routes mounted.
+- Documentation now distinguishes development defaults from production
+  deployments that require persistent storage, Redis, workers, object storage,
+  and external delivery services.
+
 ## [0.2.4]
 
 A large amount of work landed between 0.1.0 and this release without

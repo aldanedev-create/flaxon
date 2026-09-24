@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Callable
+from contextlib import AbstractAsyncContextManager, AsyncExitStack
 from typing import Any
 
 
@@ -40,6 +41,8 @@ class Lifecycle:
         """Initialize lifecycle manager."""
         self.startup_handlers: list[Callable[..., Any]] = []
         self.shutdown_handlers: list[Callable[..., Any]] = []
+        self._context_factories: list[Callable[[], AbstractAsyncContextManager[Any]]] = []
+        self._context_stack: AsyncExitStack | None = None
 
     def on_startup(self, callback: Callable[..., Any]) -> Callable[..., Any]:
         """Register a startup callback."""
@@ -51,20 +54,53 @@ class Lifecycle:
         self.shutdown_handlers.append(callback)
         return callback
 
+    def add_lifespan_context(
+        self, factory: Callable[[], AbstractAsyncContextManager[Any]]
+    ) -> Callable[[], AbstractAsyncContextManager[Any]]:
+        """Register an async context manager for the application lifespan.
+
+        Contexts are entered before startup callbacks and exited after shutdown
+        callbacks. This allows mounted ASGI applications to share the parent
+        application's lifecycle without taking ownership of the ASGI lifespan
+        scope themselves.
+        """
+        self._context_factories.append(factory)
+        return factory
+
     async def startup(self) -> None:
         """Execute all startup handlers in registration order."""
-        for callback in self.startup_handlers:
-            await call_maybe_async(callback)
+        if self._context_stack is not None:
+            return
+
+        stack = AsyncExitStack()
+        try:
+            await stack.__aenter__()
+            for factory in self._context_factories:
+                await stack.enter_async_context(factory())
+            for callback in self.startup_handlers:
+                await call_maybe_async(callback)
+        except Exception:
+            await stack.aclose()
+            raise
+        self._context_stack = stack
 
     async def shutdown(self) -> None:
         """Execute all shutdown handlers in reverse registration order."""
-        for callback in reversed(self.shutdown_handlers):
-            await call_maybe_async(callback)
+        try:
+            for callback in reversed(self.shutdown_handlers):
+                await call_maybe_async(callback)
+        finally:
+            if self._context_stack is not None:
+                stack = self._context_stack
+                self._context_stack = None
+                await stack.aclose()
 
     def clear(self) -> None:
         """Clear all registered handlers."""
         self.startup_handlers.clear()
         self.shutdown_handlers.clear()
+        self._context_factories.clear()
+        self._context_stack = None
 
     @property
     def handler_count(self) -> int:

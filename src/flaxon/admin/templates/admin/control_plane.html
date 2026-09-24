@@ -1,0 +1,78 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block content %}
+<div class="space-y-6" data-control-plane data-api-base="{{ dashboard.url_prefix }}/api/control-plane" data-csrf="{{ dashboard.csrf_token() }}">
+  <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div>
+      <p class="admin-eyebrow">Control plane</p>
+      <h1 class="text-3xl font-bold tracking-tight">{{ page_title }}</h1>
+      <p class="mt-2 max-w-3xl text-slate-400">{{ page_description }}</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a class="admin-button-secondary" href="{{ dashboard.url_prefix }}/status"><i class="fa-solid fa-heart-pulse"></i> Status</a>
+      <a class="admin-button-secondary" href="{{ dashboard.url_prefix }}/api-docs"><i class="fa-solid fa-book-open"></i> API docs</a>
+    </div>
+  </div>
+
+  <nav class="control-plane-nav" aria-label="Control plane navigation">
+    <a href="{{ dashboard.url_prefix }}/services">Services</a>
+    <a href="{{ dashboard.url_prefix }}/health">Health</a>
+    <a href="{{ dashboard.url_prefix }}/queues">Queues</a>
+    <a href="{{ dashboard.url_prefix }}/events">Events</a>
+    <a href="{{ dashboard.url_prefix }}/deployments">Releases</a>
+    <a href="{{ dashboard.url_prefix }}/audit">Audit</a>
+    <a href="{{ dashboard.url_prefix }}/security">Security</a>
+    <a href="{{ dashboard.url_prefix }}/storage">Platform</a>
+  </nav>
+
+  {% if section == "services" %}
+  <section class="admin-panel">
+    <div class="flex flex-col gap-3 border-b border-slate-700/60 p-5 sm:flex-row sm:items-center sm:justify-between">
+      <div><h2 class="text-lg font-semibold">Registered services</h2><p class="text-sm text-slate-400">Each service owns its data. The Admin stores only routing and operational metadata.</p></div>
+      <button class="admin-button-primary" type="button" data-service-add><i class="fa-solid fa-plus"></i> Register service</button>
+    </div>
+    <form data-service-form class="hidden grid gap-3 border-b border-slate-700/60 bg-slate-950/20 p-5 md:grid-cols-2">
+      <label>Service name<input name="name" required placeholder="catalog"></label>
+      <label>Display name<input name="display_name" placeholder="Catalog service"></label>
+      <label class="md:col-span-2">Base URL<input name="base_url" type="url" placeholder="https://catalog.internal"></label>
+      <label>Environment<input name="environment" value="production"></label>
+      <label>Health path<input name="health_url" value="/health/ready"></label>
+      <div class="flex items-end gap-2"><button class="admin-button-primary" type="submit">Register</button><button class="admin-button-secondary" type="button" data-service-cancel>Cancel</button></div>
+    </form>
+    <div class="overflow-x-auto"><table class="admin-table"><thead><tr><th>Service</th><th>Environment</th><th>Endpoint</th><th>Status</th><th>Updated</th></tr></thead><tbody>
+      {% for item in snapshot["services"] %}<tr><td><a class="font-semibold text-cyan-300 hover:text-cyan-200" href="{{ dashboard.url_prefix }}/services/{{ item.get("name", "") }}">{{ item.get("display_name", item.get("name", "Service")) }}</a><small>{{ item.get("name", "") }}</small></td><td>{{ item.get("environment", "default") }}</td><td class="font-mono text-xs">{{ item.get("base_url", "") or "not configured" }}</td><td><span class="status-pill status-{{ item.get("status", "unknown") }}">{{ item.get("status", "unknown") }}</span></td><td>{{ item.get("updated_at", "") }}</td></tr>{% else %}<tr><td colspan="5" class="empty-state">No services registered yet.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+  {% else %}
+  <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div class="admin-stat"><span>Registered services</span><strong>{{ snapshot.get("services", [])|length }}</strong><small>Service-owned APIs</small></div>
+    <div class="admin-stat"><span>Instances</span><strong>{{ snapshot.get("instances", [])|length }}</strong><small>Observed workers</small></div>
+    <div class="admin-stat"><span>Events</span><strong>{{ snapshot.get("events", [])|length }}</strong><small>Outbox records</small></div>
+    <div class="admin-stat"><span>Storage</span><strong class="text-base">{{ snapshot.get("storage", "configured") }}</strong><small>Persistence provider</small></div>
+  </div>
+  <section class="admin-panel">
+    <div class="border-b border-slate-700/60 p-5"><h2 class="text-lg font-semibold">{{ page_title }} data</h2><p class="mt-1 text-sm text-slate-400">This view is backed by the control-plane API and persistent Admin store.</p></div>
+    {% if rows %}<div class="divide-y divide-slate-700/50">{% for item in rows %}<div class="flex flex-col gap-2 p-5 md:flex-row md:items-start md:justify-between"><div><strong>{{ item.get("display_name", item.get("name", item.get("topic", item.get("id", item.get("key", "Record"))))) }}</strong><p class="mt-1 text-sm text-slate-400">{% if item.get("base_url") %}{{ item.get("base_url") }} · {{ item.get("environment", "default") }}{% elif item.get("status") %}Status: {{ item.get("status") }}{% elif item.get("state") %}State: {{ item.get("state") }}{% else %}{{ item.get("value", item.get("payload", "")) }}{% endif %}</p></div><span class="status-pill status-{{ item.get("status", item.get("state", "unknown")) }}">{{ item.get("status", item.get("state", "record")) }}</span></div>{% endfor %}</div>{% else %}<div class="empty-state">No records are available for this section.</div>{% endif %}
+  </section>
+  {% endif %}
+</div>
+<script>
+(() => {
+  const root = document.querySelector('[data-control-plane]');
+  if (!root) return;
+  const form = root.querySelector('[data-service-form]');
+  const add = root.querySelector('[data-service-add]');
+  const cancel = root.querySelector('[data-service-cancel]');
+  const toggle = (show) => { if (form) form.classList.toggle('hidden', !show); };
+  add?.addEventListener('click', () => toggle(true));
+  cancel?.addEventListener('click', () => toggle(false));
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const body = Object.fromEntries(new FormData(form).entries());
+    const response = await fetch(`${root.dataset.apiBase}/services`, { method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': root.dataset.csrf}, body: JSON.stringify(body) });
+    if (response.ok) window.location.reload();
+    else alert((await response.json().catch(() => ({}))).error?.message || 'Service registration failed.');
+  });
+})();
+</script>
+{% endblock %}

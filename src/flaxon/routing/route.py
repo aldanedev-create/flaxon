@@ -38,6 +38,13 @@ class Route:
     methods: set[str]
     name: str | None = None
     registration_order: int = 0
+    summary: str | None = None
+    description: str | None = None
+    tags: list[str] | None = None
+    operation_id: str | None = None
+    responses: dict[str | int, Any] | None = None
+    deprecated: bool = False
+    security: list[dict[str, list[str]]] | None = None
 
     def __post_init__(self) -> None:
         self.pattern, self.parameters = compile_path(self.path)

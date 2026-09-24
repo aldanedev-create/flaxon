@@ -323,7 +323,18 @@ def _merge_module(app: Any, module: FlaxonModule, prefix: str, mount_name: str, 
     wrapped_router = Router(prefix=module.router.prefix)
     for source in module.router.routes:
         endpoint = _wrap_endpoint(module, source.endpoint)
-        wrapped_router.route(source.path, methods=source.methods, name=source.name)(endpoint)
+        wrapped_router.route(
+            source.path,
+            methods=source.methods,
+            name=source.name,
+            summary=source.summary,
+            description=source.description,
+            tags=source.tags,
+            operation_id=source.operation_id,
+            responses=source.responses,
+            deprecated=source.deprecated,
+            security=source.security,
+        )(endpoint)
 
     app.router.include_router(wrapped_router, prefix=prefix)
 

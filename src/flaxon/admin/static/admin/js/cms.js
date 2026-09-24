@@ -37,6 +37,22 @@
         revisionCompare: null,
         mediaItems: [],
         mediaPickerField: null,
+        workspaceSection: null,
+        workspaceItems: [],
+        workspaceStats: {},
+        workspaceTitle: "CMS workspace",
+        workspaceDescription: "Operational content workspace",
+        workspaceLinks: [
+          { name: "calendar", label: "Calendar", icon: "fa-calendar-days", description: "Scheduled publishing calendar" },
+          { name: "board", label: "Board", icon: "fa-table-columns", description: "Editorial workflow board" },
+          { name: "review", label: "Review", icon: "fa-clipboard-check", description: "Content awaiting review" },
+          { name: "models", label: "Models", icon: "fa-cubes", description: "Content model registry" },
+          { name: "media", label: "Media", icon: "fa-photo-film", description: "Reusable media library" },
+          { name: "seo", label: "SEO", icon: "fa-magnifying-glass-chart", description: "Search metadata and index state" },
+          { name: "comments", label: "Moderation", icon: "fa-comments", description: "Comment moderation queue" },
+          { name: "menus", label: "Menus", icon: "fa-list", description: "Navigation hierarchy" },
+          { name: "audit", label: "Audit", icon: "fa-shield-halved", description: "Content activity history" },
+        ],
 
         async init() {
           this.applyTheme();
@@ -121,6 +137,10 @@
           if (parts.length === 0) {
             this.view = "dashboard";
             this.currentType = null;
+          } else if (parts[0] === "workspace" && parts[1]) {
+            this.openWorkspace(parts[1], false);
+          } else if (parts.length === 1 && this.workspaceLinks.some((item) => item.name === parts[0])) {
+            this.openWorkspace(parts[0], false);
           } else if (parts.length === 1) {
             this.openList(parts[0], false);
           } else if (parts[1] === "new") {
@@ -146,6 +166,20 @@
           if (name === "schedule") {
             const scheduler = await this.api("/scheduler/jobs");
             this.resourceItems = scheduler?.items || [];
+          }
+        },
+
+        async openWorkspace(section, pushHash = true) {
+          const link = this.workspaceLinks.find((item) => item.name === section) || { label: section, description: "CMS workspace" };
+          this.workspaceSection = section;
+          this.workspaceTitle = link.label;
+          this.workspaceDescription = link.description;
+          this.view = "workspace";
+          if (pushHash) window.location.hash = `#/workspace/${section}`;
+          const result = await this.api(`/workspace/${encodeURIComponent(section)}`);
+          if (result) {
+            this.workspaceItems = Array.isArray(result.items) ? result.items : Object.entries(result.items || {}).map(([name, value]) => ({ name, value }));
+            this.workspaceStats = result.stats || {};
           }
         },
 

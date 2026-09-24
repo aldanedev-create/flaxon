@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; }
+    body { max-width: 860px; margin: 0 auto; padding: 2rem; background: #f8fafc; color: #172033; }
+    header { margin-bottom: 2rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+    article { padding: 1.1rem; background: white; border: 1px solid #d7deea; border-radius: 10px; }
+    form { display: grid; gap: .7rem; margin-top: 1rem; }
+    input, button { padding: .65rem; border: 1px solid #b7c3d6; border-radius: 6px; font: inherit; }
+    button { background: #2457d6; color: white; border: 0; cursor: pointer; }
+    #status { min-height: 1.5rem; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>{{ title }}</h1>
+    <p>This page is owned by the catalog module. Orders are handled by a separate module.</p>
+  </header>
+
+  <main class="grid">
+    {% for product in products %}
+    <article>
+      <h2>{{ product.name }}</h2>
+      <p>${{ "%.2f" | format(product.price) }}</p>
+      <form class="order-form" data-product-id="{{ product.id }}">
+        <label>Quantity <input name="quantity" type="number" min="1" max="100" value="1"></label>
+        <label>Email <input name="customer_email" type="email" required placeholder="you@example.com"></label>
+        <button type="submit">Place order</button>
+      </form>
+    </article>
+    {% endfor %}
+  </main>
+  <p id="status" role="status"></p>
+
+  <script>
+    for (const form of document.querySelectorAll(".order-form")) {
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const data = new FormData(form);
+        const response = await fetch("/api/orders/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            product_id: Number(form.dataset.productId),
+            quantity: Number(data.get("quantity")),
+            customer_email: data.get("customer_email"),
+          }),
+        });
+        const payload = await response.json();
+        document.getElementById("status").textContent = response.ok
+          ? `Order #${payload.id} created.`
+          : payload.error?.message || "The order could not be created.";
+      });
+    }
+  </script>
+</body>
+</html>

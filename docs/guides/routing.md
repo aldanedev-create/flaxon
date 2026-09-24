@@ -127,24 +127,23 @@ async def get_file(file_path: str):
 
 ---
 
-# Optional Parameters
+# Typed Query Parameters
 
 ```python
+from flaxon import Query
+
+
 @app.get("/search")
-async def search(request):
-
-    query = request.query.get("q", "")
-
-    page = request.query.get_int(
-        "page",
-        1,
-    )
-
-    return {
-        "query": query,
-        "page": page,
-    }
+async def search(
+    query: str = Query("", alias="q", max_length=120),
+    page: int = Query(1, ge=1),
+):
+    return {"query": query, "page": page}
 ```
+
+`Query()` without a default is required. Values are coerced and invalid
+values return a `422` validation response. Query declarations are included in
+automatic OpenAPI documentation; see the [OpenAPI guide](openapi.md).
 
 ---
 
@@ -326,9 +325,9 @@ print(url)
 
 # Route Matching
 
-Routes are matched in registration order.
-
-Always place more specific routes before dynamic routes.
+Literal routes take precedence over dynamic routes regardless of registration
+order. Registration order is used only when matching routes have equal
+specificity.
 
 ```python
 @app.get("/users/me")

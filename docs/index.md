@@ -21,7 +21,9 @@ frontend, and deployment platform.
 | Need | Flaxon capability | Start with |
 |---|---|---|
 | HTTP endpoints | `Flaxon`, `Router`, typed path parameters, responses | [Routing](guides/routing.md) and [HTTP](api/http.md) |
+| Large application composition | `FlaxonModule`, mount-time prefixes, feature installers | [Modules](guides/Modules.md) and [Scaling](guides/scaling.md) |
 | JSON input validation | `Schema` and `fields.*Field` | [Validation](guides/validation.md) |
+| Pydantic request models | Optional Pydantic adapter | [Pydantic](guides/pydantic.md) |
 | Browser security and request policy | CORS, trusted hosts, body limits, security headers, request IDs | [Middleware](guides/middleware.md) and [Security](security.md) |
 | Accounts and access control | Sessions, JWT, API keys, authentication, roles, permissions | [Authentication](guides/authentication.md) and [Authorization](guides/authorization.md) |
 | HTML pages | Jinax templates, autoescaping, template inheritance | [Jinax](guides/jinax.md) |
@@ -32,6 +34,7 @@ frontend, and deployment platform.
 | Operations | Lifespan hooks, health endpoints, Prometheus-format metrics, logging | [Deployment](deployment.md) and [Performance](performance.md) |
 | Extensibility | Plugins and lifecycle hooks | [Plugins](guides/plugins.md) |
 | Companion integrations | AI, mobile, frontend, observability, testing, and migration projects | [Ecosystem](ecosystem.md) |
+| MCP tools | Optional FastMCP ASGI mounting and lifecycle integration | [FastMCP](guides/fastmcp.md) |
 | Test automation | Sync HTTP and async WebSocket test clients | [Testing](guides/testing.md) |
 
 Some features require optional packages or external infrastructure. For
@@ -39,6 +42,9 @@ example, Jinax requires Jinja2, production serving requires an ASGI server,
 and Redis-backed components require Redis plus its Python client. The relevant
 guide calls out those requirements; install only the extras your application
 uses.
+
+Pydantic request models and FastMCP are also optional integrations. Install
+`flaxon[pydantic]` or `flaxon[mcp]` only when your application uses them.
 
 ## Start here
 

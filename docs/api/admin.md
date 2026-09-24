@@ -8,6 +8,7 @@
             - __init__
             - register
             - add_view
+            - mount_module
             - register_widget
             - register_permission
             - unregister
@@ -259,3 +260,54 @@ The `admin` group adds `nh3`, Pillow, `python-magic`, Argon2, and WebAuthn;
 `policy` adds PyCasbin; `scheduler` adds APScheduler. `python-magic` also
 requires the platform's libmagic runtime. `bandit` and `pip-audit` are part of
 the development tools for CI security checks.
+
+## Microservice control plane
+
+The control plane is enabled by default when `AdminDashboard` is created. The
+JSON API is rooted at `/admin/api/control-plane/` and the browser pages use
+the same persistent records.
+
+```python
+from flaxon.admin import (
+    AdminControlPlane,
+    RemoteModelAdapter,
+    RemoteServiceClient,
+    ServiceRegistry,
+)
+```
+
+::: flaxon.admin.ServiceRegistry
+    options:
+        members:
+            - register
+            - unregister
+            - get
+            - list
+            - set_instance
+            - instances
+            - set_dependencies
+            - dependencies
+
+::: flaxon.admin.RemoteServiceClient
+    options:
+        members:
+            - __init__
+            - request
+            - get
+            - post
+            - patch
+            - delete
+
+::: flaxon.admin.RemoteModelAdapter
+    options:
+        members:
+            - get_instances
+            - get_instance
+            - create_instance
+            - update_instance
+            - delete_instance
+
+::: flaxon.admin.AdminControlPlane
+    options:
+        members:
+            - __init__

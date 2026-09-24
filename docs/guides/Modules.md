@@ -8,14 +8,6 @@ real primitives (`Router`, `Container`, `on_startup`/`on_shutdown`,
 
 Every example on this page has been run and verified, not just written.
 
-## Installing the file
-
-Copy `modules.py` into your Flaxon installation:
-
-```
-flaxon/
-  modules.py
-```
 
 Importing it is what activates it -- it attaches `mount_module()` onto
 the real `Flaxon` app class the moment it's imported:
@@ -59,6 +51,139 @@ mounted under `/api/v1/users` -- that's decided entirely at
 `mount_module()` time, not baked into the module when it's authored.
 That's the core design difference from Flask blueprints, whose
 `url_prefix` handling has historically been a source of confusion.
+
+---
+
+# Large application pattern
+
+Use one `FlaxonModule` for each business capability. Keep the application
+factory responsible for composition, and keep feature code responsible for
+its own routes, schemas, services, templates, and tests. This lets a large
+application grow without turning `app.py` into a registry of unrelated
+handlers.
+
+```text
+myapp/
+|-- app/
+|   |-- main.py
+|   |-- config.py
+|   `-- modules/
+|       |-- catalog/
+|       |   |-- __init__.py
+|       |   `-- module.py
+|       |-- accounts/
+|       |   |-- __init__.py
+|       |   `-- module.py
+|       `-- ai_tools/
+|           |-- __init__.py
+|           `-- module.py
+|-- tests/
+`-- pyproject.toml
+```
+
+The entry point should only create the app and mount features:
+
+```python
+# app/main.py
+from flaxon import Flaxon
+
+from app.modules.accounts.module import install_accounts
+from app.modules.catalog.module import install_catalog
+
+
+def create_app() -> Flaxon:
+    app = Flaxon("store", debug=False)
+    install_accounts(app)
+    install_catalog(app)
+    return app
+
+
+app = create_app()
+```
+
+Define routes and request models beside the feature that owns them:
+
+```python
+# app/modules/catalog/module.py
+from typing import Any
+
+from pydantic import BaseModel
+
+from flaxon.modules import FlaxonModule
+
+catalog = FlaxonModule("catalog")
+
+
+class CreateProduct(BaseModel):
+    name: str
+    price: float
+
+
+@catalog.post("/")
+async def create_product(product: CreateProduct) -> CreateProduct:
+    # Replace this with a service/repository call in a real application.
+    return product
+
+
+def install_catalog(app: Any) -> None:
+    app.mount_module(catalog, prefix="/api/products")
+```
+
+The same feature can expose MCP tools without mixing protocol startup into the
+HTTP application:
+
+```python
+# app/modules/ai_tools/module.py
+from typing import Any
+
+from fastmcp import FastMCP
+
+from flaxon.integrations.fastmcp import mount_fastmcp
+
+mcp = FastMCP("Store Tools")
+
+
+@mcp.tool
+async def find_product(name: str) -> dict[str, str | bool]:
+    return {"name": name, "available": True}
+
+
+def install_ai_tools(app: Any, auth_provider: Any) -> None:
+    mount_fastmcp(
+        app,
+        mcp,
+        path="/mcp",
+        auth=auth_provider,
+        require_auth=True,
+        stateless_http=True,
+    )
+```
+
+`auth_provider` is your application's configured authentication provider. Do
+not replace it with `require_auth=False` for a public deployment. Do not call
+`mcp.run()` from a module; `mount_fastmcp()` owns the mounted ASGI lifecycle.
+
+## Decide where code goes
+
+| Code | Location | Why |
+|---|---|---|
+| URL and HTTP method | `FlaxonModule` route | Defines the public HTTP contract |
+| JSON input shape | Pydantic model or Flaxon `Schema` | Gives clients predictable validation errors |
+| Business rules | Service called by the route/tool | Reusable from HTTP, MCP, tasks, and tests |
+| Database queries | Repository or adapter | Keeps storage replaceable and testable |
+| HTML | Feature-owned Jinax templates | Keeps presentation out of services |
+| MCP tools/resources | Feature-owned `FastMCP` instance | Keeps MCP names and permissions together |
+| App-wide wiring | `create_app()` | Makes startup, testing, and deployment consistent |
+
+Install the optional integrations only when you use them:
+
+```bash
+python -m pip install "flaxon[pydantic,mcp]"
+flaxon run app.main:app --reload
+```
+
+The complete runnable versions are in
+`examples/pydantic_api/` and `examples/fastmcp_app/`.
 
 ---
 

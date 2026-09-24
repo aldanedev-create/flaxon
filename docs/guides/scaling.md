@@ -45,6 +45,98 @@ This layout works just as well for 20 features as it does for 200 pages. Split
 a large feature into submodules only when that feature itself becomes hard to
 navigate.
 
+## Use the same boundary for Pydantic and FastMCP
+
+Optional integrations belong inside the feature module that uses them. The
+application factory should mount modules and provide shared dependencies; it
+should not contain every schema or tool.
+
+```python
+# app/modules/catalog/module.py
+from typing import Any
+
+from pydantic import BaseModel
+
+from flaxon.modules import FlaxonModule
+
+catalog = FlaxonModule("catalog")
+
+
+class CreateProduct(BaseModel):
+    name: str
+    price: float
+
+
+@catalog.post("/")
+async def create_product(product: CreateProduct) -> CreateProduct:
+    return product
+
+
+def install_catalog(app: Any) -> None:
+    app.mount_module(catalog, prefix="/api/products")
+```
+
+```python
+# app/modules/ai_tools/module.py
+from typing import Any
+
+from fastmcp import FastMCP
+
+from flaxon.integrations.fastmcp import mount_fastmcp
+
+mcp = FastMCP("Store Tools")
+
+
+@mcp.tool
+async def find_product(name: str) -> dict[str, str | bool]:
+    return {"name": name, "available": True}
+
+
+def install_ai_tools(app: Any, auth_provider: Any) -> None:
+    mount_fastmcp(
+        app,
+        mcp,
+        path="/mcp",
+        auth=auth_provider,
+        require_auth=True,
+        stateless_http=True,
+    )
+```
+
+Mount both from one factory:
+
+```python
+# app/main.py
+from flaxon import Flaxon
+
+from app.auth import auth_provider
+from app.modules.ai_tools.module import install_ai_tools
+from app.modules.catalog.module import install_catalog
+
+
+def create_app() -> Flaxon:
+    app = Flaxon("store", debug=False)
+    install_catalog(app)
+    install_ai_tools(app, auth_provider)
+    return app
+
+
+app = create_app()
+```
+
+Install the optional dependencies explicitly:
+
+```bash
+python -m pip install "flaxon[pydantic,mcp]"
+flaxon run app.main:app --reload
+```
+
+The resulting contracts are easy to find: normal JSON clients call
+`POST /api/products/`, while MCP clients connect to `/mcp`. Pydantic validates
+the JSON body; FastMCP handles MCP protocol messages; the feature service is
+where shared business rules belong. Do not call `mcp.run()` when it is mounted
+into Flaxon.
+
 ## Keep the application entry point small
 
 The application entry point should compose feature routers and global

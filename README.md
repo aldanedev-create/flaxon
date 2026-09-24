@@ -16,21 +16,24 @@
 
 Principal Author: Aldane Hutchinson
 
-
 Flaxon is an async-first ASGI framework for JSON APIs, WebSockets, and
-server-rendered applications. It provides the HTTP boundary; you choose the
+server-rendered applications. It owns the HTTP boundary while you choose the
 database, frontend, queue, and deployment platform.
 
-i Would love for other Developers to help me  maintain this codebase 
+The project is actively maintained and welcomes contributors. The current
+release is suitable for production deployments when configured with persistent
+storage, shared infrastructure, workers, and the external services required by
+your application. The API may still evolve before 1.0, so pin versions in
+production and run the test suite and benchmarks when upgrading.
 
-Run full test suite well make sure if add or change something it not broken and benchmarks as well .
+Flaxon includes an authenticated Admin dashboard, a schema-driven CMS, Jinax
+templates, WebSockets, OpenAPI with Swagger UI and ReDoc, GraphQL integration,
+database adapters, background work, migrations, and a module system for large
+applications. Optional integrations include Pydantic and FastMCP.
 
-
-> Status: Production/stable. 
-
-it says Stable but am adding things still and api may change a little but not alot.
-
-check out Teloce-py it complier that complies .vel single components to vanilla js for browser serving. is works well with flaxon or flask or any.
+Teloce-Py compiles `.vel` single-file components to browser JavaScript and can
+be served by Flaxon as a frontend layer. See the Teloce-Py documentation for
+the compiler and runtime workflow.
 
 ## Install
 
@@ -148,9 +151,16 @@ it has been produced by a trusted sanitizer.
   limiting.
 - WebSocket routes, JSON messaging, rooms, and broadcast helpers.
 - Jinax templates, caching helpers, database adapters/transactions,
-  background tasks, plugins, OpenAPI, GraphQL, health checks, and metrics.
+  background tasks, plugins, OpenAPI, Swagger UI, ReDoc, GraphQL, health
+  checks, metrics, and migrations.
 - `TestClient` and `AsyncWebSocketClient` for application tests.
-- Built in admin and Cms and Plugins there some not alot   search flaxon and find some plugins.
+- Admin and CMS features for authenticated model management, users, roles,
+  media, revisions, publishing, taxonomies, comments, menus, and custom
+  Jinax pages.
+- `FlaxonModule` composition for mountable application areas, including
+  module-owned routes, templates, static files, hooks, and CLI commands.
+- An Admin control plane for service registries, remote service model adapters,
+  service accounts, operational records, events, and microservice extensions.
 
 
 ## Documentation and examples
@@ -158,6 +168,9 @@ it has been produced by a trusted sanitizer.
 - [Documentation home](docs/index.md)
 - [Quick start](docs/quickstart.md)
 - [Growing a 200-page application](docs/guides/scaling.md)
+- [Admin and CMS](docs/guides/admin-cms.md)
+- [Microservice control plane](docs/guides/microservices.md)
+- [Modules](docs/guides/Modules.md)
 - [Deployment](docs/deployment.md)
 - [Security](docs/security.md)
 - [Examples](docs/examples/)

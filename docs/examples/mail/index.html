@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <title>Contact Us</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 420px; margin: 60px auto; }
+    body { font-family: system-ui, sans-serif; max-width: 420px; margin: 60px auto; padding: 0 1rem; }
     label { display: block; margin-top: 12px; font-weight: 600; }
     input, textarea { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; }
     button { margin-top: 16px; padding: 10px 16px; cursor: pointer; }
@@ -36,7 +36,7 @@
       };
 
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/contact", {
+        const res = await fetch("/api/contact", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -46,8 +46,8 @@
           status.textContent = "Message sent!";
           form.reset();
         } else {
-          const err = await res.json();
-          status.textContent = "Error: " + JSON.stringify(err);
+          const err = await res.json().catch(() => ({}));
+          status.textContent = "Error: " + (err.error?.message || "Request failed");
         }
       } catch (err) {
         status.textContent = "Network error: " + err.message;

@@ -179,7 +179,11 @@ Create `templates/home.html`:
 <html lang="en">
 <head><meta charset="utf-8"><title>{{ title }}</title></head>
 <body><h1>{{ title }}</h1>
-<ul>{% for item in items %}<li>{{ item }}</li>{% endfor %}</ul>
+<ul>
+    {% for item in items %}
+    <li>{{ item }}</li>
+    {% endfor %}
+    </ul>
 </body>
 </html>
 ```

@@ -63,6 +63,7 @@ class AdminDashboard:
         strict_permissions: bool = False,
         max_image_dimensions: tuple[int, int] = (10000, 10000),
         password_hasher: PasswordHasher | None = None,
+        microservices: bool | dict[str, Any] = True,
     ) -> None:
         self.app = app
         self.config = config or AdminConfig()
@@ -178,6 +179,14 @@ class AdminDashboard:
         if hasattr(self.app, "on_startup") and self.job_worker:
             self.app.on_startup(self._start_job_worker)
         self._register_routes()
+        # Keep the service control plane additive. Existing model, CMS, and
+        # custom-page routes remain the public compatibility surface; the
+        # microservice pages reserve their own named Admin resources.
+        self.control_plane = None
+        if microservices is not False:
+            from .microservices import AdminControlPlane
+
+            self.control_plane = AdminControlPlane(self)
 
     async def _stop_thumbnail_tasks(self) -> None:
         if self._job_worker_task is not None:
@@ -368,6 +377,35 @@ class AdminDashboard:
         self.app.router.route(route_path, methods=methods or {"GET"}, name=f"admin_custom_{route_name}")(protected_view)
         self.custom_views.append({"name": name, "url": route_path, "category": category, "icon": icon})
         return view
+
+    def mount_module(
+        self,
+        module: Any,
+        *,
+        prefix: str | None = None,
+        name: str | None = None,
+        navigation: list[dict[str, Any]] | None = None,
+    ) -> Any:
+        """Mount a normal :class:`FlaxonModule` as an Admin extension.
+
+        The module keeps its own routes, hooks, templates, static assets and
+        dependencies. Admin only supplies the mount boundary and optional
+        navigation metadata, so extension code does not need to reach into
+        Admin internals or query another service's database.
+        """
+
+        import flaxon.modules  # noqa: F401 - installs Flaxon.mount_module
+
+        mount_prefix = prefix or f"{self.url_prefix}/extensions/{getattr(module, 'name', 'module')}"
+        mount_name = name or f"admin.{getattr(module, 'name', 'module')}"
+        self.app.mount_module(module, prefix=mount_prefix, name=mount_name)
+        for item in navigation or getattr(module, "admin_navigation", []) or []:
+            entry = dict(item)
+            entry.setdefault("url", mount_prefix.rstrip("/") + "/" + str(entry.get("path", "")).lstrip("/"))
+            entry.setdefault("category", "Extensions")
+            entry.setdefault("icon", "fa-puzzle-piece")
+            self.custom_views.append(entry)
+        return module
 
     def _permission_context(self) -> dict[str, Any]:
         role_permission_keys = {

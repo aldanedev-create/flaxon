@@ -63,6 +63,12 @@ standard = [
     "jinja2>=3.1.0",
     "pyyaml>=6.0.0",
 ]
+pydantic = [
+    "pydantic>=2.0",
+]
+mcp = [
+    "fastmcp>=3.0",
+]
 
 # Optional integrations used by the Admin/CMS production features. Install
 # only the groups used by an application, or use ``flaxon[production]`` for a
@@ -148,7 +154,11 @@ packages = {find = {where = ["src"]}}
 include-package-data = true
 
 [tool.setuptools.package-data]
-flaxon = ["py.typed"]
+flaxon = [
+    "py.typed",
+    "admin/templates/**/*.html",
+    "admin/static/**/*",
+]
 
 [tool.setuptools.dynamic]
 version = {attr = "flaxon.__version__"}

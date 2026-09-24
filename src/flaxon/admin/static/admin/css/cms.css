@@ -58,6 +58,7 @@
     color: var(--admin-muted);
     font-size: .8rem;
 }
+.cms-workspace-stat{border:1px solid var(--admin-border);border-radius:.7rem;background:color-mix(in srgb,var(--admin-panel) 88%,transparent);padding:.8rem 1rem}.cms-workspace-stat span{display:block;color:var(--admin-muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.06em}.cms-workspace-stat strong{display:block;margin-top:.3rem;color:var(--admin-text);font-size:1.35rem}
 @media (max-width: 767px) {
     .cms-shell nav > div {
         align-items: flex-start;

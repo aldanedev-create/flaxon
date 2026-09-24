@@ -146,7 +146,57 @@ class SchemaBuilder:
 
         elif field_type == "choicefield":
             if hasattr(field, "choices"):
-                schema.string().enum(*field.choices)
+                choices = list(field.choices)
+                if choices:
+                    first_type = type(choices[0])
+                    if first_type is int:
+                        schema.integer()
+                    elif first_type is float:
+                        schema.number()
+                    elif first_type is bool:
+                        schema.boolean()
+                    else:
+                        schema.string()
+                    schema.enum(*choices)
+
+        elif field_type == "datefield":
+            schema.string().format("date")
+
+        elif field_type == "datetimefield":
+            schema.string().format("date-time")
+
+        elif field_type == "decimalfield":
+            schema.number()
+            if getattr(field, "minimum", None) is not None:
+                schema.minimum(field.minimum)
+            if getattr(field, "maximum", None) is not None:
+                schema.maximum(field.maximum)
+
+        elif field_type == "uuidfield":
+            schema.string().format("uuid")
+
+        elif field_type == "listfield":
+            item_field = getattr(field, "item_field", None)
+            schema.array(SchemaBuilder.from_field(item_field) if item_field is not None else {})
+            if getattr(field, "min_items", None) is not None:
+                schema._schema["minItems"] = field.min_items
+            if getattr(field, "max_items", None) is not None:
+                schema._schema["maxItems"] = field.max_items
+
+        elif field_type == "nestedfield":
+            nested = getattr(field, "schema_class", None)
+            if nested is not None:
+                properties = {
+                    name: SchemaBuilder.from_field(child)
+                    for name, child in getattr(nested, "__fields__", {}).items()
+                }
+                schema.object(properties)
+                required = [
+                    name for name, child in getattr(nested, "__fields__", {}).items()
+                    if getattr(child, "required", False)
+                ]
+                if required:
+                    schema.required(*required)
 
         if hasattr(field, "required") and field.required:
             pass

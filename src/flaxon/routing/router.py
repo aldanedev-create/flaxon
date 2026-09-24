@@ -37,10 +37,32 @@ class Router:
         self._pattern_collision_buckets: dict[tuple[int, str], list[Route]] = {}
         self._static_collision_buckets: dict[tuple[int, str], list[Route]] = {}
 
-    def route(self, path: str, *, methods: set[str] | list[str] | tuple[str, ...] = ("GET",), name: str | None = None) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def route(
+        self,
+        path: str,
+        *,
+        methods: set[str] | list[str] | tuple[str, ...] = ("GET",),
+        name: str | None = None,
+        summary: str | None = None,
+        description: str | None = None,
+        tags: list[str] | None = None,
+        operation_id: str | None = None,
+        responses: dict[str | int, Any] | None = None,
+        deprecated: bool = False,
+        security: list[dict[str, list[str]]] | None = None,
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Return a decorator that registers an HTTP endpoint."""
         def decorator(endpoint: Callable[..., Any]) -> Callable[..., Any]:
-            route = Route(self._path(path), endpoint, {method.upper() for method in methods}, name or endpoint.__name__)
+            route = Route(
+                self._path(path), endpoint, {method.upper() for method in methods}, name or endpoint.__name__,
+                summary=summary,
+                description=description,
+                tags=list(tags) if tags else None,
+                operation_id=operation_id,
+                responses=dict(responses) if responses else None,
+                deprecated=deprecated,
+                security=list(security) if security is not None else None,
+            )
             route.registration_order = self._registration_order
             self._registration_order += 1
             self._warn_collisions(route)
@@ -51,20 +73,20 @@ class Router:
             return endpoint
         return decorator
 
-    def get(self, path: str, *, name: str | None = None) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-        return self.route(path, methods={"GET"}, name=name)
+    def get(self, path: str, *, name: str | None = None, **metadata: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        return self.route(path, methods={"GET"}, name=name, **metadata)
 
-    def post(self, path: str, *, name: str | None = None) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-        return self.route(path, methods={"POST"}, name=name)
+    def post(self, path: str, *, name: str | None = None, **metadata: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        return self.route(path, methods={"POST"}, name=name, **metadata)
 
-    def put(self, path: str, *, name: str | None = None) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-        return self.route(path, methods={"PUT"}, name=name)
+    def put(self, path: str, *, name: str | None = None, **metadata: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        return self.route(path, methods={"PUT"}, name=name, **metadata)
 
-    def patch(self, path: str, *, name: str | None = None) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-        return self.route(path, methods={"PATCH"}, name=name)
+    def patch(self, path: str, *, name: str | None = None, **metadata: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        return self.route(path, methods={"PATCH"}, name=name, **metadata)
 
-    def delete(self, path: str, *, name: str | None = None) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-        return self.route(path, methods={"DELETE"}, name=name)
+    def delete(self, path: str, *, name: str | None = None, **metadata: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        return self.route(path, methods={"DELETE"}, name=name, **metadata)
 
     def websocket(self, path: str, *, name: str | None = None) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Return a decorator that registers a WebSocket endpoint."""
@@ -119,7 +141,19 @@ class Router:
 
         for source in router.routes:
             path = mounted_path(source.path)
-            route = Route(path, source.endpoint, set(source.methods), source.name)
+            route = Route(
+                path,
+                source.endpoint,
+                set(source.methods),
+                source.name,
+                summary=source.summary,
+                description=source.description,
+                tags=list(source.tags) if source.tags else None,
+                operation_id=source.operation_id,
+                responses=dict(source.responses) if source.responses else None,
+                deprecated=source.deprecated,
+                security=list(source.security) if source.security is not None else None,
+            )
             route.registration_order = self._registration_order
             self._registration_order += 1
             self._warn_collisions(route)

@@ -61,29 +61,30 @@ class RouteGroup:
         *,
         methods: set[str] | list[str] | tuple[str, ...] = ("GET",),
         name: str | None = None,
+        **metadata: Any,
     ) -> Callable:
         """Register a route with custom methods."""
-        return self.router.route(path, methods=methods, name=name)
+        return self.router.route(path, methods=methods, name=name, **metadata)
 
-    def get(self, path: str, *, name: str | None = None) -> Callable:
+    def get(self, path: str, *, name: str | None = None, **metadata: Any) -> Callable:
         """Register a GET route."""
-        return self.router.get(path, name=name)
+        return self.router.get(path, name=name, **metadata)
 
-    def post(self, path: str, *, name: str | None = None) -> Callable:
+    def post(self, path: str, *, name: str | None = None, **metadata: Any) -> Callable:
         """Register a POST route."""
-        return self.router.post(path, name=name)
+        return self.router.post(path, name=name, **metadata)
 
-    def put(self, path: str, *, name: str | None = None) -> Callable:
+    def put(self, path: str, *, name: str | None = None, **metadata: Any) -> Callable:
         """Register a PUT route."""
-        return self.router.put(path, name=name)
+        return self.router.put(path, name=name, **metadata)
 
-    def patch(self, path: str, *, name: str | None = None) -> Callable:
+    def patch(self, path: str, *, name: str | None = None, **metadata: Any) -> Callable:
         """Register a PATCH route."""
-        return self.router.patch(path, name=name)
+        return self.router.patch(path, name=name, **metadata)
 
-    def delete(self, path: str, *, name: str | None = None) -> Callable:
+    def delete(self, path: str, *, name: str | None = None, **metadata: Any) -> Callable:
         """Register a DELETE route."""
-        return self.router.delete(path, name=name)
+        return self.router.delete(path, name=name, **metadata)
 
     def head(self, path: str, *, name: str | None = None) -> Callable:
         """Register a HEAD route."""

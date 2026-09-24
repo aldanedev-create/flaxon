@@ -4,7 +4,7 @@ Build and run a small Flaxon application in a few minutes. This page is the
 shortest path from installation to a working HTTP API. Use the navigation
 links below to continue into the larger developer guides.
 
-**Developer navigation:** [Documentation home](index.md) | [Installation](installation.md) | [Routing](guides/routing.md) | [Requests](guides/requests.md) | [Responses](guides/responses.md) | [Validation](guides/validation.md) | [Jinax templates](guides/jinax.md) | [WebSockets](guides/websockets.md) | [Testing](guides/testing.md)
+**Developer navigation:** [Documentation home](index.md) | [Installation](installation.md) | [Routing](guides/routing.md) | [Requests](guides/requests.md) | [Responses](guides/responses.md) | [OpenAPI docs](guides/openapi.md) | [Validation](guides/validation.md) | [Pydantic](guides/pydantic.md) | [FastMCP](guides/fastmcp.md) | [Modules](guides/Modules.md) | [Jinax templates](guides/jinax.md) | [WebSockets](guides/websockets.md) | [Testing](guides/testing.md)
 
 ## 1. Create a project
 
@@ -44,7 +44,7 @@ from flaxon import Flaxon
 from flaxon.validation import Schema, fields
 
 
-app = Flaxon("hello-world", debug=True)
+app = Flaxon("hello-world", debug=True, openapi=True)
 
 
 class CreateUser(Schema):
@@ -57,7 +57,7 @@ async def home():
     return {"message": "Hello from Flaxon"}
 
 
-@app.get("/health")
+@app.get("/service-health")
 async def health():
     return {"status": "healthy", "service": "hello-world"}
 
@@ -89,8 +89,10 @@ Open these URLs:
 | URL | Purpose |
 | --- | --- |
 | `http://127.0.0.1:8000/` | Application response |
-| `http://127.0.0.1:8000/health` | Health response |
+| `http://127.0.0.1:8000/service-health` | Application health response |
 | `http://127.0.0.1:8000/users/42` | Typed route parameter |
+| `http://127.0.0.1:8000/docs` | Interactive Swagger UI |
+| `http://127.0.0.1:8000/redoc` | ReDoc API reference |
 
 Test the validated endpoint with `curl`:
 
@@ -173,6 +175,9 @@ authentication, heartbeats, and production deployment.
 | You want to build | Continue with |
 | --- | --- |
 | A structured API | [Routing](guides/routing.md), [Requests](guides/requests.md), [Responses](guides/responses.md), and [Validation](guides/validation.md) |
+| Automatic API documentation | [OpenAPI, Swagger UI, and ReDoc](guides/openapi.md) |
+| A modular API with Pydantic | [Modules](guides/Modules.md), [Pydantic](guides/pydantic.md), and the [Pydantic example](examples/pydantic-api.md) |
+| MCP tools for an existing app | [FastMCP](guides/fastmcp.md), [Modules](guides/Modules.md), and the [FastMCP example](examples/fastmcp-app.md) |
 | A server-rendered site | [Jinax](guides/jinax.md) and [Jinax API reference](api/jinax.md) |
 | Login and permissions | [Authentication](guides/authentication.md) and [Authorization](guides/authorization.md) |
 | Admin and CMS workflows | [Admin and CMS](guides/admin-cms.md), [Admin production](guides/admin-production.md), and [Admin guide](admin-guide.md) |

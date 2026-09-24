@@ -11,8 +11,8 @@
 </head>
 <body>
   <h1>Flaxon GraphQL Demo</h1>
-  <p>Backend: <code>http://127.0.0.1:8000/graphql</code>
-     &middot; Playground: <a href="http://127.0.0.1:8000/graphql/graphiql" target="_blank">GraphiQL</a></p>
+  <p>Backend: <code>/graphql</code>
+     &middot; Playground: <a href="/graphql/graphiql" target="_blank">GraphiQL</a></p>
 
   <button id="btn-hello">Query: hello</button>
   <button id="btn-users">Query: users + posts</button>
@@ -27,7 +27,7 @@
     async function runQuery(query) {
       output.textContent = "Loading...";
       try {
-        const res = await fetch("http://127.0.0.1:8000/graphql", {
+        const res = await fetch("/graphql", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ query }),

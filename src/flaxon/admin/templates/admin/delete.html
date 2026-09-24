@@ -1,12 +1,65 @@
 {% extends "admin/base.html" %}
-{% block title %}Delete {{ verbose_name }}{% endblock %}
+{% block title %}
+Delete {{ verbose_name }}
+{% endblock %}
 {% block content %}
 {% set prefix = dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') %}
 <div class="corporate-page delete-page">
-  <header class="corporate-header"><div><p class="admin-eyebrow">Destructive action</p><h1>Delete {{ verbose_name|lower }}</h1><p class="corporate-subtitle">Review the record carefully before confirming this permanent change.</p></div><a class="corporate-button corporate-button-muted" href="{{ prefix }}/{{ model.get_name() }}/{{ object_id }}"><i class="fas fa-arrow-left"></i><span>Back to record</span></a></header>
-  <div class="delete-layout"><section class="corporate-panel delete-confirmation"><div class="delete-icon"><i class="fas fa-trash"></i></div><h2>Delete this {{ verbose_name|lower }}?</h2><p class="corporate-muted">This action permanently removes record <strong>#{{ object_id }}</strong> from the configured data store. It cannot be undone from Admin.</p><div class="delete-warning"><i class="fas fa-triangle-exclamation"></i><span>Check integrations, relationships, and external references before continuing.</span></div><form method="post" action="{{ prefix }}/{{ model.get_name() }}/{{ object_id }}/delete" class="corporate-form"><input type="hidden" name="_csrf" value="{{ dashboard.csrf_token() }}"><label class="corporate-checkbox delete-ack"><input id="delete-acknowledge" type="checkbox" required><span>I understand this record will be permanently deleted.</span></label><div class="corporate-form-actions"><button id="delete-submit" type="submit" class="corporate-button corporate-button-danger" disabled><i class="fas fa-trash"></i><span>Delete permanently</span></button><a class="corporate-button corporate-button-muted" href="{{ prefix }}/{{ model.get_name() }}/{{ object_id }}">Cancel</a></div></form></section><aside class="corporate-panel delete-record-summary"><div class="corporate-panel-header"><div><p class="corporate-kicker">Record review</p><h2>{{ verbose_name|title }} #{{ object_id }}</h2></div><i class="fas fa-file-lines corporate-panel-icon"></i></div>{% if object %}<dl class="record-summary-list">{% for field in fields or ['id', 'name'] %}<div><dt>{{ field|replace('_', ' ')|title }}</dt><dd>{{ model.display_value(object, field) }}</dd></div>{% endfor %}</dl>{% else %}<p class="corporate-muted">The record could not be loaded for preview. The server will still verify it before deletion.</p>{% endif %}</aside></div>
+  <header class="corporate-header">
+    <div><p class="admin-eyebrow">Destructive action</p>
+      <h1>Delete {{ verbose_name|lower }}</h1>
+      <p class="corporate-subtitle">Review the record carefully before confirming this permanent change.</p>
+    </div>
+    <a class="corporate-button corporate-button-muted" href="{{ prefix }}/{{ model.get_name() }}/{{ object_id }}">
+      <i class="fas fa-arrow-left"></i>
+      <span>Back to record</span>
+    </a>
+  </header>
+  <div class="delete-layout">
+    <section class="corporate-panel delete-confirmation">
+      <div class="delete-icon">
+        <i class="fas fa-trash"></i>
+    </div>
+    <h2>Delete this {{ verbose_name|lower }}?</h2>
+    <p class="corporate-muted">This action permanently removes record <strong>#{{ object_id }}</strong> from the configured data store. It cannot be undone from Admin.</p>
+    <div class="delete-warning">
+      <i class="fas fa-triangle-exclamation"></i>
+      <span>Check integrations, relationships, and external references before continuing.</span>
+    </div>
+    <form method="post" action="{{ prefix }}/{{ model.get_name() }}/{{ object_id }}/delete" class="corporate-form">
+      <input type="hidden" name="_csrf" value="{{ dashboard.csrf_token() }}">
+      <label class="corporate-checkbox delete-ack">
+        <input id="delete-acknowledge" type="checkbox" required>
+        <span>I understand this record will be permanently deleted.</span>
+      </label><div class="corporate-form-actions">
+        <button id="delete-submit" type="submit" class="corporate-button corporate-button-danger" disabled>
+          <i class="fas fa-trash"></i>
+          <span>Delete permanently</span>
+        </button>
+        <a class="corporate-button corporate-button-muted" href="{{ prefix }}/{{ model.get_name() }}/{{ object_id }}">Cancel</a>
+      </div>
+    </form>
+  </section>
+  <aside class="corporate-panel delete-record-summary">
+    <div class="corporate-panel-header"><div>
+      <p class="corporate-kicker">Record review</p>
+      <h2>{{ verbose_name|title }} #{{ object_id }}</h2>
+    </div>
+    <i class="fas fa-file-lines corporate-panel-icon"></i>
+  </div>{% if object %}<dl class="record-summary-list">{% for field in fields or ['id', 'name'] %}<div>
+    <dt>{{ field|replace('_', ' ')|title }}</dt>
+    <dd>{{ model.display_value(object, field) }}</dd>
+  </div>
+  {% endfor %}
+</dl>{% else %}
+<p class="corporate-muted">The record could not be loaded for preview. The server will still verify it before deletion.</p>
+{% endif %}
+</aside>
+</div>
 </div>
 {% endblock %}
 {% block extra_scripts %}<script>
-const acknowledgement = document.getElementById('delete-acknowledge'); const submit = document.getElementById('delete-submit'); acknowledgement.addEventListener('change', () => { submit.disabled = !acknowledgement.checked; });
+const acknowledgement = document.getElementById('delete-acknowledge'); 
+const submit = document.getElementById('delete-submit');
+ acknowledgement.addEventListener('change', () => { submit.disabled = !acknowledgement.checked; });
 </script>{% endblock %}

@@ -19,6 +19,7 @@ __all__ = [
     "RedirectResponse",
     "Request",
     "Response",
+    "Query",
     "Router",
     "State",
     "StreamingResponse",
@@ -43,6 +44,10 @@ def __getattr__(name: str) -> object:
         from .routing import Router
 
         return Router
+    if name == "Query":
+        from .routing import Query
+
+        return Query
     if name in {
         "HTMLResponse",
         "JSONResponse",

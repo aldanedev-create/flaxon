@@ -14,11 +14,15 @@
         </div>
         <div class="flex flex-wrap gap-2">
             {% if can_export %}<a href="{{ prefix }}/{{ model.get_name() }}/export?format=json" class="px-3 py-2 bg-slate-700 rounded-lg text-sm" title="Export JSON"><i class="fas fa-download mr-1"></i>Export</a>{% endif %}
-            {% if can_import %}<form method="post" action="{{ prefix }}/{{ model.get_name() }}/import" enctype="multipart/form-data" class="flex items-center gap-2"><input type="hidden" name="_csrf" value="{{ dashboard.csrf_token() }}"><label class="px-3 py-2 bg-slate-700 rounded-lg text-sm cursor-pointer"><i class="fas fa-upload mr-1"></i>Import<input type="file" name="file" accept=".json,.csv,application/json,text/csv" class="sr-only" onchange="this.form.submit()"></label></form>{% endif %}
+            {% if can_import %}<form method="post" action="{{ prefix }}/{{ model.get_name() }}/import" enctype="multipart/form-data" class="flex items-center gap-2"><input type="hidden" name="_csrf" value="{{ dashboard.csrf_token() }}"><label class="px-3 py-2 bg-slate-700 rounded-lg text-sm cursor-pointer"><i class="fas fa-upload mr-1"></i>Import<input type="file" name="file" accept=".json,.csv,application/json,text/csv" class="sr-only" onchange="this.form.submit()">
+            </label>
+        </form>
+        {% endif %}
             {% if can_add %}<a href="{{ prefix }}/{{ model.get_name() }}/add" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-400 hover:from-blue-600 hover:to-cyan-500 rounded-lg text-sm font-medium transition text-white flex items-center gap-2">
                 <i class="fas fa-plus"></i>
                 Add {{ verbose_name|lower }}
-            </a>{% endif %}
+            </a>
+            {% endif %}
         </div>
     </div>
 
@@ -29,12 +33,35 @@
                 <input name="q" value="{{ query }}" form="model-search" type="text" placeholder="Search..." class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-2 text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition">
                 <form id="model-search" method="get" action="{{ prefix }}/{{ model.get_name() }}"></form>
             </div>
-            {% for filter_field in list_filter or [] %}<select name="filter_{{ filter_field }}" form="model-search" class="bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"><option value="">All {{ filter_field|replace('_',' ')|title }}</option>{% for item in objects or [] %}{% set filter_value = item.get(filter_field, '') if item is mapping else item.__dict__.get(filter_field, '') %}{% if filter_value != '' %}<option value="{{ filter_value }}"{% if request.query.get('filter_' + filter_field) == filter_value|string %} selected{% endif %}>{{ filter_value }}</option>{% endif %}{% endfor %}</select>{% endfor %}
+            {% for filter_field in list_filter or [] %}
+            <select name="filter_{{ filter_field }}" form="model-search" class="bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+                <option value="">All {{ filter_field|replace('_',' ')|title }}</option>
+                {% for item in objects or [] %}
+                {% set filter_value = item.get(filter_field, '') if item is mapping else item.__dict__.get(filter_field, '') %}
+                {% if filter_value != '' %}
+                <option value="{{ filter_value }}"{% if request.query.get('filter_' + filter_field) == filter_value|string %} selected{% endif %}>{{ filter_value }}</option>
+                {% endif %}
+                {% endfor %}
+            </select>
+            {% endfor %}
             <button type="submit" form="model-search" class="px-3 py-2 bg-slate-700 rounded-lg text-sm">Filter</button>
         </div>
     </div>
 
-    {% if can_delete or actions %}<form id="bulk-form" method="post" action="{{ prefix }}/{{ model.get_name() }}/actions/delete" onsubmit="return confirm('Apply this action to the selected records?')" class="flex items-center gap-2"><input type="hidden" name="_csrf" value="{{ dashboard.csrf_token() }}"><select name="action" onchange="this.form.action='{{ prefix }}/{{ model.get_name() }}/actions/' + this.value" class="bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm">{% if can_delete %}<option value="delete">Delete selected</option>{% endif %}{% for name, action in actions.items() %}<option value="{{ name }}">{{ name|title }}</option>{% endfor %}</select><button class="px-3 py-2 bg-slate-700 rounded text-sm">Apply</button></form>{% endif %}
+    {% if can_delete or actions %}
+    <form id="bulk-form" method="post" action="{{ prefix }}/{{ model.get_name() }}/actions/delete" onsubmit="return confirm('Apply this action to the selected records?')" class="flex items-center gap-2">
+        <input type="hidden" name="_csrf" value="{{ dashboard.csrf_token() }}">
+        <select name="action" onchange="this.form.action='{{ prefix }}/{{ model.get_name() }}/actions/' + this.value" class="bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm">
+            {% if can_delete %}
+            <option value="delete">Delete selected</option>
+            {% endif %}
+            {% for name, action in actions.items() %}
+            <option value="{{ name }}">{{ name|title }}</option>
+            {% endfor %}
+        </select>
+        <button class="px-3 py-2 bg-slate-700 rounded text-sm">Apply</button>
+    </form>
+    {% endif %}
 
     <!-- Table -->
     <div class="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl overflow-hidden">
@@ -88,6 +115,14 @@
             </table>
         </div>
     </div>
-    {% if pagination.pages > 1 %}<nav class="flex gap-2 text-sm">{% for n in range(1, pagination.pages + 1) %}<a href="{{ prefix }}/{{ model.get_name() }}?q={{ query }}{% for filter_field in list_filter or [] %}&filter_{{ filter_field }}={{ request.query.get('filter_' + filter_field, '') }}{% endfor %}{% if request.query.get('order_by') %}&order_by={{ request.query.get('order_by') }}{% endif %}&page={{ n }}" class="px-3 py-1 rounded {% if n == pagination.page %}bg-blue-600{% else %}bg-slate-700{% endif %}">{{ n }}</a>{% endfor %}</nav>{% endif %}
+    {% if pagination.pages > 1 %}
+    <nav class="flex gap-2 text-sm">
+        {% for n in range(1, pagination.pages + 1) %}
+        <a href="{{ prefix }}/{{ model.get_name() }}?q={{ query }}{% for filter_field in list_filter or [] %}&filter_{{ filter_field }}={{ request.query.get('filter_' + filter_field, '') }}{% endfor %}{% if request.query.get('order_by') %}&order_by={{ request.query.get('order_by') }}{% endif %}&page={{ n }}" class="px-3 py-1 rounded {% if n == pagination.page %}bg-blue-600{% else %}bg-slate-700{% endif %}">
+            {{ n }}
+        </a>
+        {% endfor %}
+    </nav>
+    {% endif %}
 </div>
 {% endblock %}

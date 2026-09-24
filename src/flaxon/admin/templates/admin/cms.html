@@ -48,6 +48,11 @@
               <i class="fa-solid mr-1" :class="ct.icon || 'fa-file-lines'"></i><span x-text="ct.label_plural"></span>
             </button>
           </template>
+          <template x-for="workspace in workspaceLinks" :key="'workspace-' + workspace.name">
+            <button type="button" @click="openWorkspace(workspace.name)" class="cms-nav-link shrink-0" :class="view === 'workspace' && workspaceSection === workspace.name ? 'is-active' : ''">
+              <i class="fa-solid mr-1" :class="workspace.icon"></i><span x-text="workspace.label"></span>
+            </button>
+          </template>
         </div>
       </div>
     </nav>
@@ -205,6 +210,24 @@
           <template x-if="resource === 'comments'"><div class="space-y-2"><template x-for="comment in resourceItems" :key="comment.id"><article class="bg-slate-800/60 border border-slate-700 rounded-lg p-4 flex items-center justify-between gap-4"><div><p x-text="comment.content || comment.body || 'Comment'"></p><p class="text-xs text-slate-400" x-text="comment.created_at + ' · ' + comment.status"></p></div><div class="flex gap-2"><button @click="moderateComment(comment.id,'approved')" class="px-3 py-1 bg-emerald-700 rounded text-xs">Approve</button><button @click="moderateComment(comment.id,'spam')" class="px-3 py-1 bg-amber-700 rounded text-xs">Spam</button><button @click="moderateComment(comment.id,'rejected')" class="px-3 py-1 bg-red-700 rounded text-xs">Reject</button></div></article></template></div></template>
           <template x-if="resource === 'taxonomies'"><div class="space-y-4"><form @submit.prevent="createTaxonomy()" class="flex gap-2"><input x-model="taxonomyName" required placeholder="New taxonomy name" class="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-2"><button class="px-3 py-2 bg-indigo-600 rounded">Create</button></form><template x-for="(terms,name) in resourceItems" :key="name"><section class="bg-slate-800/60 border border-slate-700 rounded-lg p-4"><div class="flex items-center justify-between"><h2 class="font-semibold" x-text="name"></h2><button @click="deleteTaxonomy(name)" class="text-red-400 text-sm">Delete taxonomy</button></div><div class="mt-3 flex gap-2"><input x-model="taxonomyTerm" placeholder="Add category or tag" class="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2"><button @click="addTaxonomyTerm(name)" class="px-3 py-2 bg-slate-700 rounded">Add term</button></div><p class="mt-3 text-sm text-slate-400" x-text="Object.keys(terms || {}).join(', ') || 'No terms yet.'"></p></section></template></div></template>
           <template x-if="resource === 'menu'"><div class="space-y-3"><p class="text-sm text-slate-400">Arrange navigation items and save their hierarchy.</p><template x-for="(item,index) in resourceItems" :key="index"><div draggable="true" class="flex gap-2 items-center"><i class="fa-solid fa-grip-vertical text-slate-500"></i><input x-model="resourceItems[index].label" placeholder="Label" class="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-2"><input x-model="resourceItems[index].url" placeholder="URL" class="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-2"><button @click="moveMenuItem(index,-1)" class="px-2 bg-slate-700 rounded" title="Move up">↑</button><button @click="moveMenuItem(index,1)" class="px-2 bg-slate-700 rounded" title="Move down">↓</button><button @click="resourceItems.splice(index,1)" class="px-3 bg-red-700 rounded">Delete</button></div></template><button @click="resourceItems.push({label:'',url:'',children:[]})" class="px-3 py-2 bg-slate-700 rounded">Add menu item</button><button @click="saveMenu()" class="px-3 py-2 bg-indigo-600 rounded">Save menu</button></div></template>
+        </div>
+      </template>
+
+      <!-- ============== CMS OPERATIONS WORKSPACE ============== -->
+      <template x-if="view === 'workspace'">
+        <div class="space-y-6">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div><button @click="goHome()" class="text-sm text-slate-400 hover:text-white"><i class="fa-solid fa-arrow-left mr-1"></i> CMS overview</button><h1 class="text-2xl font-bold mt-1" x-text="workspaceTitle"></h1><p class="text-sm text-slate-400 mt-1" x-text="workspaceDescription"></p></div>
+            <button @click="openWorkspace(workspaceSection, false)" class="px-3 py-2 rounded-lg bg-slate-700 text-sm"><i class="fa-solid fa-rotate mr-1"></i>Refresh</button>
+          </div>
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3" x-show="Object.keys(workspaceStats).length">
+            <template x-for="(value,key) in workspaceStats" :key="key"><div class="cms-workspace-stat"><span x-text="key.replaceAll('_',' ')"></span><strong x-text="value"></strong></div></template>
+          </div>
+          <section class="rounded-xl border border-slate-700/50 overflow-hidden">
+            <div class="px-4 py-3 bg-slate-800/80 border-b border-slate-700/50 flex items-center justify-between"><h2 class="font-semibold">Workspace data</h2><span class="text-xs text-slate-500" x-text="workspaceItems.length + ' records'"></span></div>
+            <div x-show="workspaceItems.length" class="divide-y divide-slate-800"><template x-for="(item,index) in workspaceItems" :key="item.id || item.name || index"><article class="p-4 hover:bg-slate-800/30"><div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><strong x-text="item.title || item.name || item.label || item.content_type || ('Record ' + (index + 1))"></strong><span class="text-xs text-slate-500" x-text="item.status || item.state || item.code || ''"></span></div><div class="mt-2 grid gap-1 text-xs text-slate-400 sm:grid-cols-2"><template x-for="(value,key) in item" :key="key"><span x-show="!['id','title','name','label','status','state','content_type'].includes(key)" class="truncate"><b class="text-slate-500" x-text="key.replaceAll('_',' ') + ': '"></b><span x-text="typeof value === 'object' ? JSON.stringify(value) : value"></span></span></template></div></article></template></div>
+            <div x-show="!workspaceItems.length" class="px-4 py-12 text-center text-sm text-slate-500">No records are available for this workspace yet.</div>
+          </section>
         </div>
       </template>
 

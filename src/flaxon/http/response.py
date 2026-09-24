@@ -51,7 +51,20 @@ class JSONResponse(Response):
     media_type = "application/json; charset=utf-8"
 
     def __init__(self, content: Any, status_code: int = 200, headers: dict[str, str] | None = None) -> None:
-        super().__init__(json.dumps(content, ensure_ascii=False, default=str), status_code, headers, self.media_type)
+        super().__init__(
+            json.dumps(content, ensure_ascii=False, default=_json_default),
+            status_code,
+            headers,
+            self.media_type,
+        )
+
+
+def _json_default(value: Any) -> Any:
+    """Serialize framework-supported model objects without hard dependencies."""
+    model_dump = getattr(value, "model_dump", None)
+    if callable(model_dump):
+        return model_dump()
+    return str(value)
 
 
 class HTMLResponse(Response):

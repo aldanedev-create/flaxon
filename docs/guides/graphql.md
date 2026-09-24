@@ -21,7 +21,7 @@ cd graphql-example
 Install dependencies:
 
 ```bash
-pip install flaxon[graphql]
+pip install flaxon
 ```
 
 Create `app.py` with the code below.

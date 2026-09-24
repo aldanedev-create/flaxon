@@ -1,0 +1,1 @@
+"""FastMCP module example package."""

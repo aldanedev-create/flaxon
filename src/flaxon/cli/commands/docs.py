@@ -37,6 +37,11 @@ class DocsCommand(Command):
             action="store_true",
             help="Include Flaxon's own system routes (/health, /metrics, /docs, etc.) in the spec",
         )
+        parser.add_argument(
+            "--check",
+            action="store_true",
+            help="Verify the existing output matches the generated spec without rewriting it",
+        )
 
     def _run(self, args: argparse.Namespace, console: Any) -> int:
         from flaxon.openapi import OpenAPIGenerator
@@ -60,7 +65,23 @@ class DocsCommand(Command):
         indent = args.indent or None
         output = json.dumps(spec, indent=indent)
 
-        with open(args.output, "w") as f:
+        if args.check:
+            try:
+                with open(args.output, encoding="utf-8") as file:
+                    existing = json.load(file)
+            except FileNotFoundError:
+                console.error(f"OpenAPI output does not exist: {args.output}")
+                return 1
+            except (OSError, json.JSONDecodeError) as exc:
+                console.error(f"OpenAPI output is not valid JSON: {exc}")
+                return 1
+            if existing != spec:
+                console.error(f"OpenAPI output is out of date: {args.output}")
+                return 1
+            console.success(f"OpenAPI spec is current: {args.output}")
+            return 0
+
+        with open(args.output, "w", encoding="utf-8") as f:
             f.write(output)
 
         path_count = len(spec.get("paths", {}))

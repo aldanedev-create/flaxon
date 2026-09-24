@@ -150,6 +150,19 @@ def test_cms_resources_and_import_export():
     assert activity.status_code == 200 and "action,resource" in activity.text
 
 
+def test_cms_editorial_workspaces_are_api_backed():
+    _, _, client, headers = _app()
+    created = client.post("/admin/cms/api/post/items", json_data={"title": "Workspace post", "status": "review"}, headers=headers)
+    assert created.status_code == 201
+    for section in ("calendar", "board", "review", "models", "seo", "references", "trash", "integrations"):
+        response = client.get(f"/admin/cms/api/workspace/{section}", headers=headers)
+        assert response.status_code == 200, section
+        assert response.json()["section"] == section
+    page = client.get("/admin/cms/", headers=headers)
+    assert page.status_code == 200
+    assert "workspaceLinks" in page.text
+
+
 @pytest.mark.asyncio
 async def test_cms_database_storage_contract_round_trips_records():
     database = MemoryDatabase()

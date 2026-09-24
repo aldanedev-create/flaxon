@@ -15,7 +15,7 @@ app = Flaxon("basic-api", debug=True)
 
 
 # Health check
-@app.get("/health")
+@app.get("/service-health")
 async def health():
     return {
         "status": "healthy",
@@ -29,7 +29,7 @@ async def home():
     return {
         "message": "Welcome to the Basic API",
         "endpoints": [
-            "GET /health",
+            "GET /service-health",
             "GET /users",
             "GET /users/<id>",
             "POST /users",
@@ -167,7 +167,7 @@ http://localhost:8000
 ## Health Check
 
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:8000/service-health
 ```
 
 Response:

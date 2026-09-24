@@ -20,9 +20,11 @@
 
     <!-- Admin CSS -->
     <link rel="stylesheet" href="/static/admin/css/admin.css?v=20260916-2">
-    {% if dashboard and dashboard.config.custom_styles %}<link rel="stylesheet" href="{{ dashboard.config.custom_styles }}">{% endif %}
+    {% if dashboard and dashboard.config.custom_styles %}<link rel="stylesheet" href="{{ dashboard.config.custom_styles }}">
+    {% endif %}
 
-    {% block extra_head %}{% endblock %}
+    {% block extra_head %}
+    {% endblock %}
 </head>
 <body class="admin-shell">
 
@@ -67,8 +69,22 @@
                         </a>
                     </div>
                     <div x-show="notificationsOpen" x-cloak @click.outside="notificationsOpen = false" class="absolute right-4 top-14 z-50 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-700 bg-slate-800 shadow-2xl">
-                        <div class="flex items-center justify-between border-b border-slate-700 px-4 py-3"><strong class="text-sm">Notifications</strong><div class="flex gap-3"><button @click="markNotificationsRead()" class="text-xs text-blue-400">Mark read</button><a href="{{ base_prefix if base_prefix is defined else (dashboard.url_prefix if dashboard else '/admin') }}/activity" class="text-xs text-blue-400">View activity</a></div></div>
-                        <div class="max-h-80 overflow-y-auto p-2"><template x-for="item in notifications" :key="item.timestamp + item.action"><div class="border-b border-slate-700/60 px-2 py-3 last:border-0"><p class="text-sm" x-text="formatNotification(item)"></p><p class="mt-1 text-xs text-slate-400" x-text="item.timestamp"></p></div></template><p x-show="!notifications.length" class="px-2 py-5 text-center text-sm text-slate-400">No recent activity.</p></div>
+                        <div class="flex items-center justify-between border-b border-slate-700 px-4 py-3">
+                            <strong class="text-sm">Notifications</strong>
+                            <div class="flex gap-3">
+                                <button @click="markNotificationsRead()" class="text-xs text-blue-400">Mark read</button>
+                                <a href="{{ base_prefix if base_prefix is defined else (dashboard.url_prefix if dashboard else '/admin') }}/activity" class="text-xs text-blue-400">View activity</a>
+                            </div>
+                        </div>
+                        <div class="max-h-80 overflow-y-auto p-2">
+                            <template x-for="item in notifications" :key="item.timestamp + item.action">
+                                <div class="border-b border-slate-700/60 px-2 py-3 last:border-0">
+                                    <p class="text-sm" x-text="formatNotification(item)"></p>
+                                    <p class="mt-1 text-xs text-slate-400" x-text="item.timestamp"></p>
+                                </div>
+                            </template>
+                                <p x-show="!notifications.length" class="px-2 py-5 text-center text-sm text-slate-400">No recent activity.</p>
+                            </div>
                     </div>
                 </div>
             </div>
@@ -77,7 +93,11 @@
         <!-- Mobile navigation drawer -->
         <div x-show="mobileMenuOpen" x-cloak class="mobile-menu-overlay fixed inset-0 z-[60] md:hidden" @click.self="mobileMenuOpen = false">
             <aside class="mobile-menu-drawer absolute right-0 top-0 h-full w-[min(21rem,88vw)] overflow-y-auto bg-slate-800 border-l border-slate-700 shadow-2xl" @click.outside="mobileMenuOpen = false">
-                <div class="flex items-center justify-between border-b border-slate-700 px-5 py-4"><strong>Admin navigation</strong><button @click="mobileMenuOpen = false" title="Close navigation" aria-label="Close navigation" class="p-2 text-slate-400 hover:text-white"><i class="fas fa-xmark"></i></button></div>
+                <div class="flex items-center justify-between border-b border-slate-700 px-5 py-4">
+                    <strong>Admin navigation</strong>
+                    <button @click="mobileMenuOpen = false" title="Close navigation" aria-label="Close navigation" class="p-2 text-slate-400 hover:text-white">
+                    <i class="fas fa-xmark"></i>
+                    </button></div>
                 <nav class="space-y-1 p-4" aria-label="Mobile Admin navigation">
                     <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/" class="mobile-menu-link"><i class="fas fa-th-large"></i>Dashboard</a>
                     {% set mobile_models = models if models is defined and models else (dashboard.registry.get_all() if dashboard else []) %}
@@ -89,10 +109,13 @@
                     <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/settings" class="mobile-menu-link"><i class="fas fa-gear"></i>Settings</a>
                     <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/activity" class="mobile-menu-link"><i class="fas fa-clock-rotate-left"></i>Activity</a>
                     <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/operations" class="mobile-menu-link"><i class="fas fa-heart-pulse"></i>Operations</a>
+                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/services" class="mobile-menu-link"><i class="fas fa-diagram-project"></i>Services</a>
+                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/health" class="mobile-menu-link"><i class="fas fa-heart-pulse"></i>Fleet health</a>
                     <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/notifications" class="mobile-menu-link"><i class="fas fa-bell"></i>Notifications</a>
                     <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/profile" class="mobile-menu-link"><i class="fas fa-user"></i>Profile</a>
                     <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/logout" class="mobile-menu-link text-red-400"><i class="fas fa-right-from-bracket"></i>Log out</a>
-                    {% if dashboard and dashboard.url_prefix == '/admin' %}<a href="/admin/cms/" class="mobile-menu-link"><i class="fas fa-pen-to-square"></i>CMS</a>{% endif %}
+                    {% if dashboard and dashboard.url_prefix == '/admin' %}
+                    <a href="/admin/cms/" class="mobile-menu-link"><i class="fas fa-pen-to-square"></i>CMS</a>{% endif %}
                 </nav>
             </aside>
         </div>
@@ -132,13 +155,21 @@
                             <span>{{ model_item.get_verbose_name_plural() }}</span>
                         </a>
                         {% endfor %}
-                        {% if dashboard %}{% for custom_view in dashboard.custom_views %}<a href="{{ custom_view.url }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas {{ custom_view.icon }} w-5"></i><span>{{ custom_view.name }}</span></a>{% endfor %}{% endif %}
+                        {% if dashboard %}{% for custom_view in dashboard.custom_views %}
+                        <a href="{{ custom_view.url }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition">
+                        <i class="fas {{ custom_view.icon }} w-5"></i>
+                        <span>{{ custom_view.name }}</span>
+                         </a>
+                         {% endfor %}
+                         {% endif %}
                         <a href="{{ base_prefix }}/users" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas fa-users w-5"></i><span>Users</span></a>
                         <a href="{{ base_prefix }}/roles" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas fa-shield-halved w-5"></i><span>Roles</span></a>
                         <a href="{{ base_prefix }}/media" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas fa-photo-film w-5"></i><span>Media</span></a>
                         <a href="{{ base_prefix }}/settings" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas fa-gear w-5"></i><span>Settings</span></a>
                         <a href="{{ base_prefix }}/activity" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas fa-clock-rotate-left w-5"></i><span>Activity</span></a>
                         <a href="{{ base_prefix }}/operations" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas fa-heart-pulse w-5"></i><span>Operations</span></a>
+                        <a href="{{ base_prefix }}/services" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas fa-diagram-project w-5"></i><span>Services</span></a>
+                        <a href="{{ base_prefix }}/health" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas fa-heart-pulse w-5"></i><span>Fleet health</span></a>
                         <a href="{{ base_prefix }}/logout" class="flex items-center gap-3 px-3 py-2 rounded-lg text-red-400 hover:bg-red-500/10 transition"><i class="fas fa-right-from-bracket w-5"></i><span>Log out</span></a>
                     </div>
                 </div>

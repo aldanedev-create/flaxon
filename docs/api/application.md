@@ -13,7 +13,8 @@ Flaxon(
     name: str,
     *,
     debug: bool | None = None,
-    config: dict[str, Any] | None = None
+    config: dict[str, Any] | None = None,
+    openapi: bool | dict[str, Any] = False
 )
 ```
 
@@ -24,6 +25,7 @@ Flaxon(
 | `name` | `str` | Application name |
 | `debug` | `bool \| None` | Enable debug mode |
 | `config` | `dict[str, Any] \| None` | Configuration dictionary |
+| `openapi` | `bool \| dict[str, Any]` | Enable automatic OpenAPI, Swagger UI, and ReDoc. A mapping supplies `enable_openapi()` options. |
 
 ---
 
@@ -36,11 +38,25 @@ route(
     path: str,
     *,
     methods: set[str] | list[str] | tuple[str, ...] = ("GET",),
-    name: str | None = None
+    name: str | None = None,
+    summary: str | None = None,
+    description: str | None = None,
+    tags: list[str] | None = None,
+    operation_id: str | None = None,
+    responses: dict[str | int, Any] | None = None,
+    deprecated: bool = False,
+    security: list[dict[str, list[str]]] | None = None
 ) -> Callable
 ```
 
 Register a route with custom HTTP methods.
+
+The `get`, `post`, `put`, `patch`, and `delete` helpers accept the same
+OpenAPI metadata: `summary`, `description`, `tags`, `operation_id`,
+`responses`, `deprecated`, and `security`.
+
+See the [OpenAPI guide](../guides/openapi.md) for query parameters, schemas,
+guards, and CLI validation.
 
 ---
 
@@ -179,6 +195,31 @@ Generate a URL for a named route.
 
 ---
 
+# OpenAPI Methods
+
+## enable_openapi
+
+```python
+enable_openapi(
+    title: str = "Flaxon API",
+    version: str = "1.0.0",
+    description: str | None = None,
+    openapi_url: str = "/openapi.json",
+    docs_url: str | None = "/docs",
+    redoc_url: str | None = "/redoc",
+    include_internal: bool = False,
+    docs_guard: Callable[[Request], Any] | None = None,
+    protect_docs: bool = False,
+    persist_authorization: bool = False,
+) -> Any
+```
+
+Register the generated OpenAPI JSON endpoint and interactive Swagger UI and
+ReDoc pages. This is equivalent to passing `openapi=True` or an options mapping
+to the constructor. See the [OpenAPI guide](../guides/openapi.md).
+
+---
+
 # Middleware Methods
 
 ## add_middleware
@@ -191,6 +232,20 @@ add_middleware(
 ```
 
 Add middleware to the application.
+
+---
+
+# ASGI Mounting
+
+## mount_asgi
+
+```python
+mount_asgi(path: str, app: Any) -> None
+```
+
+Mount a foreign ASGI application such as FastAPI, Django ASGI, or an
+integration adapter under a path prefix. The mounted application owns its
+internal routing and protocol handling.
 
 ---
 
@@ -229,6 +284,21 @@ on_shutdown(
 ```
 
 Register a shutdown callback.
+
+---
+
+## add_lifespan_context
+
+```python
+add_lifespan_context(
+    factory: Callable[[], AbstractAsyncContextManager[Any]]
+) -> Callable[[], AbstractAsyncContextManager[Any]]
+```
+
+Register an async context manager for a mounted ASGI application's startup and
+shutdown lifecycle. Contexts are entered before startup callbacks and exited
+after shutdown callbacks. FastMCP integrations use this method to initialize
+and close MCP session managers correctly.
 
 ---
 

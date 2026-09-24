@@ -4,8 +4,100 @@
 {% set prefix = dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') %}
 {% set form_fields = fields or ['name', 'description', 'status'] %}
 <div class="corporate-page record-form-page">
-  <header class="corporate-header"><div><p class="admin-eyebrow">{{ verbose_name|title }} workspace</p><h1>Create {{ verbose_name|lower }}</h1><p class="corporate-subtitle">Enter the record details below. Required fields are marked and server validation remains authoritative.</p></div><div class="corporate-actions"><a class="corporate-button corporate-button-muted" href="{{ prefix }}/{{ model.get_name() }}"><i class="fas fa-arrow-left"></i><span>Back to {{ verbose_name_plural|default('list') }}</span></a></div></header>
-  <div class="record-form-layout"><form method="post" class="corporate-panel corporate-record-form"><input type="hidden" name="_csrf" value="{{ dashboard.csrf_token() }}"><div class="corporate-panel-header"><div><p class="corporate-kicker">Record details</p><h2>New {{ verbose_name|lower }}</h2><p class="corporate-muted">Use plain values for scalar fields. JSON, relationship, and repeater fields accept valid JSON.</p></div></div><div class="record-fields">{% for field in form_fields %}{% set field_name = field|string %}{% set field_key = field_name|lower %}{% set is_readonly = (readonly_fields is defined and field_name in readonly_fields) or field_key == 'id' %}{% set is_long = field_key in ['description', 'content', 'body', 'notes', 'excerpt', 'summary'] %}{% set is_json = 'json' in field_key or field_key in ['metadata', 'settings', 'relationship', 'relationships', 'repeater', 'items'] %}<label class="corporate-field record-field {% if is_long or is_json %}record-field-wide{% endif %}"><span>{{ field_name|replace('_', ' ')|title }}{% if field_key in ['name', 'title', 'slug', 'email'] %}<b>*</b>{% endif %}</span>{% if is_long or is_json %}<textarea name="{{ field_name }}" rows="6" {% if is_readonly %}readonly{% endif %} placeholder="{% if is_json %}{&quot;key&quot;: &quot;value&quot;}{% else %}Enter {{ field_name|replace('_', ' ') }}...{% endif %}"{% if is_json %} data-json-field{% endif %}></textarea>{% elif field_key in ['active', 'enabled', 'is_active', 'published'] %}<span class="corporate-checkbox"><input type="checkbox" name="{{ field_name }}" value="true"{% if is_readonly %} disabled{% endif %}><span>Enabled</span></span>{% elif field_key == 'status' %}<select name="{{ field_name }}"{% if is_readonly %} disabled{% endif %}><option value="draft">Draft</option><option value="active">Active</option><option value="published">Published</option><option value="archived">Archived</option></select>{% elif 'email' in field_key %}<input name="{{ field_name }}" type="email" autocomplete="email" {% if is_readonly %}readonly{% endif %}>{% elif 'url' in field_key or 'link' in field_key %}<input name="{{ field_name }}" type="url" inputmode="url" {% if is_readonly %}readonly{% endif %}>{% elif 'date' in field_key or 'time' in field_key %}<input name="{{ field_name }}" type="datetime-local" {% if is_readonly %}readonly{% endif %}>{% else %}<input name="{{ field_name }}" type="text" {% if is_readonly %}readonly{% endif %}>{% endif %}{% if is_readonly %}<small>This field is read-only and will be managed by the application.</small>{% elif is_json %}<small>Enter valid JSON. Relationships and repeaters are stored as structured values.</small>{% else %}<small>Server-side model validation is applied when you submit.</small>{% endif %}</label>{% endfor %}</div><div class="corporate-form-actions"><button type="submit" class="corporate-button corporate-button-primary"><i class="fas fa-plus"></i><span>Create {{ verbose_name|lower }}</span></button><a class="corporate-button corporate-button-muted" href="{{ prefix }}/{{ model.get_name() }}">Cancel</a></div></form><aside class="record-form-aside"><section class="corporate-panel"><p class="corporate-kicker">Workflow</p><h2>Before you save</h2><ul class="corporate-checklist"><li><i class="fas fa-check"></i>Confirm required values are complete.</li><li><i class="fas fa-check"></i>Use valid JSON in structured fields.</li><li><i class="fas fa-check"></i>Review the record after creation.</li></ul></section><section class="corporate-panel"><p class="corporate-kicker">Permissions</p><h2>Access</h2><p class="corporate-muted">This page is available because your account has the model create capability. The server checks this permission again on submission.</p></section></aside></div>
+  <header class="corporate-header">
+    <div>
+      <p class="admin-eyebrow">{{ verbose_name|title }} workspace</p>
+      <h1>Create {{ verbose_name|lower }}</h1>
+      <p class="corporate-subtitle">Enter the record details below. Required fields are marked and server validation remains authoritative.</p>
+    </div>
+    <div class="corporate-actions"><a class="corporate-button corporate-button-muted" href="{{ prefix }}/{{ model.get_name() }}">
+      <i class="fas fa-arrow-left"></i>
+      <span>Back to {{ verbose_name_plural|default('list') }}</span>
+    </a>
+  </div>
+</header>
+  <div class="record-form-layout">
+    <form method="post" class="corporate-panel corporate-record-form">
+      <input type="hidden" name="_csrf" value="{{ dashboard.csrf_token() }}">
+      <div class="corporate-panel-header">
+        <div>
+          <p class="corporate-kicker">Record details</p>
+          
+          <h2>New {{ verbose_name|lower }}</h2>
+          <p class="corporate-muted">Use plain values for scalar fields. JSON, relationship, and repeater fields accept valid JSON.</p>
+        </div>
+      </div>
+      <div class="record-fields">
+        {% for field in form_fields %}
+        {% set field_name = field|string %}
+        {% set field_key = field_name|lower %}
+        {% set is_readonly = (readonly_fields is defined and field_name in readonly_fields) or field_key == 'id' %}
+        {% set is_long = field_key in ['description', 'content', 'body', 'notes', 'excerpt', 'summary'] %}
+        {% set is_json = 'json' in field_key or field_key in ['metadata', 'settings', 'relationship', 'relationships', 'repeater', 'items'] %}
+        <label class="corporate-field record-field {% if is_long or is_json %}record-field-wide{% endif %}">
+        <span>{{ field_name|replace('_', ' ')|title }}{% if field_key in ['name', 'title', 'slug', 'email'] %}<b>*</b>
+          {% endif %}
+        </span>
+        {% if is_long or is_json %}
+        <textarea name="{{ field_name }}" rows="6" {% if is_readonly %}readonly{% endif %} placeholder="{% if is_json %}{&quot;key&quot;: &quot;value&quot;}
+        {% else %}Enter {{ field_name|replace('_', ' ') }}...{% endif %}"{% if is_json %} data-json-field{% endif %}>
+
+        </textarea>
+        {% elif field_key in ['active', 'enabled', 'is_active', 'published'] %}
+        <span class="corporate-checkbox"><input type="checkbox" name="{{ field_name }}" value="true"{% if is_readonly %} disabled{% endif %}>
+          <span>Enabled</span>
+        </span>
+        {% elif field_key == 'status' %}
+        <select name="{{ field_name }}"{% if is_readonly %} disabled{% endif %}>
+          <option value="draft">Draft</option>
+          <option value="active">Active</option>
+          <option value="published">Published</option>
+          <option value="archived">Archived</option>
+        </select>{% elif 'email' in field_key %}
+        <input name="{{ field_name }}" type="email" autocomplete="email" {% if is_readonly %}readonly{% endif %}>
+        {% elif 'url' in field_key or 'link' in field_key %}
+        <input name="{{ field_name }}" type="url" inputmode="url" {% if is_readonly %}readonly{% endif %}>
+        {% elif 'date' in field_key or 'time' in field_key %}
+        <input name="{{ field_name }}" type="datetime-local" {% if is_readonly %}readonly{% endif %}>
+        {% else %}<input name="{{ field_name }}" type="text" {% if is_readonly %}readonly{% endif %}>
+        {% endif %}
+        {% if is_readonly %}
+        <small>This field is read-only and will be managed by the application.</small>
+        {% elif is_json %}
+        <small>Enter valid JSON. Relationships and repeaters are stored as structured values.</small>
+        {% else %}
+        <small>Server-side model validation is applied when you submit.</small>
+        {% endif %}
+      </label>
+      {% endfor %}
+    
+    </div>
+    <div class="corporate-form-actions">
+      <button type="submit" class="corporate-button corporate-button-primary">
+        <i class="fas fa-plus"></i>
+        <span>Create {{ verbose_name|lower }}</span>
+      </button>
+      <a class="corporate-button corporate-button-muted" href="{{ prefix }}/{{ model.get_name() }}">Cancel</a>
+    </div>
+  </form>
+  <aside class="record-form-aside">
+    <section class="corporate-panel">
+      <p class="corporate-kicker">Workflow</p>
+      <h2>Before you save</h2>
+      <ul class="corporate-checklist">
+        <li><i class="fas fa-check"></i>Confirm required values are complete.</li>
+        
+        <li><i class="fas fa-check"></i>Use valid JSON in structured fields.</li>
+        <li><i class="fas fa-check"></i>Review the record after creation.</li>
+      </ul>
+    </section>
+    <section class="corporate-panel">
+      <p class="corporate-kicker">Permissions</p>
+      <h2>Access</h2>
+      <p class="corporate-muted">This page is available because your account has the model create capability. The server checks this permission again on submission.</p>
+    </section>
+  </aside>
+</div>
 </div>
 {% endblock %}
 {% block extra_scripts %}<script>

@@ -1,7 +1,9 @@
 <!-- templates/admin/detail.html -->
 {% extends "admin/base.html" %}
 
-{% block title %}View {{ verbose_name }}{% endblock %}
+{% block title %}
+View {{ verbose_name }}
+{% endblock %}
 
 {% block content %}
 {% set prefix = dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') %}
@@ -17,10 +19,12 @@
                 <i class="fas fa-arrow-left"></i>
                 Back to list
             </a>
-            {% if can_change %}<a href="{{ prefix }}/{{ model.get_name() }}/{{ object_id }}/edit" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-400 hover:from-blue-600 hover:to-cyan-500 rounded-lg text-sm font-medium transition text-white flex items-center gap-2">
+            {% if can_change %}
+            <a href="{{ prefix }}/{{ model.get_name() }}/{{ object_id }}/edit" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-400 hover:from-blue-600 hover:to-cyan-500 rounded-lg text-sm font-medium transition text-white flex items-center gap-2">
                 <i class="fas fa-edit"></i>
                 Edit
-            </a>{% endif %}
+            </a>
+            {% endif %}
             <a href="{{ prefix }}/{{ model.get_name() }}/{{ object_id }}/history" class="px-4 py-2 bg-slate-700/50 rounded-lg text-sm text-white">History</a>
         </div>
     </div>
@@ -34,7 +38,9 @@
             {% set render_fields = fields or (object.keys() if object else ['id', 'name']) %}
             {% for field in render_fields %}
             <div class="flex flex-col sm:flex-row sm:items-center border-b border-slate-700/30 pb-3">
-                <div class="w-full sm:w-48 text-sm text-slate-400 font-medium">{{ field|replace('_', ' ')|title }}</div>
+                <div class="w-full sm:w-48 text-sm text-slate-400 font-medium">
+                    {{ field|replace('_', ' ')|title }}
+                </div>
                 <div class="flex-1 text-white text-sm mt-1 sm:mt-0 break-all">
                     {{ object[field] if object and field in object else (object_id if field == 'id' else '') }}
                 </div>

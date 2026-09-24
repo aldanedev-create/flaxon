@@ -15,11 +15,15 @@ never casts them. Cast explicitly in your resolver (int(args["authorId"]))
 before using them, e.g. for dict-key lookups.
 """
 
+from pathlib import Path
+
 from flaxon import Flaxon
-from flaxon.graphql import GraphQLSchema, ObjectType, Field, List
+from flaxon.graphql import Field, GraphQLSchema, List, ObjectType
 from flaxon.graphql.scalars import ID
+from flaxon.http import HTMLResponse
 
 app = Flaxon("graphql-example", debug=True)
+BASE_DIR = Path(__file__).parent
 
 # --------------------
 # Data Storage
@@ -146,9 +150,5 @@ app.enable_graphql(schema, url="/graphql")
 
 
 @app.get("/")
-async def home():
-    return {
-        "message": "Welcome to Flaxon GraphQL",
-        "endpoint": "/graphql",
-        "playground": "/graphql/graphiql",
-    }
+async def home() -> HTMLResponse:
+    return HTMLResponse((BASE_DIR / "index.html").read_text(encoding="utf-8"))

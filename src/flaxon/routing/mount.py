@@ -76,7 +76,18 @@ class Mount:
             raise ValueError(f"Cannot mount object of type {type(self.app)}")
 
         for route in http_routes:
-            self._router.route(route.path, methods=route.methods, name=route.name)(route.endpoint)
+            self._router.route(
+                route.path,
+                methods=route.methods,
+                name=route.name,
+                summary=getattr(route, "summary", None),
+                description=getattr(route, "description", None),
+                tags=getattr(route, "tags", None),
+                operation_id=getattr(route, "operation_id", None),
+                responses=getattr(route, "responses", None),
+                deprecated=getattr(route, "deprecated", False),
+                security=getattr(route, "security", None),
+            )(route.endpoint)
 
         for route in websocket_routes:
             self._router.websocket(route.path, name=route.name)(route.endpoint)

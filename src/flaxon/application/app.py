@@ -8,6 +8,7 @@ from pathlib import Path
 import secrets
 import time
 import traceback
+import types
 import typing
 from collections.abc import Callable
 from typing import Any
@@ -16,29 +17,39 @@ import uuid
 from flaxon.admin import AdminConfig, AdminDashboard
 from flaxon.debugging import Dashboard, Debugger, ErrorStore
 from flaxon.dependency_injection import Container
-from flaxon.exceptions import BadRequest, HTTPException
+from flaxon.exceptions import BadRequest, ConfigurationError, HTTPException
 from flaxon.graphql import GraphQLSchema
 from flaxon.graphql.playground import AltairPlayground, GraphiQLPlayground
 from flaxon.health import HealthRegistry, LivenessProbe, ReadinessProbe, StartupProbe
 from flaxon.http import HTMLResponse, JSONResponse, Request, Response
+from flaxon.integrations.pydantic import is_pydantic_model_type, load_pydantic_model
 from flaxon.metrics import MetricsCollector, PrometheusExporter
 from flaxon.middleware import RequestIDMiddleware, SecurityHeadersMiddleware
 from flaxon.plugins import PluginManager
-from flaxon.routing import Router
+from flaxon.routing import MISSING, Query, Router
 from flaxon.sessions import SessionManager
 from flaxon.sessions.backends.memory import MemoryBackend
-from flaxon.validation import Schema
+from flaxon.validation import Schema, ValidationError
 from flaxon.websocket import WebSocket, WebSocketManager
 
 from .configuration import Config
 from .lifecycle import Lifecycle
 from .state import State
 
+_UNRESOLVED = object()
+
 
 class Flaxon:
     """An async-first ASGI application with route and middleware support."""
 
-    def __init__(self, name: str, *, debug: bool | None = None, config: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self,
+        name: str,
+        *,
+        debug: bool | None = None,
+        config: dict[str, Any] | None = None,
+        openapi: bool | dict[str, Any] = False,
+    ) -> None:
         self.name = name
         self.config = Config(config)
         if debug is not None:
@@ -91,6 +102,10 @@ class Flaxon:
         self._graphql_schema: GraphQLSchema | None = None
         self._openapi_generator: Any = None
         self._asgi_mounts: list[tuple[str, Any]] = []
+
+        if openapi:
+            options = dict(openapi) if isinstance(openapi, dict) else {}
+            self.enable_openapi(**options)
 
     # ============================================================
     # SYSTEM & DIAGNOSTIC ENDPOINTS
@@ -148,30 +163,52 @@ class Flaxon:
         self._asgi_mounts.sort(key=lambda mount: -len(mount[0]))
 
     def route(
-        self, path: str, *, methods: set[str] | list[str] | tuple[str, ...] = ("GET",), name: str | None = None
+        self,
+        path: str,
+        *,
+        methods: set[str] | list[str] | tuple[str, ...] = ("GET",),
+        name: str | None = None,
+        summary: str | None = None,
+        description: str | None = None,
+        tags: list[str] | None = None,
+        operation_id: str | None = None,
+        responses: dict[str | int, Any] | None = None,
+        deprecated: bool = False,
+        security: list[dict[str, list[str]]] | None = None,
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Register a route with an explicit set of HTTP methods."""
-        return self.router.route(path, methods=methods, name=name)
+        return self.router.route(
+            path,
+            methods=methods,
+            name=name,
+            summary=summary,
+            description=description,
+            tags=tags,
+            operation_id=operation_id,
+            responses=responses,
+            deprecated=deprecated,
+            security=security,
+        )
 
-    def get(self, path: str, *, name: str | None = None) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def get(self, path: str, *, name: str | None = None, **metadata: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Register a GET route."""
-        return self.router.get(path, name=name)
+        return self.router.get(path, name=name, **metadata)
 
-    def post(self, path: str, *, name: str | None = None) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def post(self, path: str, *, name: str | None = None, **metadata: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Register a POST route."""
-        return self.router.post(path, name=name)
+        return self.router.post(path, name=name, **metadata)
 
-    def put(self, path: str, *, name: str | None = None) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def put(self, path: str, *, name: str | None = None, **metadata: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Register a PUT route."""
-        return self.router.put(path, name=name)
+        return self.router.put(path, name=name, **metadata)
 
-    def patch(self, path: str, *, name: str | None = None) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def patch(self, path: str, *, name: str | None = None, **metadata: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Register a PATCH route."""
-        return self.router.patch(path, name=name)
+        return self.router.patch(path, name=name, **metadata)
 
-    def delete(self, path: str, *, name: str | None = None) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def delete(self, path: str, *, name: str | None = None, **metadata: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Register a DELETE route."""
-        return self.router.delete(path, name=name)
+        return self.router.delete(path, name=name, **metadata)
 
     def websocket(self, path: str, *, name: str | None = None) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Register a WebSocket route."""
@@ -202,9 +239,17 @@ class Flaxon:
         self,
         title: str = "Flaxon API",
         version: str = "1.0.0",
-        spec_url: str = "/openapi.json",
+        description: str | None = None,
+        openapi_url: str = "/openapi.json",
+        spec_url: str | None = None,
         docs_url: str | None = "/docs",
         redoc_url: str | None = "/redoc",
+        include_internal: bool = False,
+        docs_guard: Callable[[Request], Any] | None = None,
+        protect_docs: bool = False,
+        persist_authorization: bool = False,
+        swagger_asset_url: str = "https://unpkg.com/swagger-ui-dist@5",
+        redoc_asset_url: str = "https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js",
     ) -> Any:
         """
         Enable auto-generated OpenAPI docs, derived from your routes, endpoint
@@ -213,22 +258,59 @@ class Flaxon:
         """
         from flaxon.openapi import OpenAPIGenerator, ReDoc, SwaggerUI
 
-        self._openapi_generator = OpenAPIGenerator(title=title, version=version)
+        if self._openapi_generator is not None:
+            return self._openapi_generator
+        if spec_url is not None:
+            openapi_url = spec_url
+        if protect_docs and docs_guard is None:
+            raise ConfigurationError("protect_docs=True requires a docs_guard callback.")
 
-        @self.router.get(spec_url, name="flaxon_openapi_spec")
-        async def openapi_spec() -> Any:
+        self._openapi_generator = OpenAPIGenerator(
+            title=title,
+            version=version,
+            description=description,
+        )
+
+        async def guarded(request: Request) -> Response | None:
+            if docs_guard is None:
+                return None
+            result = docs_guard(request)
+            if inspect.isawaitable(result):
+                result = await result
+            if isinstance(result, Response):
+                return result
+            if not result:
+                raise HTTPException(403, "API documentation is protected.")
+            return None
+
+        @self.router.get(openapi_url, name="flaxon_openapi_spec")
+        async def openapi_spec(request: Request) -> Any:
             from flaxon.http import JSONResponse
-            return JSONResponse(self._openapi_generator.generate_from_app(self))
+            denied = await guarded(request)
+            if denied is not None:
+                return denied
+            return JSONResponse(self._openapi_generator.generate_from_app(self, include_internal=include_internal))
 
         if docs_url:
             @self.router.get(docs_url, name="flaxon_swagger_docs")
-            async def swagger_docs() -> Any:
-                return SwaggerUI(openapi_url=spec_url, title=title).render()
+            async def swagger_docs(request: Request) -> Any:
+                denied = await guarded(request)
+                if denied is not None:
+                    return denied
+                return SwaggerUI(
+                    openapi_url=openapi_url,
+                    title=title,
+                    asset_url=swagger_asset_url,
+                    persist_authorization=persist_authorization,
+                ).render()
 
         if redoc_url:
             @self.router.get(redoc_url, name="flaxon_redoc_docs")
-            async def redoc_docs() -> Any:
-                return ReDoc(openapi_url=spec_url, title=title).render()
+            async def redoc_docs(request: Request) -> Any:
+                denied = await guarded(request)
+                if denied is not None:
+                    return denied
+                return ReDoc(openapi_url=openapi_url, title=title, asset_url=redoc_asset_url).render()
 
         return self._openapi_generator
 
@@ -361,6 +443,10 @@ class Flaxon:
         """Register a shutdown callback."""
         return self.lifecycle.on_shutdown(callback)
 
+    def add_lifespan_context(self, factory: Callable[[], Any]) -> Callable[[], Any]:
+        """Register an async context manager for the application lifespan."""
+        return self.lifecycle.add_lifespan_context(factory)
+
     # ============================================================
     # ASGI INTERFACE & HANDLERS
     # ============================================================
@@ -484,22 +570,79 @@ class Flaxon:
                 kwargs[name] = request
             elif name in container_kwargs:
                 kwargs[name] = container_kwargs[name]
-            elif (
-                isinstance(request, Request)
-                and isinstance(annotation, type)
-                and issubclass(annotation, Schema)
-            ):
-                try:
-                    body = await request.json()
-                except json.JSONDecodeError as exc:
-                    raise BadRequest("Request body must be valid JSON.") from exc
-                kwargs[name] = annotation.load(body)
-            elif parameter.default is not inspect.Parameter.empty:
-                continue
+            elif isinstance(parameter.default, Query):
+                kwargs[name] = self._resolve_query_parameter(request, name, annotation, parameter.default)
             else:
-                raise TypeError(f"Cannot resolve endpoint parameter {name!r}")
+                body_value = await self._resolve_body_parameter(request, annotation)
+                if body_value is not _UNRESOLVED:
+                    kwargs[name] = body_value
+                elif parameter.default is not inspect.Parameter.empty:
+                    continue
+                else:
+                    raise TypeError(f"Cannot resolve endpoint parameter {name!r}")
         result = endpoint(**kwargs)
         return await result if inspect.isawaitable(result) else result
+
+    @staticmethod
+    def _resolve_query_parameter(request: Request | WebSocket, name: str, annotation: Any, declaration: Query) -> Any:
+        """Read and coerce a declared query parameter without extra dependencies."""
+        if not isinstance(request, Request):
+            if declaration.default is MISSING:
+                raise TypeError(f"Query parameter {name!r} requires an HTTP request")
+            return declaration.default
+
+        key = declaration.alias or name
+        if key not in request.query:
+            if declaration.default is MISSING:
+                raise ValidationError({name: ["This query parameter is required."]})
+            return declaration.default
+
+        value: Any = request.query[key]
+        target = annotation
+        origin = typing.get_origin(target)
+        if origin in (typing.Union, types.UnionType):
+            target = next((item for item in typing.get_args(target) if item is not type(None)), str)
+        try:
+            if target is bool:
+                normalized = str(value).strip().lower()
+                if normalized in {"1", "true", "yes", "on"}:
+                    converted = True
+                elif normalized in {"0", "false", "no", "off"}:
+                    converted = False
+                else:
+                    raise ValueError("expected a boolean")
+            elif target is int:
+                converted = int(value)
+            elif target is float:
+                converted = float(value)
+            elif target is str or target is inspect.Parameter.empty or target is Any:
+                converted = value
+            else:
+                converted = target(value)
+            if declaration.ge is not None and converted < declaration.ge:
+                raise ValueError(f"must be greater than or equal to {declaration.ge}")
+            if declaration.le is not None and converted > declaration.le:
+                raise ValueError(f"must be less than or equal to {declaration.le}")
+            if declaration.min_length is not None and len(converted) < declaration.min_length:
+                raise ValueError(f"must contain at least {declaration.min_length} characters")
+            if declaration.max_length is not None and len(converted) > declaration.max_length:
+                raise ValueError(f"must contain no more than {declaration.max_length} characters")
+            return converted
+        except (TypeError, ValueError) as exc:
+            raise ValidationError({name: [f"Invalid value for query parameter '{key}'."]}) from exc
+
+    async def _resolve_body_parameter(self, request: Request | WebSocket, annotation: Any) -> Any:
+        """Resolve an optional Pydantic or native Flaxon body schema."""
+        is_native_schema = isinstance(annotation, type) and issubclass(annotation, Schema)
+        if not isinstance(request, Request) or not (is_pydantic_model_type(annotation) or is_native_schema):
+            return _UNRESOLVED
+        try:
+            body = await request.json()
+        except json.JSONDecodeError as exc:
+            raise BadRequest("Request body must be valid JSON.") from exc
+        if is_pydantic_model_type(annotation):
+            return load_pydantic_model(annotation, body)
+        return annotation.load(body)
 
     async def _handle_websocket(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
         socket = WebSocket(scope, receive, send, self.websocket_manager)

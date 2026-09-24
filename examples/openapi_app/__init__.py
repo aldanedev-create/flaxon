@@ -1,0 +1,1 @@
+"""Runnable automatic OpenAPI example."""

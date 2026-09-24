@@ -14,7 +14,12 @@
     </div>
   </header>
 
-  {% if message %}<div class="media-alert media-alert-success"><i class="fas fa-circle-check"></i><span>Upload complete: {{ message }}</span></div>{% endif %}
+  {% if message %}
+  <div class="media-alert media-alert-success">
+    <i class="fas fa-circle-check"></i>
+    <span>Upload complete: {{ message }}</span>
+  </div>
+  {% endif %}
   <div class="media-layout">
     <aside class="media-sidebar" aria-label="Media folders">
       <div class="media-sidebar-heading"><strong>Library</strong><span>{{ total_files }}</span></div>
