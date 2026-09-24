@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Updated the root README with the current production boundary, optional
   integrations, Admin/CMS capabilities, modules, and microservice guidance.
+- Added a zero-to-hero guide matrix and cross-document navigation to the
+  documentation landing page and Quick Start.
 - Added documentation for the Admin control plane, service-owned databases,
   remote model adapters, service accounts, events, and Flaxon modules.
 

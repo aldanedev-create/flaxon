@@ -59,6 +59,28 @@ Pydantic request models and FastMCP are also optional integrations. Install
 4. When the project grows, follow the [large-application guide](guides/scaling.md)
    before adding more pages or endpoints.
 
+## Choose the next guide
+
+Use this path to move from a first API to a production application. Each link
+points to a maintained guide or runnable example in this repository.
+
+| You want to build | Continue with |
+|---|---|
+| A structured API | [Routing](guides/routing.md), [Requests](guides/requests.md), [Responses](guides/responses.md), and [Validation](guides/validation.md) |
+| Automatic API documentation | [OpenAPI, Swagger UI, and ReDoc](guides/openapi.md) |
+| A modular API with Pydantic | [Modules](guides/Modules.md), [Pydantic](guides/pydantic.md), and the [Pydantic example](examples/pydantic-api.md) |
+| MCP tools for an existing app | [FastMCP](guides/fastmcp.md), [Modules](guides/Modules.md), and the [FastMCP example](examples/fastmcp-app.md) |
+| A server-rendered site | [Jinax](guides/jinax.md) and [Jinax API reference](api/jinax.md) |
+| Login and permissions | [Authentication](guides/authentication.md) and [Authorization](guides/authorization.md) |
+| Admin and CMS workflows | [Admin and CMS](guides/admin-cms.md), [Admin production](guides/admin-production.md), and [Admin guide](admin-guide.md) |
+| Database-backed content | [Databases](guides/databases.md) and [Migration guide](migration-guide.md) |
+| Background work | [Tasks](guides/tasks.md) and [Scaling](guides/scaling.md) |
+| Tests and diagnostics | [Testing](guides/testing.md) and [Debugging](guides/debugging.md) |
+| Production deployment | [Deployment](deployment.md), [Security](security.md), and [Performance](performance.md) |
+| Mobile or frontend clients | [Mobile backends](guides/mobile-developement.md) and [Frontend integration](examples/frontend-integration.md) |
+
+**More developer navigation:** [API reference](api/application.md) | [Examples](examples/basic-api.md) | [Configuration](configuration.md) | [Plugins](guides/plugins.md) | [Contributing](contributing.md) | [Updates](updates.md)
+
 ## Supported public field classes
 
 Validation fields use their full class names. Copy these names exactly:
