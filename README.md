@@ -14,7 +14,7 @@
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-000000.svg" alt="Code style: ruff"></a>
 </p>
 
-Principal Author: Aldane Hutchinson
+Author: Aldane Hutchinson
 
 Flaxon is an async-first ASGI framework for JSON APIs, WebSockets, and
 server-rendered applications. It owns the HTTP boundary while you choose the
