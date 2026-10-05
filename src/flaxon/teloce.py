@@ -55,7 +55,7 @@ class Teloce:
             self.register_source(source.name, source.directory, routes=source.routes)
 
         cache_control = (
-            "no-cache" if app.debug else "public, max-age=31536000, immutable"
+            "no-cache"
         )
         app.mount_static(self.static_url, str(self.build_dir), cache_control=cache_control)
         app.on_startup(self.build)
@@ -95,7 +95,7 @@ class Teloce:
             except ImportError as exc:
                 raise RuntimeError(
                     "Teloce support requires the optional dependency: "
-                    "pip install 'flaxon[teloce]'"
+                    "pip install --upgrade flaxon teloce-py"
                 ) from exc
 
             missing = [str(source.directory) for source in self.sources if not source.directory.is_dir()]
@@ -149,8 +149,15 @@ class Teloce:
                     mode=self.options.get("spa_mode", "history"),
                     base=self.options.get("spa_base", "/"),
                     route_overrides=route_overrides,
-                    minify=not self.app.debug,
+                    minify=False,
                 )
+                if not self.app.debug and self.options.get("minify", True):
+                    from minifyjs import minify
+                    optimized = minify(router_path.read_text(encoding="utf-8"),
+                                       compress=True, mangle=True, format="esm",
+                                       target=self.options.get("target") or "es2020",
+                                       source_name="router.js")
+                    router_path.write_text(optimized.code, encoding="utf-8")
                 self.router_output = router_path.relative_to(self.build_dir).as_posix()
 
             self._assert_entry_exists(self.entry)
@@ -186,9 +193,11 @@ class Teloce:
                 "window.__TELOCE_ROUTER__ = router;"
                 "document.addEventListener('click', event => {"
                 "const link = event.target.closest?.('a[data-teloce-link]');"
-                "if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;"
+                "if (!link || link.hasAttribute('download') || (link.target && link.target.toLowerCase() !== '_self') || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;"
                 "const url = new URL(link.href, location.href);"
-                "if (url.origin !== location.origin) return;"
+                "if (url.origin !== location.origin || !['http:', 'https:'].includes(url.protocol)) return;"
+                "if (url.pathname === location.pathname && url.search === location.search && url.hash) return;"
+                "if (!router.resolve(url.pathname + url.search)) return;"
                 "event.preventDefault(); router.push(url.pathname + url.search + url.hash);"
                 "});"
             )
