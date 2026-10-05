@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Teloce integration
+
+- Generated assets revalidate instead of caching stable router/aliases as immutable.
+- Client links respect downloads, targets, same-page fragments and unmatched routes.
+- Production router optimization uses MinifyJS, alongside Teloce's native production backend.
+- Reload watching includes `.vel` sources and ignores `.flaxon` build output.
+- Added integration API documentation and five lessons; shortened the README.
+
 ### Changed
 
 - Fixed Jinax `CompositeLoader` so custom Admin and module templates can fall

@@ -116,3 +116,81 @@ def test_production_html_entry_uses_stable_hashed_alias_and_css(tmp_path: Path) 
     assert b'/_flaxon/ui/app.js' in response.body
     assert b'<link rel="stylesheet" href="/_flaxon/' in response.body
     assert b'.css">' in response.body
+
+
+def test_production_static_aliases_revalidate_and_router_uses_minifyjs(tmp_path, monkeypatch):
+    import minifyjs
+    calls=[]
+    original=minifyjs.minify
+    def tracked(source, **options):
+        calls.append(options)
+        return original(source, **options)
+    monkeypatch.setattr(minifyjs,'minify',tracked)
+    _component(tmp_path/'ui/app.html','<main id="router-view"></main>')
+    _component(tmp_path/'ui/pages/Jobs.html','<h1>Jobs</h1>')
+    app=Flaxon('cache',debug=False)
+    integration=app.use_teloce(project_root=tmp_path)
+    integration.build()
+    client=TestClient(app)
+    for path in ('/_flaxon/router.js','/_flaxon/ui/app.js'):
+        assert client.get(path).headers['cache-control']=='no-cache'
+    assert any(call.get('source_name')=='router.js' for call in calls)
+
+
+def test_link_handler_preserves_browser_navigation(tmp_path):
+    _component(tmp_path/'ui/app.html','<main id="router-view"></main>')
+    _component(tmp_path/'ui/pages/Jobs.html','<h1>Jobs</h1>')
+    app=Flaxon('links',debug=True)
+    integration=app.use_teloce(project_root=tmp_path)
+    document=integration.render().body.decode()
+    assert "link.hasAttribute('download')" in document
+    assert "link.target.toLowerCase() !== '_self'" in document
+    assert 'router.resolve(url.pathname + url.search)' in document
+    assert 'url.hash) return' in document
+
+
+def test_reloader_watches_vel_but_ignores_generated_build(tmp_path):
+    from flaxon.server.reload import Reloader
+    watcher=Reloader()
+    assert watcher._should_watch(tmp_path/'ui/App.vel')
+    assert watcher._should_watch(tmp_path/'ui/app.html')
+    assert not watcher._should_watch(tmp_path/'.flaxon/build/ui/app.js')
+
+
+def test_navigation_listener_behavior_in_javascript(tmp_path):
+    import shutil, subprocess, json
+    node=shutil.which('node')
+    if not node:
+        pytest.skip('Node required for generated listener regression test')
+    _component(tmp_path/'ui/app.html','<main id="router-view"></main>')
+    _component(tmp_path/'ui/pages/Jobs.html','<h1>Jobs</h1>')
+    app=Flaxon('links',debug=True)
+    document=app.use_teloce(project_root=tmp_path).render().body.decode()
+    start=document.index("document.addEventListener('click'")
+    listener=document[start:document.index('</script>',start)].strip()
+    # Execute the exact generated listener with browser-like objects.
+    script='''let handler;
+const document={addEventListener:(name,fn)=>handler=fn};
+const location={origin:'http://localhost',pathname:'/',search:''};
+let pushed=[];
+const router={resolve:path=>path.startsWith('/jobs')?{}:null,push:path=>pushed.push(path)};
+''' + listener + '''
+function click(href,extra={}) {
+ let prevented=false;
+ const link={href,target:'',hasAttribute:()=>false,...extra};
+ handler({target:{closest:()=>link},button:0,preventDefault:()=>prevented=true});
+ return prevented;
+}
+if(!click('http://localhost/jobs') || pushed[0]!=='/jobs') throw Error('client route');
+for(const [url,props] of [
+ ['http://localhost/jobs',{target:'_blank'}],
+ ['http://localhost/jobs',{hasAttribute:()=>true}],
+ ['http://localhost/backend',{}],
+ ['http://other/jobs',{}],
+ ['http://localhost/#section',{}],
+ ['mailto:someone@example.com',{}]]) {
+ if(click(url,props)) throw Error('intercepted normal link '+url);
+}
+if(pushed.length!==1) throw Error('unexpected router calls');
+'''
+    subprocess.run([node,'-e',script],check=True,capture_output=True,text=True)
