@@ -1,0 +1,11 @@
+{% extends "admin/base.html" %}
+{% block title %}School overview{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <div><p class="text-sm text-slate-400">Custom Admin page</p><h1 class="text-3xl font-bold">Northstar school overview</h1><p class="text-slate-400 mt-1">A module-backed operational snapshot.</p></div>
+  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    {% for label, value in [("Students", student_count), ("Courses", course_count), ("Staff", staff_count), ("Published news", news_count)] %}<div class="rounded-xl border border-slate-700 bg-slate-800/60 p-5"><p class="text-xs uppercase tracking-wide text-slate-400">{{ label }}</p><p class="mt-2 text-3xl font-bold">{{ value }}</p></div>{% endfor %}
+  </div>
+  <div class="flex flex-wrap gap-3"><a class="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white" href="{{ admin_url }}">Open Admin</a><a class="rounded-lg border border-slate-600 px-4 py-2 font-semibold" href="{{ cms_url }}">Open CMS</a></div>
+</div>
+{% endblock %}

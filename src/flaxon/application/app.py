@@ -61,6 +61,7 @@ class Flaxon:
         self.state = State()
         self.lifecycle = Lifecycle()
         self.jinax: Any = None
+        self.teloce: Any = None
         self.websocket_manager = WebSocketManager()
         self.error_store = ErrorStore()
         self.debugger = Debugger(debug=self.debug)
@@ -230,6 +231,12 @@ class Flaxon:
     def use_templates(self, engine: Any) -> None:
         """Set the template engine used by request rendering."""
         self.jinax = engine
+
+    def use_teloce(self, **options: Any) -> Any:
+        """Enable optional Teloce HTML SPA compilation and asset serving."""
+        from flaxon.teloce import install_teloce
+
+        return install_teloce(self, **options)
 
     # ============================================================
     # ADMIN METHODS

@@ -3,8 +3,16 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+try:
+    from jinja2 import BaseLoader
+except ImportError:  # pragma: no cover - Jinax raises a clearer error when used.
+    class BaseLoader:  # type: ignore[no-redef]
+        """Fallback base so importing optional loader helpers stays lightweight."""
 
-class CompositeLoader:
+        pass
+
+
+class CompositeLoader(BaseLoader):
     def __init__(self, loaders: list[Any] | None = None) -> None:
         self.loaders = loaders or []
 

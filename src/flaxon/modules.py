@@ -57,6 +57,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import inspect
+from pathlib import Path
 from typing import Any, Callable
 
 from flaxon.routing.router import Router
@@ -89,11 +90,15 @@ class FlaxonModule:
         name: str,
         template_dir: str | None = None,
         static_dir: str | None = None,
+        ui_dir: str | Path | None = None,
+        ui_routes: dict[str, str] | None = None,
     ) -> None:
         self.name = name
         self.router = Router()  # unprefixed -- prefix decided at mount time
         self.template_dir = template_dir
         self.static_dir = static_dir
+        self.ui_dir = ui_dir
+        self.ui_routes = dict(ui_routes or {})
         self._required: list[str] = []
         self._startup_hooks: list[Callable[..., Any]] = []
         self._shutdown_hooks: list[Callable[..., Any]] = []
@@ -363,6 +368,23 @@ def _merge_module(app: Any, module: FlaxonModule, prefix: str, mount_name: str, 
             app.jinax.environment.loader = CompositeLoader(
                 [app.jinax.environment.loader, FileSystemLoader(module.template_dir)]
             )
+
+    if module.ui_dir:
+        from flaxon.teloce import TeloceSource
+
+        source = TeloceSource(mount_name, module.ui_dir, module.ui_routes)
+        if app.teloce is not None:
+            app.teloce.register_source(
+                source.name,
+                source.directory,
+                routes=source.routes,
+            )
+        else:
+            pending = getattr(app, "_teloce_ui_sources", None)
+            if pending is None:
+                pending = []
+                app._teloce_ui_sources = pending
+            pending.append(source)
 
     for hook in module._startup_hooks:
         app.on_startup(hook)

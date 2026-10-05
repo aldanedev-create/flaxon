@@ -1,0 +1,9 @@
+<template><section><h1>Team chat</h1><p>The chat module contributes a page and a WebSocket.</p><div class="card"><div v-for="message in messages" :key="message.text"><strong>{{ message.author }}</strong>: {{ message.text }}</div><form class="row" @submit.prevent="send"><input v-model="draft" aria-label="Message" placeholder="Message the team"><button>Send</button></form></div></section></template>
+<script>
+export default {
+  data() { return { draft: "", messages: [] }; },
+  mounted() { this.socket = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/chat/ws`); this.socket.onmessage = event => this.messages.push(JSON.parse(event.data)); },
+  beforeUnmount() { this.socket?.close(); },
+  methods: { send() { if (!this.draft.trim()) return; this.socket.send(JSON.stringify({ text: this.draft })); this.draft = ""; } }
+};
+</script>

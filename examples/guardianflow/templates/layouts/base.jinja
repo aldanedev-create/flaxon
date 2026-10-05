@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GuardianFlow | {{ title|default('Security intelligence') }}</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="/dashboard"><span class="brand-mark">G</span><span>GuardianFlow</span></a><span class="status"><i></i> Demo system online</span></header>
+  <div class="shell">
+    <aside class="sidebar"><p class="eyebrow">WORKSPACE</p><nav>
+      <a class="{{ 'active' if active == 'dashboard' else '' }}" href="/dashboard">Overview</a>
+      <a class="{{ 'active' if active == 'events' else '' }}" href="/events">Event stream</a>
+      <a class="{{ 'active' if active == 'cameras' else '' }}" href="/cameras">Cameras</a>
+      <a class="{{ 'active' if active == 'alerts' else '' }}" href="/alerts">Alerts</a>
+      <a class="{{ 'active' if active == 'rules' else '' }}" href="/rules">Rules</a>
+    </nav><div class="sidebar-note"><strong>Hackathon demo</strong><span>Structured events become useful activity stories.</span></div></aside>
+    <main class="main">{% block content %}{% endblock %}</main>
+  </div>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

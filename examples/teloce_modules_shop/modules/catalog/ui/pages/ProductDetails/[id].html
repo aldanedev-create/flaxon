@@ -1,0 +1,2 @@
+<template><section><a href="/products" data-teloce-link>Back to catalog</a><div class="card"><h1>{{ product.name }}</h1><p class="price">J$ {{ product.price }}</p></div></section></template>
+<script>export default { props: ["id"], data() { return { product: {} }; }, async mounted() { this.product = await (await fetch(`/api/catalog/products/${this.id}`)).json(); } };</script>

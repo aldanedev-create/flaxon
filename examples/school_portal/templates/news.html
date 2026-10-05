@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="news-intro">
+  <div>
+    <p class="eyebrow">The Northstar bulletin</p>
+    <h1>What's happening on campus.</h1>
+    <p class="news-intro-copy">Stories, announcements, and moments from our students, faculty, and families.</p>
+  </div>
+  <div class="news-intro-note">
+    <span class="news-intro-note-mark" aria-hidden="true">*</span>
+    <div><strong>Live from Northstar</strong><span>Published by our school community</span></div>
+  </div>
+</section>
+
+{% if items %}
+  {% set featured = items[0] %}
+  <section class="news-feature" aria-labelledby="featured-story-title">
+    <div class="news-feature-copy">
+      <p class="story-label">Featured story</p>
+      <h2 id="featured-story-title">{{ featured.title }}</h2>
+      <p class="news-feature-summary">{{ featured.summary }}</p>
+      <div class="news-meta"><span>{{ featured.get("category") or "Campus update" }}</span><span aria-hidden="true">·</span><time>{{ featured.get("published_date") or "Recently" }}</time></div>
+      {% if featured.get("body") %}<div class="richtext news-feature-body">{{ featured.get("body") | safe }}</div>{% endif %}
+    </div>
+    <div class="news-feature-visual" aria-label="Northstar Academy campus story">
+      <span class="visual-kicker">Northstar / 01</span>
+      <strong>Learning<br><em>in motion.</em></strong>
+      <span class="visual-footer">Curiosity is part of every day.</span>
+    </div>
+  </section>
+
+  {% if items[1:] %}
+  <section class="news-latest" aria-labelledby="latest-news-title">
+    <div class="news-section-heading"><div><p class="eyebrow">Keep exploring</p><h2 id="latest-news-title">Latest from campus</h2></div><a class="text-link" href="/about">Meet our community -&gt;</a></div>
+    <div class="news-grid">
+      {% for item in items[1:] %}
+      <article class="news-card">
+        <div class="news-card-top"><span class="news-tag">{{ item.get("category") or "Campus update" }}</span><time>{{ item.get("published_date") or "Recently" }}</time></div>
+        <h3>{{ item.title }}</h3>
+        <p>{{ item.summary }}</p>
+        {% if item.get("body") %}<div class="richtext">{{ item.get("body") | safe }}</div>{% endif %}
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+{% else %}
+  <section class="news-empty"><span class="news-empty-mark" aria-hidden="true">*</span><h2>No published news yet.</h2><p>Add an announcement from the <a class="text-link" href="/admin/cms/">Admin CMS</a> to see it here.</p></section>
+{% endif %}
+{% endblock %}

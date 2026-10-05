@@ -45,6 +45,8 @@ classifiers = [
 # Added PyYAML to core dependencies
 dependencies = [
     "pyyaml>=6.0.0",
+    "teloce-py>=0.2.6",
+
 ]
 dynamic = ["version"]
 
@@ -69,6 +71,7 @@ pydantic = [
 mcp = [
     "fastmcp>=3.0",
 ]
+
 
 # Optional integrations used by the Admin/CMS production features. Install
 # only the groups used by an application, or use ``flaxon[production]`` for a
@@ -95,6 +98,7 @@ production = [
     "casbin>=1.40.0",
     "APScheduler>=3.10.4",
     "redis>=5.0.0",
+
 ]
 
 dev = [

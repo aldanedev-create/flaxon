@@ -1,0 +1,23 @@
+<template>
+  <section>
+    <div class="page-head"><div><h1>Jobs</h1><p>Track visits, work, and customer approvals.</p></div><button @click="load">Refresh</button></div>
+    <p v-if="loading">Loading jobs...</p>
+    <div v-else class="list"><JobCard v-for="job in jobs" :key="job.id" :job="job" /></div>
+  </section>
+</template>
+<script>
+import JobCard from "../components/JobCard.html";
+export default {
+  components: { JobCard },
+  data() { return { jobs: [], loading: true }; },
+  async mounted() { await this.load(); },
+  methods: {
+    async load() {
+      this.loading = true;
+      const response = await fetch("/api/jobs");
+      this.jobs = (await response.json()).items;
+      this.loading = false;
+    }
+  }
+};
+</script>

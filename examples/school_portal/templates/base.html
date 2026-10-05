@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Northstar Academy is a college-preparatory school for curious, capable students.">
+  <title>{{ title }} | Northstar Academy</title>
+  <link rel="stylesheet" href="/school-static/school.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <div class="utility-bar">
+    <div>Independent school | Austin, Texas</div>
+    <div class="utility-links"><a href="/contact">Contact</a><a href="/calendar">Calendar</a><a href="/admin/login">Admin login</a></div>
+  </div>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Northstar Academy home"><span class="brand-mark">N</span><span>Northstar <b>Academy</b></span></a>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" aria-label="Primary navigation">
+      <a href="/about">Our school</a>
+      <a href="/academics">Academics</a>
+      <a href="/students">Student life</a>
+      <a href="/news">News</a>
+      <a href="/calendar">Events</a>
+      <a class="nav-cta" href="/admissions">Admissions</a>
+    </nav>
+  </header>
+  <main id="main-content">{% block content %}{% endblock %}</main>
+  <footer class="site-footer">
+    <div class="footer-brand"><a class="brand" href="/"><span class="brand-mark">N</span><span>Northstar <b>Academy</b></span></a><p>Learning with purpose. Leading with care.</p></div>
+    <div class="footer-links"><div><strong>Explore</strong><a href="/about">Our school</a><a href="/academics">Academics</a><a href="/students">Student life</a></div><div><strong>Connect</strong><a href="/admissions">Admissions</a><a href="/calendar">Calendar</a><a href="/contact">Contact</a></div></div>
+    <div class="footer-bottom"><span>Northstar Academy</span><span>(c) 2026 Northstar Academy</span></div>
+  </footer>
+  <script>
+    const menu = document.querySelector('.menu-toggle');
+    const nav = document.querySelector('#site-nav');
+    menu?.addEventListener('click', () => {
+      const open = document.body.classList.toggle('nav-open');
+      menu.setAttribute('aria-expanded', String(open));
+    });
+  </script>
+</body>
+</html>

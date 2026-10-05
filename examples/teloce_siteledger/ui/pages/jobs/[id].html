@@ -1,0 +1,10 @@
+<template>
+  <section><a href="/jobs" data-teloce-link>Back to jobs</a><div class="card"><h1>{{ job.customer }}</h1><p>{{ job.status }}</p><strong>J$ {{ job.total }}</strong></div></section>
+</template>
+<script>
+export default {
+  props: ["id"],
+  data() { return { job: {} }; },
+  async mounted() { this.job = await (await fetch(`/api/jobs/${this.id}`)).json(); }
+};
+</script>

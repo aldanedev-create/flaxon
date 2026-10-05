@@ -1,0 +1,2 @@
+<template><section><h1>Orders</h1><p>Fulfilment is isolated from catalog code.</p><div class="card" v-for="order in orders" :key="order.number"><strong>{{ order.number }}</strong><p>{{ order.customer }} - {{ order.status }}</p></div></section></template>
+<script>export default { data() { return { orders: [] }; }, async mounted() { this.orders = (await (await fetch("/api/orders")).json()).items; } };</script>

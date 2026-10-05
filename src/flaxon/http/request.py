@@ -75,3 +75,15 @@ class Request:
         if self.app is None or self.app.jinax is None:
             raise RuntimeError("No template engine configured")
         return HTMLResponse(await self.app.jinax.render(template, context or {}))
+
+    async def compile(
+        self,
+        entry: str = "app.html",
+        context: dict[str, Any] | None = None,
+        *,
+        title: str | None = None,
+    ) -> HTMLResponse:
+        """Render a startup-compiled Teloce HTML component as an SPA shell."""
+        if self.app is None or self.app.teloce is None:
+            raise RuntimeError("Teloce is not configured; call app.use_teloce() first")
+        return self.app.teloce.render(entry, context, title=title)

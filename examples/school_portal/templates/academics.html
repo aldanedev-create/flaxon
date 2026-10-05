@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="inner-hero inner-hero-blue"><p class="eyebrow">Academics</p><h1>A curriculum with range, depth, and purpose.</h1><p>Students build strong foundations, follow their questions, and learn to connect ideas across disciplines.</p></section>
+<section class="content-split"><div><p class="eyebrow">How we teach</p><h2>Ambition with room to wonder.</h2></div><div class="content-copy"><p>Northstar courses are demanding without being narrow. Teachers make space for discussion, practice, revision, and the kind of real work that makes knowledge stick.</p><ul class="check-list"><li>Small seminars and hands-on studios</li><li>Dedicated advising and student support</li><li>Project-based learning across departments</li></ul></div></section>
+<section class="catalog-section"><div class="section-heading"><div><p class="eyebrow">Course catalog</p><h2>What students can explore</h2></div><a class="text-link" href="/academics/courses">View all courses -&gt;</a></div><div class="catalog-grid">{% for course in courses %}<article class="catalog-card"><span class="course-code">{{ course.code }}</span><h3>{{ course.name }}</h3><p>{{ course.teacher }} | Room {{ course.room }}</p></article>{% endfor %}</div></section>
+<section class="callout-strip"><strong>Ready to see the full picture?</strong><span>Browse the live course directory managed by Northstar Admin.</span><a class="button button-light" href="/academics/courses">Course directory</a></section>
+{% endblock %}

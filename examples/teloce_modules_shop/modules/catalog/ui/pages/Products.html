@@ -1,0 +1,5 @@
+<template><section><h1>Catalog</h1><p>Inventory UI and APIs belong to one module.</p><div class="cards"><ProductCard v-for="product in products" :key="product.id" :product="product" /></div></section></template>
+<script>
+import ProductCard from "../components/ProductCard.html";
+export default { components: { ProductCard }, data() { return { products: [] }; }, async mounted() { this.products = (await (await fetch("/api/catalog/products")).json()).items; } };
+</script>

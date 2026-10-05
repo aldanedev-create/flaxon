@@ -702,6 +702,14 @@ class AdminDashboard:
 
     async def login(self, request: Request) -> Response:
         if request.method == "GET":
+            # Keep an active admin session when a user returns from the public
+            # site through the login link. The login page should not obscure a
+            # valid session; invalid or expired cookies simply fall through.
+            if request.cookies.get("session_id"):
+                current = await self.auth.backend.authenticate(request)
+                if current is not None:
+                    request.user = current
+                    return RedirectResponse(f"{self.url_prefix}/", status_code=302)
             return await self.jinax.render_response("admin/login.html", {"title": self.config.site_title, "error": None, "csrf_token": self.csrf_token(), "reset_url": f"{self.url_prefix}/password-reset", "remember": True})
         form = await request.form()
         data = self.validate_csrf(form.to_dict() if hasattr(form, "to_dict") else form)

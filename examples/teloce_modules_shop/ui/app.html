@@ -1,0 +1,37 @@
+<template>
+  <div class="app-shell">
+    <header><a class="brand" href="/" data-teloce-link>Petal &amp; Stem</a><span>Operations</span></header>
+    <div class="body">
+      <nav>
+        <a href="/products" data-teloce-link>Catalog</a>
+        <a href="/orders" data-teloce-link>Orders</a>
+        <a href="/chat" data-teloce-link>Team chat</a>
+        <a href="/login" data-teloce-link>Account</a>
+      </nav>
+      <main id="router-view" data-teloce-router-view></main>
+    </div>
+  </div>
+</template>
+
+
+<script>export default { props: ["store"] };</script>
+<style>
+:root { font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #18221d; background: #f5f7f6; }
+* { box-sizing: border-box; } body { margin: 0; }
+header { height: 64px; padding: 0 24px; display: flex; align-items: center; gap: 14px; color: white; background: #173f32; }
+.brand { color: white; font-size: 20px; font-weight: 800; text-decoration: none; }
+.body { min-height: calc(100vh - 64px); display: grid; grid-template-columns: 210px 1fr; }
+nav { padding: 22px 14px; display: grid; align-content: start; gap: 6px; background: white; border-right: 1px solid #dce3df; }
+nav a { padding: 10px 12px; border-radius: 6px; color: #405047; text-decoration: none; }
+nav a:hover { color: #173f32; background: #e8f1ed; }
+#router-view { padding: 28px; }
+h1 { margin: 0 0 6px; } p { color: #637069; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.card { padding: 18px; color: inherit; background: white; border: 1px solid #dce3df; border-radius: 8px; text-decoration: none; }
+.price { color: #176b4b; font-weight: 800; }
+button, input { min-height: 42px; border-radius: 6px; font: inherit; }
+button { border: 0; padding: 0 15px; color: white; background: #176b4b; cursor: pointer; }
+input { border: 1px solid #bfcac4; padding: 0 12px; }
+.row { display: flex; gap: 10px; }
+@media (max-width: 700px) { .body { grid-template-columns: 1fr; } nav { display: flex; overflow-x: auto; border-right: 0; border-bottom: 1px solid #dce3df; } #router-view { padding: 20px 16px; } }
+</style>

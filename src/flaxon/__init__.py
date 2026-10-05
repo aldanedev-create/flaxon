@@ -23,6 +23,7 @@ __all__ = [
     "Router",
     "State",
     "StreamingResponse",
+    "Teloce",
     "TextResponse",
     "WebSocket",
     "WebSocketDisconnect",
@@ -78,4 +79,8 @@ def __getattr__(name: str) -> object:
         from .jinax import Jinax
 
         return Jinax
+    if name == "Teloce":
+        from .teloce import Teloce
+
+        return Teloce
     raise AttributeError(f"module 'flaxon' has no attribute {name!r}")

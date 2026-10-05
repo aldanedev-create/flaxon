@@ -1,0 +1,6 @@
+name: package_removal
+conditions: [package_delivered, person_detected, package_removed]
+within_seconds: 3600
+result:
+  type: package_removal
+  severity: warning

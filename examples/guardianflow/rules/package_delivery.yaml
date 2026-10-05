@@ -1,0 +1,6 @@
+name: package_delivery
+conditions: [person_detected, package_detected, person_left]
+within_seconds: 120
+result:
+  type: package_delivery
+  severity: info

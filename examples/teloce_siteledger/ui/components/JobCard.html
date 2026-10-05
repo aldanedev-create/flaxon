@@ -1,0 +1,7 @@
+<template>
+  <a class="card job" :href="'/jobs/' + job.id" data-teloce-link>
+    <span><strong>{{ job.customer }}</strong><br><small>Job #{{ job.id }}</small></span>
+    <span><span class="badge">{{ job.status }}</span><br><strong>J$ {{ job.total }}</strong></span>
+  </a>
+</template>
+<script>export default { props: ["job"] };</script>

@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Fixed Jinax `CompositeLoader` so custom Admin and module templates can fall
+  back to framework package templates such as `admin/base.html`.
+- Admin login now redirects authenticated users back to the dashboard instead
+  of rendering a second login form after public-site navigation.
+- Expanded the school portal example with a responsive institutional website,
+  CMS-backed events, admissions, academics, student-life, contact, calendar,
+  and public news pages.
 - Updated the root README with the current production boundary, optional
   integrations, Admin/CMS capabilities, modules, and microservice guidance.
 - Added a zero-to-hero guide matrix and cross-document navigation to the

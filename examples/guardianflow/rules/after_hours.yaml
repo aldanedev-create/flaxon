@@ -1,0 +1,8 @@
+name: after_hours
+conditions: [person_detected]
+schedule:
+  start: "22:00"
+  end: "06:00"
+result:
+  type: after_hours_activity
+  severity: warning

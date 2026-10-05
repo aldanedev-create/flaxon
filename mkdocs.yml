@@ -207,6 +207,7 @@ nav:
       - Frontend Integration: examples/frontend-integration.md
       - CMS Example: examples/cms/admin-cms/example-cms.md
       - Full Admin and CMS: examples/cms/full_admin_cms/README.md
+      - School Portal: examples/school-portal.md
       - Mail Example: examples/mail/readme.md
       - GraphQL Example: examples/grahql/readme.md
       - Modules Example: examples/Modules/readme.md
