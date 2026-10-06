@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Readable full-stack course
+
+- Shorten the README around Python server and Teloce browser development, keeping the logo.
+- Split the full-stack course into ten numbered lesson files with navigation and API coverage maps.
+- Add a runnable typed Taskboard using HTML components, TypeScript helpers, validation and reusable components.
+- Add compilation/API and browser tests for the Taskboard.
+
+
 ## Unreleased — Full-stack page configuration
 
 - Add optional favicon, description, language, theme color, stylesheet and script settings to Teloce page shells.

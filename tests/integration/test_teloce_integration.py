@@ -249,3 +249,22 @@ def test_typescript_cdn_example_builds_and_serves(tmp_path):
     component = client.get('/_flaxon/ui/app.js')
     assert component.status_code == 200
     assert './units.ts' not in component.text
+
+
+def test_taskboard_course_example_compiles_typed_html_and_api(tmp_path):
+    import shutil
+    import importlib.util
+    source = Path(__file__).resolve().parents[2] / "examples/teloce_taskboard"
+    shutil.copytree(source, tmp_path / "taskboard")
+    spec = importlib.util.spec_from_file_location("taskboard_course", tmp_path / "taskboard/app.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    client = TestClient(module.app)
+    assert client.get("/").status_code == 200
+    assert client.post("/api/tasks", json_data={"title": "Ship docs"}).status_code == 201
+    assert client.post("/api/tasks", json_data={"title": ""}).status_code == 422
+    assert len(client.get("/api/tasks").json()["items"]) == 2
+    for output in ["app.js", "api.js", "types.js", "format.js", "components/TaskRow.js"]:
+        response = client.get("/_flaxon/ui/" + output)
+        assert response.status_code == 200
+        assert 'from "./types.ts"' not in response.text

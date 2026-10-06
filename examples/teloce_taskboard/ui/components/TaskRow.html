@@ -1,0 +1,31 @@
+<template>
+  <article>
+    <h2>{{ task.title }}</h2>
+    <p>{{ status }}</p>
+  </article>
+</template>
+
+<script lang="ts">
+import { taskStatus } from "../format.ts";
+
+export default {
+  props: ["task"],
+  computed: {
+    status() {
+      return taskStatus(this.task);
+    },
+  },
+};
+</script>
+
+<style scoped>
+article {
+  padding: 1rem;
+  border: 1px solid #b9c7d5;
+  border-radius: 0.5rem;
+}
+
+h2 {
+  font-size: 1.1rem;
+}
+</style>

@@ -35,20 +35,30 @@ Create `ui/app.html`:
 
 ```html
 <template>
-  <main><h1>Taskboard</h1><p role="status">{{ status }}</p>
-    <ul><li v-for="task in tasks" :key="task.id">{{ task.title }}</li></ul>
+  <main>
+    <h1>Taskboard</h1>
+    <p role="status">{{ status }}</p>
+    <ul>
+      <li v-for="task in tasks" :key="task.id">{{ task.title }}</li>
+    </ul>
   </main>
 </template>
 <script>
 export default {
-  data() { return { tasks: [], status: "Loading…" }; },
+  data() {
+    return { tasks: [], status: "Loading…" };
+  },
   async mounted() {
     try {
       const response = await fetch("/api/tasks");
-      if (!response.ok) throw new Error("Could not load tasks");
+      if (!response.ok) {
+        throw new Error("Could not load tasks");
+      }
       this.tasks = (await response.json()).items;
       this.status = "Ready";
-    } catch { this.status = "Could not load tasks. Refresh to retry."; }
+    } catch {
+      this.status = "Could not load tasks. Refresh to retry.";
+    }
   }
 };
 </script>
