@@ -1,9 +1,11 @@
-# Flaxon documentation
+# Flaxon full-stack documentation
 
-Flaxon is an async-first ASGI framework for HTTP APIs, WebSockets, and
-server-rendered applications. It is deliberately technology-neutral: Flaxon
-handles the web boundary, while your application chooses its database, queue,
-frontend, and deployment platform.
+Flaxon combines Python HTTP APIs and WebSockets with integrated Teloce browser
+interfaces. Build pages, components and backend features in one project, or use
+Jinax for server-rendered HTML. Database and deployment choices remain yours.
+
+Start with the [full-stack quick start](quickstart.md), then follow the
+[10 detailed lessons](fullstack/index.md).
 
 ## What you can build
 
@@ -20,6 +22,7 @@ frontend, and deployment platform.
 
 | Need | Flaxon capability | Start with |
 |---|---|---|
+| Interactive browser UI | Teloce components, pages, scoped CSS, TypeScript and page-head resources | [Teloce API](api/teloce.md) and [Full-stack lessons](fullstack/index.md) |
 | HTTP endpoints | `Flaxon`, `Router`, typed path parameters, responses | [Routing](guides/routing.md) and [HTTP](api/http.md) |
 | Large application composition | `FlaxonModule`, mount-time prefixes, feature installers | [Modules](guides/Modules.md) and [Scaling](guides/scaling.md) |
 | JSON input validation | `Schema` and `fields.*Field` | [Validation](guides/validation.md) |

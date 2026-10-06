@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "flaxon"
-description = "A technology-neutral, async-first Python backend framework"
+description = "An async-first Python full-stack framework with integrated Teloce interfaces"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
@@ -18,7 +18,7 @@ keywords = [
     "python",
     "framework",
     "web",
-    "backend",
+    "full-stack",
     "asgi",
     "async",
     "api",

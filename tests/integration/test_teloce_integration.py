@@ -194,3 +194,58 @@ for(const [url,props] of [
 if(pushed.length!==1) throw Error('unexpected router calls');
 '''
     subprocess.run([node,'-e',script],check=True,capture_output=True,text=True)
+
+
+def test_optional_head_resources_escape_and_preserve_defaults(tmp_path):
+    _component(tmp_path / "ui" / "app.html", "<h1>Hello</h1>")
+    app = Flaxon("Default title", debug=True)
+    integration = app.use_teloce(
+        project_root=tmp_path, favicon='/static/icon.svg?a=1&b=2',
+        description='A "quoted" <description>', lang='fr', theme_color='#101827',
+        stylesheets=[{"href": "https://cdn.example.com/theme.css", "media": "screen"}],
+        scripts=[{"src": "https://cdn.example.com/app.js", "defer": True, "async": False}],
+    )
+    document = integration.render(title="Page & title").body.decode()
+    assert '<html lang="fr">' in document
+    assert '<title>Page &amp; title</title>' in document
+    assert 'A &quot;quoted&quot; &lt;description&gt;' in document
+    assert 'icon.svg?a=1&amp;b=2' in document
+    assert 'defer></script>' in document
+    assert ' async' not in document
+    assert 'name="theme-color"' in document
+    plain = Flaxon("Plain", debug=True).use_teloce(project_root=tmp_path)
+    document = plain.render().body.decode()
+    assert '<title>Plain</title>' in document
+    assert 'rel="icon"' not in document
+
+
+@pytest.mark.parametrize("resource", [
+    {"src": "javascript:alert(1)"}, {"src": "data:text/javascript,x"},
+    {"src": "/script.js", "onload": "alert(1)"},
+    {"src": "/script.js", "defer": "false"},
+])
+def test_head_rejects_unsafe_or_invalid_script_attributes(tmp_path, resource):
+    with pytest.raises((ValueError, TypeError)):
+        Flaxon("test").use_teloce(project_root=tmp_path, scripts=[resource])
+
+
+def test_typescript_cdn_example_builds_and_serves(tmp_path):
+    import shutil
+    import importlib.util
+    source = Path(__file__).resolve().parents[2] / "examples" / "teloce_head_ts"
+    shutil.copytree(source, tmp_path / "example")
+    spec = importlib.util.spec_from_file_location("head_example", tmp_path / "example" / "app.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    client = TestClient(module.app)
+    response = client.get("/")
+    assert response.status_code == 200
+    assert 'bootstrap@5.3.3' in response.text
+    assert client.get('/static/favicon.svg').status_code == 200
+    assert client.get('/api/about').json()['message'].startswith('Python')
+    compiled = client.get('/_flaxon/ui/units.js')
+    assert compiled.status_code == 200
+    assert ': number' not in compiled.text
+    component = client.get('/_flaxon/ui/app.js')
+    assert component.status_code == 200
+    assert './units.ts' not in component.text

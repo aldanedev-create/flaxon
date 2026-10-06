@@ -179,3 +179,11 @@ Do not make a public frontend depend on Admin cookies.
 - Restrict service tokens to scopes and rotate them through a secret manager.
 - Keep Admin audit records append-only and apply a documented retention policy.
 - Treat the built-in service registry as an operational catalog, not a service discovery replacement.
+
+## Use this capability in a full-stack app
+
+Flaxon serves Python APIs and Teloce interfaces in one project. Keep validation,
+authorization and privileged operations on the server; components call those
+endpoints and present their results. Follow the [full-stack lessons](../fullstack/index.md)
+and [Teloce integration reference](../api/teloce.md) to connect this capability
+to pages, components and application modules.

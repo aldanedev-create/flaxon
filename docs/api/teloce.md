@@ -1,4 +1,4 @@
-# Teloce integration: API and five lessons
+# Teloce full-stack integration: API reference
 
 Flaxon owns HTTP, APIs and WebSockets. Teloce compiles UI components and handles
 browser state and navigation. MinifyJS optimizes generated production JavaScript;
@@ -192,3 +192,53 @@ Add real authentication, database storage and authorization for business data.
 
 [SiteLedger example](../../examples/teloce_siteledger/README.md) ·
 [Modules example](../../examples/teloce_modules_shop/README.md)
+
+## Optional page-head configuration
+
+All additions are optional; existing `title`-only applications continue working.
+
+```python
+app.mount_static("/static", str(project_root / "public"))
+theme_cdn = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+app.use_teloce(
+    project_root=project_root, ui_dir="ui", title="Taskboard",
+    favicon="/static/favicon.svg", description="Team tasks in one place.",
+    lang="en", theme_color="#101827", stylesheets=[theme_cdn],
+    scripts=[{"src": "/static/help.js", "defer": True}],
+)
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `favicon` | None | Icon link URL; serve the file separately |
+| `description` | None | Escaped description meta content |
+| `lang` | `en` | Escaped HTML document language, not script language |
+| `theme_color` | None | Theme-color meta content |
+| `stylesheets` | None | Ordered strings or dictionaries containing `href` |
+| `scripts` | None | Ordered strings or dictionaries containing `src` |
+
+Scripts support `type`, boolean `defer`/`async`, `integrity`, `crossorigin`,
+`referrerpolicy`. Stylesheets support `rel`, `type`, `media`, `sizes`, `integrity`,
+`crossorigin`, `referrerpolicy`. Resource URLs allow relative, HTTP and HTTPS
+URLs; executable/data schemes and unknown attributes are rejected. Values are
+escaped; arbitrary HTML/event-handler attributes are not accepted.
+
+These settings add tags to the head; they do not download, bundle or upload CDN
+resources. Pin trusted dependencies. Scripts execute with page privileges.
+Use verified SRI hashes and `crossorigin="anonymous"` where supported; don't
+invent hashes. Async resources have no guaranteed execution order. Do not assume
+an external library has loaded before a component mounts: coordinate explicitly
+if your component depends on it. Fonts and resources may require network access
+and disclose requests to providers. Local copies support offline applications.
+
+Generated component CSS precedes extra stylesheet links, allowing intentional
+external overrides. Deferred classic scripts retain their order with each other;
+module and async timing needs separate consideration. The integration still
+emits an inline module bootstrap; a strict CSP needs a compatible nonce/hash
+strategy beyond these resource attributes. A favicon does not configure native
+Windows icons. Manifest and arbitrary head HTML are not part of this API.
+
+For TypeScript, use `<script lang="ts">` and import `.ts` helpers with a compatible
+Teloce version. Output is JavaScript; transpilation does not replace type checking.
+See the [tested example](../../examples/teloce_head_ts/README.md) and
+[10 full-stack lessons](../fullstack/index.md).

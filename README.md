@@ -1,54 +1,39 @@
 # Flaxon
 
-**Simple Python. Backend APIs and integrated Teloce interfaces.**
+![Flaxon logo](assets/flaxon.png)
 
-Flaxon is an async-first ASGI framework for APIs, WebSockets and web applications.
-Use its module system to keep backend endpoints and Teloce pages together, or
-choose your own frontend and database. Jinax templates, validation, OpenAPI,
-Admin/CMS and optional integrations support larger applications.
+**Simple Python. Complete web applications.**
 
-## Install
-
-Python 3.11+:
+Flaxon is an async-first Python full-stack framework: build HTTP APIs,
+WebSockets and interactive Teloce interfaces in one project. Keep endpoints,
+pages and components together with feature modules. Use Jinax for server-rendered
+HTML, or integrate another frontend when needed.
 
 ```bash
 pip install "flaxon[standard]"
 ```
 
-## API
-
-```python
-from flaxon import Flaxon
-
-app = Flaxon("hello", debug=True)
-
-@app.get("/api/hello")
-async def hello():
-    return {"message": "Hello from Flaxon"}
-```
-
-Run with `flaxon run app:app --reload`.
-
-## Teloce UI
-
 ```python
 from pathlib import Path
-from flaxon import Request
+from flaxon import Flaxon, Request
 
-app.use_teloce(project_root=Path(__file__).parent, ui_dir="ui")
+app = Flaxon("Hello", debug=True)
+app.use_teloce(project_root=Path(__file__).parent, ui_dir="ui", title="Hello")
 
 @app.get("/")
-@app.get("/<path:spa_path>")
-async def page(request: Request, spa_path: str = ""):
-    return await request.compile("app.html", {"business": "My business"})
+async def home(request: Request):
+    return await request.compile("app.html", {"message": "Hello from Python"})
 ```
 
-Write components in `ui/app.html` and pages in `ui/pages/`. Flaxon compiles them
-at startup, serves the JavaScript and connects Teloce's browser router. With the
-updated Teloce integration, MinifyJS optimizes production output without Node.
-Development keeps readable code and source maps. Authentication and persistent
-storage remain application responsibilities.
+Create `ui/app.html` with `<template><h1>{{ message }}</h1></template>` and
+`<script>export default { props: ["message"] };</script>`, then run
+`flaxon run app:app --reload`.
 
-[API and five lessons](docs/api/teloce.md) · [SiteLedger](examples/teloce_siteledger) ·
-[Modules shop](examples/teloce_modules_shop) · [Documentation](docs/index.md) ·
-[Changelog](CHANGELOG.md) · [License](LICENSE)
+Teloce compiles components to browser JavaScript; MinifyJS optimizes production
+output. TypeScript components and modules are supported by compatible Teloce
+versions. The integrated UI is client-rendered; Jinax provides server templates.
+
+[Quick start](docs/quickstart.md) · [10 full-stack lessons](docs/fullstack/index.md) ·
+[Head settings and API](docs/api/teloce.md) ·
+[TypeScript/CDN example](examples/teloce_head_ts) ·
+[Documentation](docs/index.md) · [Changelog](CHANGELOG.md) · [License](LICENSE)

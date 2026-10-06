@@ -2,7 +2,7 @@
 
 ## Overview
 
-The **Flaxon VS Code Extension** provides full IDE support for **Flaxon**, the async-first Python backend framework. It brings intelligent code completion, route exploration, debugging, and project scaffolding directly into your editor.
+The **Flaxon VS Code Extension** provides full IDE support for **Flaxon**, the async-first Python full-stack framework. It brings intelligent code completion, route exploration, debugging, and project scaffolding directly into your editor.
 
 | Property | Value |
 |----------|-------|

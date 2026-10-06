@@ -313,3 +313,8 @@ Now that Flaxon is installed, continue with:
 - **Deployment** — Prepare your application for production.
 
 You're ready to start building modern Python applications with Flaxon.
+## Build the complete application
+
+After installation, follow the [full-stack quick start](quickstart.md).
+Teloce compiles the interface and Flaxon serves it alongside your APIs.
+See [10 lessons](fullstack/index.md) for the full application workflow.

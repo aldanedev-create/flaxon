@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Full-stack page configuration
+
+- Add optional favicon, description, language, theme color, stylesheet and script settings to Teloce page shells.
+- Escape head values and validate resource schemes and supported attributes.
+- Add a TypeScript/CDN converter example and integration coverage.
+- Position Flaxon as a Python full-stack framework; add a full-stack quick start and ten lessons.
+
+
 All notable changes to Flaxon will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
