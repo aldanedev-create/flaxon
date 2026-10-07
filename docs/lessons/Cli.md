@@ -60,7 +60,9 @@ Result: 1 warning(s), 0 failure(s)
 
 ## `flaxon new`
 
-Scaffolds a new project directory.
+Scaffolds a modular Flaxon + Teloce welcome application by default, including TypeScript, scoped component styles, a Python API, SQLite migrations, and a protected admin.
+
+After generation, install the project, run `python management.py migrate`, and create your administrator with `python management.py setup-admin`. There is no default password. Use `--template basic` for the smaller API-only starter. See [getting started](../getting-started.md) for the complete workflow.
 
 ```bash
 flaxon new my-project

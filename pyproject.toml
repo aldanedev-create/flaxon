@@ -161,6 +161,7 @@ include-package-data = true
 [tool.setuptools.package-data]
 flaxon = [
     "py.typed",
+    "cli/starter/**/*.tmpl",
     "admin/templates/**/*.html",
     "admin/static/**/*",
 ]

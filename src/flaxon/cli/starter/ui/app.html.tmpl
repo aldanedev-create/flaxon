@@ -1,0 +1,7 @@
+<template>
+  <Welcome :project-name="project_name" />
+</template>
+<script lang="ts">
+import Welcome from "../modules/welcome/ui/Welcome.html";
+export default { components: { Welcome }, props: ["project_name"] };
+</script>

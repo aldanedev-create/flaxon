@@ -1,0 +1,18 @@
+"""A real Python API with a module-owned Teloce component."""
+
+from pathlib import Path
+from datetime import datetime, timezone
+from flaxon import __version__
+from flaxon.modules import FlaxonModule
+
+welcome = FlaxonModule("welcome", ui_dir=Path(__file__).parent / "ui")
+
+
+@welcome.get("/status")
+async def status():
+    return {
+        "message": "Your Teloce interface is talking to a Flaxon module.",
+        "framework": "Flaxon",
+        "version": __version__,
+        "time": datetime.now(timezone.utc).isoformat(),
+    }

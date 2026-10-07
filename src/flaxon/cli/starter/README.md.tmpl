@@ -1,0 +1,27 @@
+# __PROJECT_NAME__
+
+Your modular Flaxon + Teloce full-stack application.
+
+```bash
+python -m pip install -e .
+python management.py migrate
+python management.py setup-admin
+flaxon run app:app --reload
+```
+
+Open http://127.0.0.1:8000 for the welcome SPA and http://127.0.0.1:8000/admin/login for your protected admin. The welcome page works immediately; admin setup asks for your own username and password. Use at least eight characters with upper- and lowercase letters, a number, and a special character. No credentials are generated or committed.
+
+- `app.py`: app factory, module mounting, Teloce, database lifecycle and admin.
+- `modules/welcome/module.py`: the module's Python status API.
+- `modules/welcome/ui/Welcome.html`: its component with scoped CSS and TypeScript.
+- `modules/welcome/ui/api.ts`: typed browser API helper.
+- `ui/app.html`: SPA entry that composes feature components.
+- `management.py`: `migrate`, `migrate --status`, `setup-admin`, and `createsuperuser`.
+- `migrations/`: ordered JSON migrations using Flaxon's MigrationRunner.
+- `data/app.sqlite3`: persistent application and admin storage, ignored by Git.
+
+Run management commands from any directory using the script's path; database and migration paths are anchored to this project. Stop/restart the server after creating an administrator so its account list reloads. `FLAXON_DEBUG=0` disables framework debug mode; configure production security and deployment before exposing your app publicly. The included admin store is a single-node starter configuration.
+
+Use source/editable deployment so `ui/`, `public/`, and `migrations/` remain beside the application. Teloce compiles the components and TypeScript; MinifyJS optimizes the JavaScript. Add a new module for each feature, then mount it in `create_app()`.
+
+[Getting started](https://github.com/aldanedev-create/flaxon/blob/main/docs/getting-started.md) · [10 full-stack lessons](https://github.com/aldanedev-create/flaxon/blob/main/docs/fullstack/index.md) · [All documentation](https://github.com/aldanedev-create/flaxon/blob/main/docs/index.md)

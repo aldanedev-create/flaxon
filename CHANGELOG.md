@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Default `flaxon new` to a modular Teloce full-stack welcome application with TypeScript, scoped styles, a module API, persistent protected admin, and project-local migration/admin commands. Keep `--template basic` available.
+- Package the starter assets in Flaxon distributions and correct the generated Flaxon dependency name.
+- Add a canonical getting-started guide and a complete documentation directory.
+
 ## Unreleased — Readable full-stack course
 
 - Shorten the README around Python server and Teloce browser development, keeping the logo.
