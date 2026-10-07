@@ -13,7 +13,17 @@ from settings import ROOT, DATA_DIR, DATABASE_PATH, PROJECT_NAME, DEBUG
 
 def create_app():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    app = Flaxon(PROJECT_NAME, debug=DEBUG)
+    app = Flaxon(PROJECT_NAME, debug=DEBUG, openapi=True)
+
+# openapi=True
+#This registers:
+#| URL | Purpose |
+#|---|---|
+#| `/openapi.json` | Generated OpenAPI 3.1 document |
+#| `/docs` | Interactive Swagger UI with Try it out |
+#| `/redoc` | ReDoc reference browser |
+
+
     database = DatabaseManager(SQLiteAdapter(database=str(DATABASE_PATH)))
     app.container.register_instance("db", database)
     app.on_startup(database.initialize)
