@@ -155,7 +155,7 @@ Use the guides for explanations, the API pages for reference, and the examples f
 - [Industrial Admin Customization](lessons/Industrial%20Admin%20Customization.md)
 - [Deploying Flaxon Apps](lessons/Platform-Deployment.md)
 - [Building a Production App with Modules](lessons/production-app-guide.md)
-- [Teloce Cheatsheet](lessons/Teloce-cheatsheet.md)
+- [Teloce Integration Reference](api/teloce.md)
 - [Flaxon VS Code Extension Cheat Sheet](lessons/vscode%20Cheatsheet.md)
 
 ### VS Code extension

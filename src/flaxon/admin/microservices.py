@@ -232,6 +232,13 @@ class RemoteServiceError(RuntimeError):
     """A remote service request failed after retry/circuit-breaker handling."""
 
 
+class _NoServiceRedirect(urllib.request.HTTPRedirectHandler):
+    """Prevent service credentials from being forwarded to redirect targets."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 class RemoteServiceClient:
     """Dependency-free JSON client for service-owned APIs.
 
@@ -265,7 +272,8 @@ class RemoteServiceClient:
 
         def send() -> Any:
             request = urllib.request.Request(url, data=data, headers=request_headers, method=method.upper())
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+            opener = urllib.request.build_opener(_NoServiceRedirect())
+            with opener.open(request, timeout=self.timeout) as response:
                 raw = response.read()
                 if not raw:
                     return None
