@@ -54,6 +54,7 @@ class NewCommand(Command):
                 console.info("  source .venv/bin/activate  # On Windows: .venv\\Scripts\\activate")
             console.info("  python -m pip install -e .")
             if args.template == "fullstack":
+                console.info("  flaxon welcome")
                 console.info("  python management.py migrate")
                 console.info("  python management.py setup-admin")
             console.info("  flaxon run app:app --reload")

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ project_name }} — Jinax example</title>
+    <link rel="stylesheet" href="/assets/app.css" />
+    <link rel="icon" href="https://flaxon-website.vercel.app/assets/images/logo/flaxon.png" />
+    <style>
+      main { max-width: 760px; margin: 64px auto; padding: 24px; }
+      p { line-height: 1.8; }
+      nav { display: flex; flex-wrap: wrap; gap: 24px; margin-top: 32px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a href="https://flaxon-website.vercel.app/">
+        <img src="https://flaxon-website.vercel.app/assets/images/logo/flaxon.png" alt="Flaxon" width="52" height="60" />
+      </a>
+      <h1>A complete page, rendered with Jinax.</h1>
+      <p>Welcome to {{ project_name }}. Flaxon passed your project name to this HTML template, and Jinax rendered the response on the server.</p>
+      <p>You can build your whole application this way: Python routes, HTML templates, forms, layouts, and your own JavaScript when you need it. Teloce is optional.</p>
+      <p>This example does not load the Teloce runtime. The starter's main page demonstrates the other option: interactive HTML components and TypeScript compiled by Teloce.</p>
+      <p>Edit <code>templates/welcome.html</code> and the <code>/server-page</code> route in <code>app.py</code> to make this page your own.</p>
+      <nav>
+        <a href="/">Back to the welcome page</a>
+        <a href="/admin/login">Open your admin</a>
+        <a href="https://flaxon-website.vercel.app/docs.html">Read the documentation</a>
+      </nav>
+    </main>
+  </body>
+</html>

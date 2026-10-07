@@ -25,7 +25,15 @@ def starter(tmp_path, monkeypatch):
     project = tmp_path / "my-project"
     Generator().generate(project)
     monkeypatch.syspath_prepend(str(project))
-    names = ["app", "settings", "management", "modules", "modules.welcome", "modules.welcome.module"]
+    names = [
+        "app",
+        "settings",
+        "management",
+        "flaxon_cli",
+        "modules",
+        "modules.welcome",
+        "modules.welcome.module",
+    ]
     previous = {name: sys.modules.pop(name) for name in names if name in sys.modules}
     try:
         yield project
@@ -57,9 +65,9 @@ def test_generated_app_serves_module_ui_assets_and_protected_admin(starter, monk
     response = client.get("/")
     assert response.status_code == 200
     assert "Welcome to my-project" in response.text
-    assert "/assets/flaxon.svg" in response.text
+    assert "https://flaxon-website.vercel.app/assets/images/logo/flaxon.png" in response.text
     assert client.get("/api/welcome/status").json()["framework"] == "Flaxon"
-    assert client.get("/assets/flaxon.svg").status_code == 200
+    assert client.get("/assets/app.css").status_code == 200
     assert client.get("/_flaxon/ui/app.js").status_code == 200
     assert client.get("/_flaxon/modules/welcome/ui/Welcome.js").status_code == 200
     assert client.get("/_flaxon/modules/welcome/ui/api.js").status_code == 200
@@ -184,10 +192,20 @@ def test_generated_welcome_browser_calls_python_and_opens_admin(starter):
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch()
             page = browser.new_page()
+            # Keep the browser check independent of the external logo host.
+            logo = Path(__file__).resolve().parents[2] / "assets/flaxon.png"
+            page.route(
+                "https://flaxon-website.vercel.app/assets/images/logo/flaxon.png",
+                lambda route: route.fulfill(content_type="image/png", body=logo.read_bytes()),
+            )
             errors = []
             page.on("pageerror", lambda error: errors.append(str(error)))
             page.goto(f"http://127.0.0.1:{port}/")
-            page.get_by_role("heading", name="Welcome to my-project").wait_for()
+            page.get_by_role("heading", name="The installation worked successfully!").wait_for()
+            page.get_by_text("Welcome to my-project.").wait_for()
+            page.get_by_role("link", name="Try the Jinax example").click()
+            page.get_by_role("heading", name="A complete page, rendered with Jinax.").wait_for()
+            page.get_by_role("link", name="Back to the welcome page").click()
             page.get_by_role("button", name="Try your Python API").click()
             page.get_by_role("status").filter(has_text="talking to a Flaxon module").wait_for()
             page.get_by_role("link", name="Open your admin").click()
@@ -197,3 +215,45 @@ def test_generated_welcome_browser_calls_python_and_opens_admin(starter):
     finally:
         server.should_exit = True
         thread.join(timeout=10)
+
+
+def test_module_owned_custom_commands_run_via_real_cli(starter, monkeypatch, capsys):
+    monkeypatch.chdir(starter)
+    monkeypatch.setattr(sys, "argv", ["flaxon", "welcome"])
+    assert main() == 0
+    assert "Welcome to my-project." in capsys.readouterr().out
+    monkeypatch.setattr(sys, "argv", ["flaxon", "welcome-status"])
+    assert main() == 0
+    assert "talking to a Flaxon module" in capsys.readouterr().out
+    assert not (starter / "data").exists(), "Custom commands must not start the app or create its database"
+
+
+def test_jinax_is_a_complete_server_rendered_option(starter):
+    app = importlib.import_module("app").app
+    response = TestClient(app).get("/server-page")
+    assert response.status_code == 200
+    assert "Welcome to my-project" in response.text
+    assert "Teloce is optional" in response.text
+    assert "<!doctype html>" in response.text
+    assert "/_flaxon/" not in response.text
+    assert "https://flaxon-website.vercel.app/docs.html" in response.text
+
+
+def test_custom_commands_are_discovered_in_fresh_python_processes(starter):
+    import subprocess
+
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(str(Path(path).resolve()) for path in sys.path if path)
+    for command in ["welcome", "welcome-status"]:
+        result = subprocess.run(
+            [sys.executable, "-m", "flaxon.cli.main", command],
+            cwd=starter,
+            env=env,
+            text=True,
+            capture_output=True,
+            timeout=10,
+        )
+        assert result.returncode == 0, result.stderr
+        expected = "Welcome to my-project" if command == "welcome" else "talking to a Flaxon module"
+        assert expected in result.stdout
+    assert not (starter / "data").exists()
