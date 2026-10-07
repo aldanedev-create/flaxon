@@ -4,8 +4,9 @@ from collections.abc import Callable
 from typing import Any
 
 try:
-    from jinja2 import BaseLoader
+    from jinja2 import BaseLoader, TemplateNotFound
 except ImportError:  # pragma: no cover - Jinax raises a clearer error when used.
+    TemplateNotFound = FileNotFoundError
     class BaseLoader:  # type: ignore[no-redef]
         """Fallback base so importing optional loader helpers stays lightweight."""
 
@@ -27,7 +28,7 @@ class CompositeLoader(BaseLoader):
         for loader in self.loaders:
             try:
                 return loader.get_source(environment, template)
-            except FileNotFoundError:
+            except (FileNotFoundError, TemplateNotFound):
                 continue
 
         raise FileNotFoundError(f"Template '{template}' not found in any loader")

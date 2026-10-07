@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 
@@ -45,7 +46,8 @@ class Escaper:
     def escape_css(cls, value: str) -> str:
         if not value:
             return value
-        return re.sub(r"[^a-zA-Z0-9]", lambda m: f"\\{ord(m.group(0)):x}", value)
+        # Terminate hex escapes so a following hex digit cannot extend them.
+        return re.sub(r"[^a-zA-Z0-9]", lambda m: f"\\{ord(m.group(0)):x} ", value)
 
     @classmethod
     def escape_url(cls, value: str) -> str:

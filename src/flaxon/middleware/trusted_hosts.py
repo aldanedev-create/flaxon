@@ -59,7 +59,21 @@ class TrustedHostsMiddleware(Middleware):
         """Check if the host is allowed."""
         # ASGI supplies the Host header, which commonly includes a port in
         # development and can include one in production.
-        hostname = urlsplit(f"//{host}").hostname
+        # Host is an HTTP authority, not a URL. Reject URL delimiters and
+        # whitespace before parsing so userinfo and paths cannot be hidden.
+        if (
+            not host
+            or any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in host)
+            or any(char in host for char in "@/\\?#")
+        ):
+            return False
+        try:
+            authority = urlsplit(f"//{host}")
+            hostname = authority.hostname
+            # Accessing port also validates its syntax and range.
+            _ = authority.port
+        except ValueError:
+            hostname = None
         if hostname is None:
             return False
         host = hostname.lower()
