@@ -30,6 +30,9 @@ class ProxyHeadersMiddleware(Middleware):
 
     def _is_trusted_proxy(self, ip: str) -> bool:
         if not self.trusted_proxies:
+            return False
+
+        if "*" in self.trusted_proxies:
             return True
 
         if ip in self.trusted_proxies:
@@ -99,7 +102,7 @@ class ProxyHeadersMiddleware(Middleware):
             return
 
         client_ip = self._get_client_ip(scope)
-        if client_ip and not self._is_trusted_proxy(client_ip):
+        if not client_ip or not self._is_trusted_proxy(client_ip):
             await self.app(scope, receive, send)
             return
 
@@ -111,7 +114,7 @@ class ProxyHeadersMiddleware(Middleware):
 
         if self.forward_proto:
             proto = self._get_forwarded_proto(scope)
-            if proto:
+            if proto in {"http", "https"}:
                 scope["scheme"] = proto
                 scope["flaxon.forwarded_proto"] = proto
 

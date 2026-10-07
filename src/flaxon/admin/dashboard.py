@@ -9,6 +9,7 @@ import io
 import json
 import base64
 import hashlib
+import mimetypes
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -64,6 +65,7 @@ class AdminDashboard:
         max_image_dimensions: tuple[int, int] = (10000, 10000),
         password_hasher: PasswordHasher | None = None,
         microservices: bool | dict[str, Any] = True,
+        cookie_secure: bool | None = None,
     ) -> None:
         self.app = app
         self.config = config or AdminConfig()
@@ -95,6 +97,7 @@ class AdminDashboard:
             permission_provider=permission_provider,
             strict_permissions=strict_permissions,
             password_hasher=password_hasher,
+            cookie_secure=not getattr(app, "debug", False) if cookie_secure is None else cookie_secure,
         )
         self.password_reset_sender = password_reset_sender
         self.email_verification_sender = email_verification_sender
@@ -805,6 +808,7 @@ class AdminDashboard:
                         error = str(exc)
                     else:
                         record["password_hash"] = self.auth.hasher.hash(str(form["password"]))
+                        self.auth.invalidate_user_sessions(user.username)
                 if form.get("mfa_action") == "enable":
                     if await self._allow_auth_action(request, "mfa-enroll", user.username):
                         mfa_uri, recovery_codes = self.auth.begin_mfa_setup(user.username, self.config.site_title)
@@ -967,6 +971,7 @@ class AdminDashboard:
             except ValueError as exc:
                 raise BadRequest(str(exc)) from exc
             record["password_hash"] = self.auth.hasher.hash(str(data["password"]))
+            self.auth.invalidate_user_sessions(username)
         if self.store:
             self.store.set("users", username, record)
         await self._persist_database()
@@ -987,26 +992,21 @@ class AdminDashboard:
                 if content_type not in self.allowed_upload_types:
                     raise BadRequest("This file type is not allowed.")
                 folder = "/".join(Sanitizer.sanitize_filename(part) for part in str(form.get("folder", "")).split("/") if part.strip())
+                filename = self._media_filename(str(getattr(upload, "filename", "upload.bin")), content_type)
+                content = await upload.read()
+                if len(content) > self.max_upload_size:
+                    raise BadRequest("Uploaded file exceeds the configured size limit.")
+                content = await self._validate_media_bytes(content, content_type)
                 if self.media_storage is not None:
-                    filename = Sanitizer.sanitize_filename(str(getattr(upload, "filename", "upload.bin")))
                     relative = "/".join(part for part in (folder, filename) if part)
-                    content = await upload.read()
-                    content = await self._validate_media_bytes(content, content_type)
                     await self._storage_write(relative, content, content_type)
                     path = relative
                     upload_size = len(content)
                 else:
-                    path = self.media.save(upload, path=folder)
+                    path = self.media.save_bytes(content, self.media.generate_filename(filename), path=folder)
                     relative = str(os.path.relpath(path, self.media.base_path)).replace(os.sep, "/")
-                    upload_size = getattr(upload, "size", 0)
-                    with open(path, "rb") as media_file:
-                        original_content = media_file.read()
-                    sanitized_content = await self._validate_media_bytes(original_content, content_type)
-                    if sanitized_content != original_content:
-                        with open(path, "wb") as media_file:
-                            media_file.write(sanitized_content)
-                        upload_size = len(sanitized_content)
-                    self.media_metadata.setdefault(relative, {})["sha256"] = hashlib.sha256(sanitized_content).hexdigest()
+                    upload_size = len(content)
+                    self.media_metadata.setdefault(relative, {})["sha256"] = hashlib.sha256(content).hexdigest()
                 if self.media_storage is not None:
                     self.media_metadata.setdefault(relative, {})["sha256"] = hashlib.sha256(content).hexdigest()
                 self.media_metadata.setdefault(relative, {})["content_type"] = content_type
@@ -1133,6 +1133,7 @@ class AdminDashboard:
             content_type = str(data.get("content_type", "application/octet-stream")).lower()
             if content_type not in self.allowed_upload_types:
                 raise BadRequest("This file type is not allowed.")
+            filename = self._media_filename(filename, content_type)
             upload_id = self.resumable_uploads.create(filename, total_size, data.get("sha256"), content_type=content_type)
             return JSONResponse({"upload_id": upload_id, "offset": 0}, status_code=201)
         if upload_id is None:
@@ -1147,6 +1148,7 @@ class AdminDashboard:
         session = self.resumable_uploads.status(upload_id)
         filename, content = self.resumable_uploads.finalize(upload_id)
         content_type = str(session.get("content_type", "application/octet-stream"))
+        filename = self._media_filename(filename, content_type)
         content = await self._validate_media_bytes(content, content_type)
         if self.media_storage is not None:
             await self._storage_write(filename, content, content_type)
@@ -1202,6 +1204,24 @@ class AdminDashboard:
         if hasattr(result, "__await__"):
             await result
 
+    def _media_filename(self, filename: str, content_type: str) -> str:
+        """Keep stored extensions consistent with the allowed media type."""
+        safe = Sanitizer.sanitize_filename(filename)
+        extensions = {
+            "image/jpeg": {".jpg", ".jpeg"},
+            "image/png": {".png"},
+            "image/gif": {".gif"},
+            "image/webp": {".webp"},
+            "application/pdf": {".pdf"},
+            "text/plain": {".txt"},
+        }
+        allowed = extensions.get(content_type)
+        if allowed is None:
+            allowed = {mimetypes.guess_extension(content_type) or ".bin"}
+        if Path(safe).suffix.lower() not in allowed:
+            safe = str(Path(safe).with_suffix(sorted(allowed)[0]))
+        return safe
+
     async def _validate_media_bytes(self, data: bytes, content_type: str) -> bytes:
         if self.media_scanner is not None:
             scanner = getattr(self.media_scanner, "scan", self.media_scanner)
@@ -1218,6 +1238,8 @@ class AdminDashboard:
         except Exception:  # noqa: BLE001 - libmagic failures are optional-platform failures.
             detected_type = ""
         declared_type = content_type.lower().split(";", 1)[0].strip()
+        if declared_type == "application/pdf" and not data.startswith(b"%PDF-"):
+            raise BadRequest("The file content does not match its PDF type.")
         if detected_type and declared_type.startswith("image/") and not detected_type.startswith("image/"):
             raise BadRequest("The file content does not match its image type.")
         if detected_type and declared_type == "application/pdf" and detected_type != "application/pdf":
@@ -1234,8 +1256,8 @@ class AdminDashboard:
                 save_kwargs = {"exif": b""} if image_format in {"JPEG", "WEBP", "PNG"} else {}
                 image.save(output, format=image_format, **save_kwargs)
                 return output.getvalue()
-            except ImportError:
-                return data
+            except ImportError as exc:
+                raise BadRequest("Image uploads require Pillow; install flaxon[admin].") from exc
             except (OSError, ValueError) as exc:
                 raise BadRequest("The uploaded image is invalid.") from exc
         return data

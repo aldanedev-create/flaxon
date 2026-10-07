@@ -754,7 +754,9 @@ class CMS:
         if len(content) > dashboard.max_upload_size:
             raise BadRequest("Uploaded file exceeds the configured size limit.")
         content = await dashboard._validate_media_bytes(content, content_type)
-        filename = dashboard.media.generate_filename(str(getattr(upload, "filename", "upload.bin")))
+        filename = dashboard.media.generate_filename(
+            dashboard._media_filename(str(getattr(upload, "filename", "upload.bin")), content_type)
+        )
 
         if dashboard.media_storage is not None:
             relative = filename

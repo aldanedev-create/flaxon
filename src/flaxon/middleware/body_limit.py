@@ -37,10 +37,8 @@ class BodyLimitMiddleware(Middleware):
         if content_length is not None and content_length > self.max_size:
             raise PayloadTooLarge(max_size=self.max_size)
 
-        if content_length is not None and content_length <= self.max_size:
-            await self.app(scope, receive, send)
-            return
-
+        # Content-Length is only an early rejection hint. Always count bytes
+        # received, including when a proxy or client understates the length.
         body_size = 0
 
         async def receive_wrapper() -> dict[str, Any]:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import math
 import time
 import uuid
 from typing import Any
@@ -125,14 +126,37 @@ class SessionManager:
 
     def _decode(self, cookie: str) -> tuple[dict[str, Any], bool] | None:
         try:
-            parts = cookie.split(".", 1)
+            parts = cookie.rsplit(".", 1)
             if len(parts) != 2:
                 return None
             data, signature = parts
             if not self._verify(data, signature):
                 return None
-            return json.loads(data), True
-        except (json.JSONDecodeError, ValueError):
+            payload = json.loads(data)
+            if not isinstance(payload, dict) or not isinstance(payload.get("id"), str):
+                return None
+            if not isinstance(payload.get("data", {}), dict):
+                return None
+            created = payload.get("created")
+            ttl = payload.get("ttl")
+            if (
+                isinstance(created, bool)
+                or not isinstance(created, (int, float))
+                or not math.isfinite(created)
+            ):
+                return None
+            if (
+                isinstance(ttl, bool)
+                or not isinstance(ttl, (int, float))
+                or not math.isfinite(ttl)
+                or ttl <= 0
+            ):
+                return None
+            now = time.time()
+            if created > now or created + min(ttl, self.ttl) <= now:
+                return None
+            return payload, True
+        except (json.JSONDecodeError, ValueError, TypeError):
             return None
 
     def _generate_session_id(self) -> str:
@@ -140,7 +164,6 @@ class SessionManager:
 
     def get_session(self, request: Request) -> Session:
         cookies = request.cookies
-        session_data = None
         session = None
 
         if self.cookie_name in cookies:

@@ -29,7 +29,8 @@ class CSRF:
         try:
             nonce, timestamp_str, signature = token.split(".", 2)
             timestamp = int(timestamp_str)
-            if time.time() - timestamp > 3600:
+            age = time.time() - timestamp
+            if not nonce or age < 0 or age > 3600:
                 return False
             expected = self._sign(f"{nonce}.{timestamp_str}")
             return hmac.compare_digest(expected, signature)
@@ -40,7 +41,9 @@ class CSRF:
         token = request.headers.get(self.header_name)
         if token:
             return token
-        return request.cookies.get(self.cookie_name)
+        # Cookies are sent automatically by browsers, including on forged
+        # requests. Require explicit submission rather than trusting a cookie.
+        return None
 
     def validate_request(self, request: Request) -> None:
         if request.method in {"GET", "HEAD", "OPTIONS", "TRACE"}:

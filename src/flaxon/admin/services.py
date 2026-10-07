@@ -54,11 +54,13 @@ class AdminAuth:
         permission_provider: AuthorizationProvider | None = None,
         strict_permissions: bool = False,
         password_hasher: PasswordHasher | None = None,
+        cookie_secure: bool = True,
     ) -> None:
         self.backend = backend or SessionBackend()
         self.hasher = password_hasher or PasswordHasher()
         self.password_validator = PasswordValidator()
         self.strict_permissions = strict_permissions
+        self.cookie_secure = cookie_secure
         self.users: dict[str, dict[str, Any]] = {}
         self.role_permissions: dict[str, list[str]] = {}
         self.permission_provider = permission_provider or DefaultAuthorizationProvider(
@@ -167,9 +169,13 @@ class AdminAuth:
             code = otp or ""
             trusted = self.consume_trusted_device(username, trusted_device) if trusted_device else False
             if not trusted and not self.verify_otp(record["mfa_secret"], code) and not self.consume_recovery_code(username, code):
+                for key, values in failures.items():
+                    values.append(now)
+                    self._login_failures[key] = values
                 return None
         for key in keys:
             self._login_failures.pop(key, None)
+        user.metadata["_admin_session_version"] = record.get("session_version", 0)
         return await self.backend.create_token(user, expires_in=expires_in)
 
     @staticmethod
@@ -335,9 +341,19 @@ class AdminAuth:
         raise Forbidden("Insufficient admin permissions")
 
     async def current_user(self, request: Request) -> User:
-        user = getattr(request, "user", None) or await self.backend.authenticate(request)
+        # Authenticate through the Admin backend rather than accepting a user
+        # installed by unrelated application authentication middleware.
+        user = await self.backend.authenticate(request)
         if user is None:
             raise Unauthorized("Authentication required")
+        record = self.users.get(user.username)
+        if record is None or record.get("active", True) is False or str(record["id"]) != str(user.id):
+            raise Unauthorized("Authentication required")
+        if user.metadata.get("_admin_session_version", 0) != record.get("session_version", 0):
+            raise Unauthorized("Authentication required")
+        # Sessions contain a snapshot; account removal and permission changes
+        # must take effect at the next protected request.
+        user = self.user(user.username)
         request.user = user
         return user
 
@@ -368,9 +384,18 @@ class AdminAuth:
         if self.password_validator.validate(password):
             return False
         record["password_hash"] = self.hasher.hash(password)
+        self.invalidate_user_sessions(entry["username"])
         self._reset_tokens.pop(token, None)
         self._persist_auth_tokens()
         return True
+
+    def invalidate_user_sessions(self, username: str) -> None:
+        """Invalidate existing session snapshots and trusted devices."""
+        record = self.users[username]
+        record["session_version"] = secrets.token_hex(16)
+        self.revoke_all_trusted_devices(username)
+        if self.store:
+            self.store.set("users", username, record)
 
     def request_email_verification(self, username: str, expires_in: int = 86400) -> str | None:
         record = self.users.get(username)
@@ -395,10 +420,12 @@ class AdminAuth:
         return True
 
     def attach_cookie(self, response: Response, token: str, max_age: int = 86400) -> None:
-        response.headers.add("set-cookie", f"session_id={token}; Max-Age={max_age}; Path=/; HttpOnly; SameSite=Lax")
+        secure = "; Secure" if self.cookie_secure else ""
+        response.headers.add("set-cookie", f"session_id={token}; Max-Age={max_age}; Path=/; HttpOnly; SameSite=Lax{secure}")
 
     def clear_cookie(self, response: Response) -> None:
-        response.headers.add("set-cookie", "session_id=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax")
+        secure = "; Secure" if self.cookie_secure else ""
+        response.headers.add("set-cookie", f"session_id=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax{secure}")
 
 
 class AdminStore:
