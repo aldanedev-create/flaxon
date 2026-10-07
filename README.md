@@ -29,31 +29,31 @@ flaxon run app:app --reload
 
 Open [localhost:8000](http://127.0.0.1:8000/) to see your application. The starter includes a welcome interface, feature modules, custom CLI commands, migrations, and a protected Admin dashboard.
 
-See the [getting started guide](docs/getting-started.md) for the complete setup.
+See the [getting started guide](https://github.com/aldanedev-create/flaxon/blob/main/docs/getting%20Starting.md) for the complete setup.
 
 ## Documentation
 
-Visit the [Flaxon documentation](https://flaxon-website.vercel.app/docs.html) or browse the [repository guides](docs/index.md).
+Visit the [Flaxon documentation](https://flaxon-website.vercel.app/docs.html) or browse the [repository guides](https://github.com/aldanedev-create/flaxon/blob/main/docs/index.md).
 
-- [Teloce full-stack applications](docs/api/teloce.md)
-- [Jinax server-rendered applications](docs/guides/jinax.md)
-- [Admin and CMS](docs/guides/admin-cms.md)
-- [Modules](docs/guides/Modules.md)
-- [Deployment](docs/deployment.md)
+- [Teloce full-stack applications](https://github.com/aldanedev-create/flaxon/blob/main/docs/api/teloce.md)
+- [Jinax server-rendered applications](https://github.com/aldanedev-create/flaxon/blob/main/docs/guides/jinax.md)
+- [Admin and CMS](https://github.com/aldanedev-create/flaxon/blob/main/docs/guides/admin-cms.md)
+- [Modules](https://github.com/aldanedev-create/flaxon/blob/main/docs/guides/Modules.md)
+- [Deployment](https://github.com/aldanedev-create/flaxon/blob/main/docs/deployment.md)
 
 ## Examples
 
-Explore the [example applications](examples/), including a [modular Teloce shop](examples/teloce_modules_shop/), [taskboard](examples/teloce_taskboard/), and [school portal](examples/school_portal/).
+Explore the [example applications](https://github.com/aldanedev-create/flaxon/tree/main/examples), including a [modular Teloce shop](https://github.com/aldanedev-create/flaxon/tree/main/examples/teloce_modules_shop), [taskboard](examples/teloce_taskboard/), and [school portal](https://github.com/aldanedev-create/flaxon/tree/main/examples/school_portal).
 
 ## Community and Contributing
 
 Created and maintained by **Aldane Hutchinson**. Contributions, documentation improvements, and examples are welcome.
 
-Report bugs and suggest features through [GitHub Issues](https://github.com/aldanedev-create/flaxon/issues). Read the [contribution guidelines](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md) to get involved.
+Report bugs and suggest features through [GitHub Issues](https://github.com/aldanedev-create/flaxon/issues). Read the [contribution guidelines](https://github.com/aldanedev-create/flaxon/blob/main/CONTRIBUTING.md) and [Code of Conduct](https://github.com/aldanedev-create/flaxon/blob/main/CODE_OF_CONDUCT.md) to get involved.
 
 ## Security
 
-Report vulnerabilities privately following [SECURITY.md](SECURITY.md).
+Report vulnerabilities privately following [SECURITY.md](https://github.com/aldanedev-create/flaxon/blob/main/SECURITY.md).
 
 ## License
 

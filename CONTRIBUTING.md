@@ -158,6 +158,6 @@ Aldane Hutchinson (@aldane)
 
 - Open an issue for bugs or feature requests
 - Join our Discord for community support
-- Email: maintainers@flaxon.dev
+- Email: aldanehutchinson5@gmail.com
 
 Thank you for contributing to Flaxon! 🚀
