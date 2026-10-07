@@ -1,12 +1,12 @@
 # Project information
 site_name: Flaxon
-site_description: A technology-neutral, async-first Python backend framework
+site_description: A Python full-stack framework with integrated Teloce interfaces
 site_author: Aldane Hutchinson
 site_url: https://flaxon.dev
 
 # Repository
-repo_name: aldanedev-create/Flaxon-Backend-Framework
-repo_url: https://github.com/aldanedev-create/Flaxon-Backend-Framework
+repo_name: aldanedev-create/flaxon
+repo_url: https://github.com/aldanedev-create/flaxon
 edit_uri: blob/main/docs/
 
 # Copyright
@@ -94,7 +94,7 @@ markdown_extensions:
   - pymdownx.magiclink:
       repo_url_shorthand: true
       user: aldanedev-create
-      repo: Flaxon-Backend-Framework
+      repo: flaxon
   - pymdownx.mark
   - pymdownx.smartsymbols
   - pymdownx.snippets:
@@ -154,7 +154,7 @@ nav:
       - Quick Start: quickstart.md
       - Philosophy: philosophy.md
       - Configuration: configuration.md
-      - Getting Started Reference: "getting Starting.md"
+      - New Project and Admin Setup: getting-started.md
   - User Guide:
       - Routing: guides/routing.md
       - Requests: guides/requests.md
@@ -250,7 +250,7 @@ nav:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/aldanedev-create/Flaxon-Backend-Framework
+      link: https://github.com/aldanedev-create/flaxon
   consent:
     title: Cookie consent
     description: >-

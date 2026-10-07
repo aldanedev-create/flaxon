@@ -1,0 +1,199 @@
+"""Exercise the generated full-stack application, not just template strings."""
+
+from __future__ import annotations
+
+import asyncio
+import importlib
+import os
+import sqlite3
+import sys
+import tomllib
+from pathlib import Path
+from urllib.parse import quote, unquote
+import re
+
+import pytest
+
+from flaxon.admin.services import AdminStore
+from flaxon.cli.generator import Generator
+from flaxon.cli.main import create_parser, main
+from flaxon.testing import TestClient
+
+
+@pytest.fixture
+def starter(tmp_path, monkeypatch):
+    project = tmp_path / "my-project"
+    Generator().generate(project)
+    monkeypatch.syspath_prepend(str(project))
+    names = ["app", "settings", "management", "modules", "modules.welcome", "modules.welcome.module"]
+    previous = {name: sys.modules.pop(name) for name in names if name in sys.modules}
+    try:
+        yield project
+    finally:
+        for name in names:
+            sys.modules.pop(name, None)
+        sys.modules.update(previous)
+
+
+def test_new_defaults_to_fullstack_and_keeps_basic():
+    parser = create_parser()
+    assert parser.parse_args(["new", "my-project"]).template == "fullstack"
+    assert parser.parse_args(["new", "my-project", "--template", "basic"]).template == "basic"
+
+
+def test_starter_metadata_and_literal_teloce_bindings(starter):
+    metadata = tomllib.loads((starter / "pyproject.toml").read_text())
+    assert metadata["project"]["name"] == "my-project"
+    assert "flaxon[standard]>=0.2.5" in metadata["project"]["dependencies"]
+    assert "{{ projectName }}" in (starter / "modules/welcome/ui/Welcome.html").read_text()
+    assert "data/" in (starter / ".gitignore").read_text()
+
+
+@pytest.mark.parametrize("debug", ["1", "0"])
+def test_generated_app_serves_module_ui_assets_and_protected_admin(starter, monkeypatch, debug):
+    monkeypatch.setenv("FLAXON_DEBUG", debug)
+    app = importlib.import_module("app").app
+    client = TestClient(app)
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "Welcome to my-project" in response.text
+    assert "/assets/flaxon.svg" in response.text
+    assert client.get("/api/welcome/status").json()["framework"] == "Flaxon"
+    assert client.get("/assets/flaxon.svg").status_code == 200
+    assert client.get("/_flaxon/ui/app.js").status_code == 200
+    assert client.get("/_flaxon/modules/welcome/ui/Welcome.js").status_code == 200
+    assert client.get("/_flaxon/modules/welcome/ui/api.js").status_code == 200
+    assert client.get("/admin").status_code == 401
+    assert client.get("/admin/login").status_code == 200
+    assert app._flaxon_admin_store.list("users") == {}
+
+
+def test_generated_migrations_apply_once_and_use_project_path(starter, monkeypatch, capsys):
+    management = importlib.import_module("management")
+    monkeypatch.chdir(starter.parent)
+    assert management.main(["migrate"]) == 0
+    assert "Applied 1 migration" in capsys.readouterr().out
+    assert management.main(["migrate"]) == 0
+    assert "Applied 0 migration" in capsys.readouterr().out
+    management.main(["migrate", "--status"])
+    assert "1 applied, 0 pending" in capsys.readouterr().out
+    with sqlite3.connect(starter / "data/app.sqlite3") as db:
+        db.execute("INSERT INTO project_notes(title) VALUES (?)", ("My first module",))
+        assert db.execute("SELECT title FROM project_notes").fetchone()[0] == "My first module"
+
+
+def test_admin_setup_hashes_persists_and_authenticates(starter, monkeypatch):
+    management = importlib.import_module("management")
+    password = "Welcome123!"
+    monkeypatch.setattr(management.getpass, "getpass", lambda prompt: password)
+    assert management.main(["setup-admin", "--username", "owner"]) == 0
+    store = AdminStore(str(starter / "data/app.sqlite3"))
+    record = store.get("users", "owner")
+    assert "password" not in record
+    assert record["password_hash"] != password
+    assert record["permissions"] == ["admin.superuser"]
+    app = importlib.import_module("app").app
+    dashboard = app._flaxon_admin_dashboard
+    token = asyncio.run(dashboard.auth.login("owner", password))
+    assert token
+    client = TestClient(app)
+    response = client.get("/admin", headers={"cookie": f"session_id={token}"})
+    assert response.status_code == 200
+    assert "Welcome to your Flaxon admin" in response.text
+    with pytest.raises(SystemExit) as error:
+        management.main(["createsuperuser", "--username", "owner"])
+    assert error.value.code == 1
+    assert store.get("users", "owner") == record
+
+
+@pytest.mark.parametrize("passwords", [("weak", "weak"), ("Welcome123!", "different")])
+def test_invalid_admin_passwords_create_no_account(starter, monkeypatch, passwords):
+    management = importlib.import_module("management")
+    answers = iter(passwords)
+    monkeypatch.setattr(management.getpass, "getpass", lambda prompt: next(answers))
+    with pytest.raises(SystemExit) as error:
+        management.main(["setup-admin", "--username", "owner"])
+    assert error.value.code == 1
+    assert AdminStore(str(starter / "data/app.sqlite3")).list("users") == {}
+
+
+def test_generator_preserves_existing_files_and_rejects_unknown_templates(tmp_path):
+    path = tmp_path / "existing"
+    path.mkdir()
+    (path / "app.py").write_text("keep me")
+    with pytest.raises(FileExistsError):
+        Generator().generate(path)
+    assert (path / "app.py").read_text() == "keep me"
+    with pytest.raises(ValueError):
+        Generator().generate(tmp_path / "invalid", "unknown")
+    assert not (tmp_path / "invalid").exists()
+    basic = tmp_path / "basic"
+    Generator().generate(basic, "basic")
+    assert (basic / "app.py").is_file()
+    assert not (basic / "management.py").exists()
+
+
+def test_docs_directory_lists_every_document_and_getting_started_links_exist():
+    docs = Path(__file__).resolve().parents[2] / "docs"
+    index = (docs / "index.md").read_text()
+    for page in docs.rglob("*.md"):
+        if page != docs / "index.md":
+            assert f"({quote(page.relative_to(docs).as_posix(), safe='/')})" in index
+    for name in ["index.md", "getting-started.md"]:
+        for target in re.findall(r"\]\(([^)]+)\)", (docs / name).read_text()):
+            if "://" not in target:
+                assert (docs / unquote(target.split("#")[0])).is_file(), target
+
+
+def test_new_command_generates_project_and_prints_management_steps(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["flaxon", "new", "hello-flaxon", "--no-venv"])
+    assert main() == 0
+    assert (tmp_path / "hello-flaxon/management.py").is_file()
+    output = capsys.readouterr().out
+    assert "management.py migrate" in output
+    assert "management.py setup-admin" in output
+    assert main() == 1
+
+
+@pytest.mark.skipif(
+    os.getenv("FLAXON_BROWSER_TESTS") != "1",
+    reason="Set FLAXON_BROWSER_TESTS=1 and install Playwright Chromium",
+)
+def test_generated_welcome_browser_calls_python_and_opens_admin(starter):
+    import socket
+    import threading
+    import time
+
+    import uvicorn
+    from playwright.sync_api import sync_playwright
+
+    app = importlib.import_module("app").app
+    with socket.socket() as reserved:
+        reserved.bind(("127.0.0.1", 0))
+        port = reserved.getsockname()[1]
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning"))
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    try:
+        deadline = time.monotonic() + 20
+        while not server.started:
+            if not thread.is_alive() or time.monotonic() > deadline:
+                raise RuntimeError("Generated application did not start")
+            time.sleep(0.05)
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch()
+            page = browser.new_page()
+            errors = []
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            page.goto(f"http://127.0.0.1:{port}/")
+            page.get_by_role("heading", name="Welcome to my-project").wait_for()
+            page.get_by_role("button", name="Try your Python API").click()
+            page.get_by_role("status").filter(has_text="talking to a Flaxon module").wait_for()
+            page.get_by_role("link", name="Open your admin").click()
+            page.locator('input[name="password"]').wait_for()
+            assert not errors, errors
+            browser.close()
+    finally:
+        server.should_exit = True
+        thread.join(timeout=10)

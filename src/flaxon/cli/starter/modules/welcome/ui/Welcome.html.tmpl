@@ -1,0 +1,239 @@
+<template>
+  <main>
+    <header>
+      <a href="/" class="brand"
+        ><img src="/assets/flaxon.svg" alt="" /> Flaxon</a
+      ><span>Python + Teloce</span>
+    </header>
+    <section class="hero">
+      <div class="badge">✓ Your application is ready</div>
+      <h1>
+        Welcome to<br /><em>{{ projectName }}</em>
+      </h1>
+      <p>
+        Python on the server. HTML components and TypeScript in the browser.<br />One
+        project, ready for your next idea.
+      </p>
+      <div class="actions">
+        <button @click="checkAPI" :disabled="busy">
+          {{ busy ? "Checking…" : "Try your Python API →" }}</button
+        ><a class="secondary" href="/admin/login">Open your admin ↗</a>
+      </div>
+      <p role="status" class="status">{{ message }}</p>
+    </section>
+    <section class="cards">
+      <article>
+        <span>01 / BUILD</span>
+        <h2>Start with a module</h2>
+        <p>
+          Your first feature lives in <code>modules/welcome/</code>. Keep its
+          Python API and Teloce interface together.
+        </p>
+        <a :href="docs + '/guides/Modules.md'">Learn modules →</a>
+      </article>
+      <article>
+        <span>02 / CREATE</span>
+        <h2>Make it your own</h2>
+        <p>
+          Edit <code>Welcome.html</code>, its scoped styles, and
+          <code>api.ts</code>. Teloce compiles your browser code.
+        </p>
+        <a :href="docs + '/fullstack/index.md'">Follow the 10 lessons →</a>
+      </article>
+      <article>
+        <span>03 / MANAGE</span>
+        <h2>Your admin is included</h2>
+        <p>
+          Apply migrations and create your own administrator. There is no
+          default password.
+        </p>
+        <code class="command"
+          >python management.py migrate<br />python management.py
+          setup-admin</code
+        ><a :href="docs + '/guides/admin-cms.md'">Learn admin and CMS →</a>
+      </article>
+    </section>
+    <footer>
+      <a :href="docs + '/index.md'">Explore all documentation ↗</a
+      ><span>Simple Python. Complete applications.</span>
+    </footer>
+  </main>
+</template>
+<script lang="ts">
+import { fetchStatus } from "./api.ts";
+export default {
+  props: ["projectName"],
+  data() {
+    return {
+      busy: false,
+      message: "",
+      docs: "https://github.com/aldanedev-create/flaxon/blob/main/docs",
+    };
+  },
+  methods: {
+    async checkAPI() {
+      this.busy = true;
+      try {
+        const result = await fetchStatus();
+        this.message = `${result.message} Flaxon ${result.version}.`;
+      } catch (error) {
+        this.message = String(error);
+      } finally {
+        this.busy = false;
+      }
+    },
+  },
+};
+</script>
+<style scoped>
+main {
+  max-width: 1120px;
+  margin: auto;
+  padding: 32px;
+}
+header,
+footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+header > span {
+  font-size: 12px;
+  color: #8396ae;
+}
+.brand {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 23px;
+  font-weight: 700;
+  color: #eef4ff;
+  text-decoration: none;
+}
+.brand img {
+  width: 36px;
+}
+.hero {
+  text-align: center;
+  padding: 80px 0 45px;
+}
+.badge {
+  display: inline-block;
+  padding: 8px 15px;
+  border: 1px solid #356451;
+  border-radius: 25px;
+  color: #b1f0ce;
+  font-size: 12px;
+  background: #15372c;
+}
+h1 {
+  font-size: 64px;
+  line-height: 1.12;
+  letter-spacing: -3px;
+  margin: 28px 0;
+}
+h1 em {
+  color: #a2e9c7;
+  font-style: normal;
+}
+.hero p {
+  line-height: 1.8;
+  color: #a6b5c9;
+}
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin: 28px 0;
+}
+.secondary {
+  border: 1px solid #38495f;
+  border-radius: 8px;
+  padding: 13px 20px;
+  color: #e0e9f6;
+  text-decoration: none;
+}
+.status {
+  min-height: 24px;
+  font-size: 13px;
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+}
+.cards article {
+  padding: 26px;
+  border: 1px solid #2b4155;
+  background: #14273a;
+  border-radius: 14px;
+  animation: appear 0.45s ease;
+}
+.cards article > span {
+  color: #83c8ab;
+  font-size: 10px;
+  letter-spacing: 2px;
+}
+h2 {
+  font-size: 19px;
+  margin-top: 22px;
+}
+.cards p {
+  color: #a9b8ca;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.cards a,
+footer a {
+  color: #a5e8c8;
+  font-size: 12px;
+  text-decoration: none;
+}
+.command {
+  display: block;
+  font-size: 11px;
+  line-height: 1.9;
+  margin: 16px 0;
+  color: #c6d6e8;
+}
+footer {
+  margin-top: 50px;
+  border-top: 1px solid #2c4056;
+  padding-top: 24px;
+  font-size: 11px;
+  color: #8199b5;
+}
+@keyframes appear {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (max-width: 800px) {
+  h1 {
+    font-size: 43px;
+  }
+  .cards {
+    grid-template-columns: 1fr;
+  }
+  .hero {
+    padding-top: 55px;
+  }
+  .actions {
+    flex-direction: column;
+  }
+  footer {
+    gap: 20px;
+    align-items: start;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cards article {
+    animation: none;
+  }
+}
+</style>

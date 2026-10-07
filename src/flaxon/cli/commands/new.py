@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import sys
 from typing import Any
 
 from ..base import Command
@@ -19,7 +20,12 @@ class NewCommand(Command):
 
     def _add_arguments(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("directory", help="Project directory name")
-        parser.add_argument("--template", default="basic", help="Project template to use")
+        parser.add_argument(
+            "--template",
+            default="fullstack",
+            choices=["fullstack", "basic"],
+            help="Project template (default: modular Teloce full-stack app)",
+        )
         parser.add_argument("--no-venv", action="store_true", help="Skip virtual environment creation")
 
     def _run(self, args: argparse.Namespace, console: Any) -> int:
@@ -38,7 +44,8 @@ class NewCommand(Command):
             if not args.no_venv:
                 console.info("Creating virtual environment...")
                 import subprocess
-                subprocess.run(["python", "-m", "venv", ".venv"], cwd=directory, check=False)
+
+                subprocess.run([sys.executable, "-m", "venv", ".venv"], cwd=directory, check=True)
 
             console.success(f"Project created at {directory.resolve()}")
             console.info("\nNext steps:")
@@ -46,6 +53,9 @@ class NewCommand(Command):
             if not args.no_venv:
                 console.info("  source .venv/bin/activate  # On Windows: .venv\\Scripts\\activate")
             console.info("  python -m pip install -e .")
+            if args.template == "fullstack":
+                console.info("  python management.py migrate")
+                console.info("  python management.py setup-admin")
             console.info("  flaxon run app:app --reload")
             return 0
 
