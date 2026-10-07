@@ -56,7 +56,7 @@ class JWT:
                 raise Unauthorized("Token has expired")
 
             return payload_data
-        except (json.JSONDecodeError, ValueError) as exc:
+        except (json.JSONDecodeError, ValueError, TypeError) as exc:
             raise Unauthorized("Invalid token") from exc
 
 

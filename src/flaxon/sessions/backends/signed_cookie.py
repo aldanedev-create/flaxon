@@ -32,7 +32,7 @@ class SignedCookieBackend:
 
     def decode_session(self, cookie_value: str) -> Session | None:
         try:
-            parts = cookie_value.split(".", 1)
+            parts = cookie_value.rsplit(".", 1)
             if len(parts) != 2:
                 return None
 
@@ -53,7 +53,7 @@ class SignedCookieBackend:
                 created_at=session_data["created_at"],
             )
 
-        except (json.JSONDecodeError, KeyError, ValueError):
+        except (json.JSONDecodeError, KeyError, ValueError, TypeError):
             return None
 
     async def save(self, session: Session) -> None:

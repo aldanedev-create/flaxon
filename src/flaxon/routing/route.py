@@ -63,7 +63,10 @@ class Route:
         if not matched:
             return None
         values = matched.groupdict()
-        return {name: get_converter(converter).cast(values[name]) for name, converter in self.parameters}
+        try:
+            return {name: get_converter(converter).cast(values[name]) for name, converter in self.parameters}
+        except (ValueError, TypeError):
+            return None
 
 
 @dataclass
@@ -83,4 +86,7 @@ class WebSocketRoute:
         if not matched:
             return None
         values = matched.groupdict()
-        return {name: get_converter(converter).cast(values[name]) for name, converter in self.parameters}
+        try:
+            return {name: get_converter(converter).cast(values[name]) for name, converter in self.parameters}
+        except (ValueError, TypeError):
+            return None

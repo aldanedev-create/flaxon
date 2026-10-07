@@ -49,7 +49,7 @@ class PasswordHasher:
             iterations = int(iterations)
             new_hash = self._hash_raw(password, salt, iterations)
             return hmac.compare_digest(new_hash, hash_value)
-        except ValueError:
+        except (ValueError, TypeError):
             return False
 
     def needs_rehash(self, hashed: str) -> bool:
