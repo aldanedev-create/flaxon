@@ -13,6 +13,7 @@ JSON API, so a team can replace the SPA with React, Vue, mobile, or server-side
 clients without replacing the backend contracts.
 
 ## Quick Start
+first pip install flaxon[admin]
 
 ```python
 from flaxon import Flaxon

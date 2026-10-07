@@ -64,6 +64,7 @@ Features include:
 ---
 
 # Creating an Admin Dashboard
+First pip install flaxon[admin]
 
 ```python
 from flaxon import Flaxon
