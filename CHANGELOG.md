@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.6
 
 - Add synchronous and asynchronous module-owned starter commands, exposed through project CLI discovery.
 - Refresh the welcome page with an installation-success design, hosted Flaxon logo and website links, and a working Jinax page alongside Teloce. Explain both complete-app options in the generated README and getting-started guide.
@@ -9,7 +9,7 @@
 - Package the starter assets in Flaxon distributions and correct the generated Flaxon dependency name.
 - Add a canonical getting-started guide and a complete documentation directory.
 
-## Unreleased — Readable full-stack course
+## 2.6 — Readable full-stack course
 
 - Shorten the README around Python server and Teloce browser development, keeping the logo.
 - Split the full-stack course into ten numbered lesson files with navigation and API coverage maps.
@@ -17,7 +17,7 @@
 - Add compilation/API and browser tests for the Taskboard.
 
 
-## Unreleased — Full-stack page configuration
+## 2.6 — Full-stack page configuration
 
 - Add optional favicon, description, language, theme color, stylesheet and script settings to Teloce page shells.
 - Escape head values and validate resource schemes and supported attributes.
@@ -30,7 +30,7 @@ All notable changes to Flaxon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.6]
 
 ### Teloce integration
 
