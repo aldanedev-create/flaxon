@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add synchronous and asynchronous module-owned starter commands, exposed through project CLI discovery.
+- Refresh the welcome page with an installation-success design, hosted Flaxon logo and website links, and a working Jinax page alongside Teloce. Explain both complete-app options in the generated README and getting-started guide.
+
 - Default `flaxon new` to a modular Teloce full-stack welcome application with TypeScript, scoped styles, a module API, persistent protected admin, and project-local migration/admin commands. Keep `--template basic` available.
 - Package the starter assets in Flaxon distributions and correct the generated Flaxon dependency name.
 - Add a canonical getting-started guide and a complete documentation directory.

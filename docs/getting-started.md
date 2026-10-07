@@ -26,11 +26,19 @@ There is no preset administrator or password. Use a password of at least eight c
 
 `flaxon new my-project --template basic` keeps the smaller Python API starter available. The default `fullstack` template includes the interface, module, database, and admin.
 
+## Choose your interface
+
+Flaxon supports complete websites with **Jinax** (server-rendered HTML templates) and interactive applications with **Teloce** (compiled HTML components and TypeScript). The starter demonstrates both: `/` uses Teloce and `/server-page` uses Jinax. You can choose either for your whole application or combine them.
+
+For a Jinax-only application, keep `app.use_templates(...)`, remove `app.use_teloce(...)`, and change the root route to return `app.jinax.render_response("welcome.html", {"project_name": PROJECT_NAME})`. Your Python modules, API routes, database, and admin remain available.
+
 ## Understand the generated project
 
 | File or directory | Purpose |
 | --- | --- |
 | `app.py` | Compose the application, mount the module, configure Teloce, and serve `/`. |
+| `templates/welcome.html` | Complete Jinax HTML page at `/server-page`. |
+| `flaxon_cli.py` | Register custom commands owned by your feature modules. |
 | `settings.py` | Project paths, SQLite location, and development mode. |
 | `modules/welcome/module.py` | Your first module-owned Python API. |
 | `modules/welcome/ui/Welcome.html` | Welcome component with `lang="ts"` and scoped CSS. |
@@ -42,6 +50,19 @@ There is no preset administrator or password. Use a password of at least eight c
 | `data/` | Local database and uploads; excluded from Git. |
 
 Teloce compiles the browser code; Flaxon handles requests, Python modules, persistence, and administration. The welcome example does not need a separate Node development server.
+
+## Run and extend module-owned commands
+
+From the generated project directory, run:
+
+```bash
+flaxon welcome
+flaxon welcome-status
+```
+
+These commands live in `modules/welcome/module.py`, using `@welcome.cli_command(...)`. The first is synchronous; the second awaits the module's async status helper. `flaxon_cli.py` exposes them with `welcome.install_cli_commands(globals())`. They work without starting the web server or connecting to a database. Add commands to another feature module and install them in `flaxon_cli.py`; use unique names that do not conflict with built-in commands. See the [module guide](guides/Modules.md) and [CLI guide](lessons/Cli.md).
+
+The welcome page links to the [documentation website](https://flaxon-website.vercel.app/docs.html) and uses its hosted logo. The logo and external documentation require internet access; local routes and commands work offline.
 
 ## Change the application
 

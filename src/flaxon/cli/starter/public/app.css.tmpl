@@ -2,11 +2,11 @@
   font-family:
     system-ui,
     -apple-system,
-    Segoe UI,
+    "Segoe UI",
     sans-serif;
-  background: #0e1c2c;
-  color: #e9f0fa;
-  color-scheme: dark;
+  color-scheme: light;
+  background: #ffffff;
+  color: #233f32;
 }
 body {
   margin: 0;
@@ -14,25 +14,31 @@ body {
 * {
   box-sizing: border-box;
 }
+a {
+  color: #176d49;
+  text-underline-offset: 4px;
+}
+a:hover {
+  color: #0f5035;
+}
 button {
   font: inherit;
-  font-size: 13px;
-  background: #a2e9c7;
-  color: #163b2b;
+  font-size: 14px;
+  background: #176d49;
+  color: #fff;
   border: 0;
-  border-radius: 8px;
-  padding: 13px 20px;
+  border-radius: 6px;
+  padding: 12px 16px;
   cursor: pointer;
-  font-weight: 600;
 }
 button:disabled {
-  opacity: 0.6;
+  opacity: 0.65;
   cursor: wait;
 }
 a:focus-visible,
 button:focus-visible {
-  outline: 2px solid #b6f6d7;
-  outline-offset: 5px;
+  outline: 3px solid #23835b;
+  outline-offset: 4px;
 }
 code {
   font-family: ui-monospace, monospace;

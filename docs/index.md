@@ -14,7 +14,7 @@ python management.py setup-admin
 flaxon run
 ```
 
-The default starter welcomes you at `/`, demonstrates a module-owned Python API from TypeScript, and includes a protected `/admin`. There is no default administrator password. Read [getting started](getting-started.md) for virtual environments, project files, command details, and deployment boundaries.
+The default starter welcomes you at `/`, demonstrates a module-owned Python API from TypeScript, and includes a protected `/admin`. Try `/server-page` for the complete Jinax example, and run `flaxon welcome` or `flaxon welcome-status` for module-owned custom commands. Choose Flaxon + Jinax for server-rendered applications, Flaxon + Teloce for interactive interfaces, or combine them. There is no default administrator password. Read [getting started](getting-started.md) for virtual environments, project files, command details, and deployment boundaries.
 
 ## A complete learning path
 

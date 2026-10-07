@@ -1,8 +1,9 @@
-"""Application composition: mount Python modules, Teloce UI, and protected admin."""
+"""Application composition: mount modules, Jinax pages, Teloce UI, and protected admin."""
 
 from flaxon import Flaxon, Request
 from flaxon.admin import AdminConfig, AdminDashboard
 from flaxon.admin.services import AdminStore
+from flaxon.jinax import Jinax
 from flaxon.database.adapters.sqlite import SQLiteAdapter
 from flaxon.database.manager import DatabaseManager
 
@@ -20,6 +21,9 @@ def create_app():
     app.mount_module(welcome, prefix="/api/welcome")
     app.mount_static("/assets", str(ROOT / "public"))
 
+    # Jinax can power your entire website, or coexist with a Teloce interface.
+    app.use_templates(Jinax(str(ROOT / "templates"), auto_reload=DEBUG))
+
     # The admin has its own server-rendered interface and persistent accounts.
     AdminDashboard(
         app,
@@ -34,7 +38,7 @@ def create_app():
         project_root=ROOT,
         ui_dir="ui",
         title=f"Welcome to {PROJECT_NAME}",
-        favicon="/assets/flaxon.svg",
+        favicon="https://flaxon-website.vercel.app/assets/images/logo/flaxon.png",
         description="Your Python and Teloce full-stack application is ready.",
         stylesheets=["/assets/app.css"],
         options={"minifier": "minifyjs"},
@@ -43,6 +47,10 @@ def create_app():
     @app.get("/")
     async def home(request: Request):
         return await request.compile("app.html", {"project_name": PROJECT_NAME})
+
+    @app.get("/server-page")
+    async def server_page(request: Request):
+        return await app.jinax.render_response("welcome.html", {"project_name": PROJECT_NAME})
 
     return app
 
