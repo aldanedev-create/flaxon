@@ -1,11 +1,44 @@
 # Changelog
 
+## Unreleased
+
+- Add synchronous and asynchronous module-owned starter commands, exposed through project CLI discovery.
+- Refresh the welcome page with an installation-success design, hosted Flaxon logo and website links, and a working Jinax page alongside Teloce. Explain both complete-app options in the generated README and getting-started guide.
+
+- Default `flaxon new` to a modular Teloce full-stack welcome application with TypeScript, scoped styles, a module API, persistent protected admin, and project-local migration/admin commands. Keep `--template basic` available.
+- Package the starter assets in Flaxon distributions and correct the generated Flaxon dependency name.
+- Add a canonical getting-started guide and a complete documentation directory.
+
+## Unreleased — Readable full-stack course
+
+- Shorten the README around Python server and Teloce browser development, keeping the logo.
+- Split the full-stack course into ten numbered lesson files with navigation and API coverage maps.
+- Add a runnable typed Taskboard using HTML components, TypeScript helpers, validation and reusable components.
+- Add compilation/API and browser tests for the Taskboard.
+
+
+## Unreleased — Full-stack page configuration
+
+- Add optional favicon, description, language, theme color, stylesheet and script settings to Teloce page shells.
+- Escape head values and validate resource schemes and supported attributes.
+- Add a TypeScript/CDN converter example and integration coverage.
+- Position Flaxon as a Python full-stack framework; add a full-stack quick start and ten lessons.
+
+
 All notable changes to Flaxon will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Teloce integration
+
+- Generated assets revalidate instead of caching stable router/aliases as immutable.
+- Client links respect downloads, targets, same-page fragments and unmatched routes.
+- Production router optimization uses MinifyJS, alongside Teloce's native production backend.
+- Reload watching includes `.vel` sources and ignores `.flaxon` build output.
+- Added integration API documentation and five lessons; shortened the README.
 
 ### Changed
 

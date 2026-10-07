@@ -176,7 +176,7 @@ async def about(request):
             "About Flaxon",
 
             "description":
-            "Technology-neutral async-first Python backend framework.",
+            "Technology-neutral async-first Python full-stack framework.",
 
 
             "features":[

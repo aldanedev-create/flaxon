@@ -1,0 +1,241 @@
+<template>
+  <main>
+    <header>
+      <a href="https://flaxon-website.vercel.app/" class="brand">
+        <img
+          src="https://flaxon-website.vercel.app/assets/images/logo/flaxon.png"
+          alt="Flaxon"
+          width="52"
+          height="60"
+        />
+        <span>Flaxon</span>
+      </a>
+      <a href="https://flaxon-website.vercel.app/docs.html">Documentation ↗</a>
+    </header>
+
+    <section class="success" aria-labelledby="welcome-heading">
+      <span class="check" aria-hidden="true">✓</span>
+      <h1 id="welcome-heading">The installation worked successfully!</h1>
+      <p class="project">
+        Welcome to <strong>{{ projectName }}</strong
+        >.
+      </p>
+      <p>
+        Your new Python application is ready. This is the starter page; replace
+        it with your own idea.
+      </p>
+    </section>
+
+    <section class="introduction">
+      <h2>What is Flaxon?</h2>
+      <p>
+        Flaxon is an async Python web framework for building complete
+        applications. Write routes, APIs, validation, database features,
+        WebSockets, and administration in Python. Organize features into modules
+        that can own their routes, templates, UI, and custom commands.
+      </p>
+      <h2>Choose how you build your pages</h2>
+      <p>
+        This starter uses Teloce. You can also build your whole application with
+        Flaxon and Jinax, or use both in the same project.
+      </p>
+    </section>
+
+    <section class="choices" aria-label="Your interface choices">
+      <article>
+        <h3>Flaxon + Jinax</h3>
+        <p>
+          Build a complete server-rendered website with Python and Jinja-style
+          HTML templates. Use layouts, forms, and Python routes; Teloce is
+          optional.
+        </p>
+        <a href="/server-page">Try the Jinax example →</a>
+      </article>
+      <article>
+        <h3>Flaxon + Teloce</h3>
+        <p>
+          Build an interactive full-stack app with HTML components, scoped CSS,
+          and JavaScript or TypeScript. Teloce compiles the interface; MinifyJS
+          optimizes the generated JavaScript.
+        </p>
+        <button @click="checkAPI" :disabled="busy">
+          {{ busy ? "Checking…" : "Try your Python API →" }}
+        </button>
+        <p role="status" class="status">{{ message }}</p>
+      </article>
+    </section>
+
+    <section class="next">
+      <h2>Start building</h2>
+      <p>
+        Edit <code>modules/welcome/</code> for your first feature. Run its
+        custom commands from your project directory:
+      </p>
+      <pre><code>flaxon welcome
+flaxon welcome-status</code></pre>
+      <p>
+        Your protected admin is ready after you apply migrations and create your
+        own administrator. There is no default password.
+      </p>
+      <pre><code>python management.py migrate
+python management.py setup-admin</code></pre>
+      <a class="secondary" href="/admin/login">Open your admin →</a>
+    </section>
+
+    <footer>
+      <a href="https://flaxon-website.vercel.app/docs.html"
+        >Read the documentation ↗</a
+      >
+      <a href="https://flaxon-website.vercel.app/examples.html"
+        >Explore examples ↗</a
+      >
+      <span>Simple Python. Serious applications.</span>
+    </footer>
+  </main>
+</template>
+<script lang="ts">
+import { fetchStatus } from "./api.ts";
+export default {
+  props: ["projectName"],
+  data() {
+    return { busy: false, message: "" };
+  },
+  methods: {
+    async checkAPI() {
+      this.busy = true;
+      try {
+        const result = await fetchStatus();
+        this.message = `${result.message} Flaxon ${result.version}.`;
+      } catch (error) {
+        this.message = String(error);
+      } finally {
+        this.busy = false;
+      }
+    },
+  },
+};
+</script>
+<style scoped>
+main {
+  max-width: 960px;
+  margin: auto;
+  padding: 32px;
+}
+header,
+footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: #183b2e;
+  font-size: 26px;
+  font-weight: 700;
+}
+.brand img {
+  object-fit: contain;
+}
+header > a:last-child {
+  font-size: 14px;
+}
+.success {
+  text-align: center;
+  padding: 64px 0 42px;
+  border-bottom: 1px solid #dce5df;
+}
+.check {
+  display: inline-grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border: 2px solid #23835b;
+  border-radius: 50%;
+  color: #23835b;
+  font-size: 36px;
+}
+h1 {
+  color: #176d49;
+  font-size: clamp(28px, 4vw, 40px);
+  line-height: 1.25;
+  margin: 24px 0 16px;
+  letter-spacing: -1px;
+}
+p {
+  color: #52605a;
+  line-height: 1.75;
+}
+.project {
+  font-size: 20px;
+  color: #233f32;
+}
+h2 {
+  font-size: 22px;
+  color: #233f32;
+}
+h3 {
+  font-size: 20px;
+  margin-top: 0;
+  color: #233f32;
+}
+.introduction {
+  padding: 24px 0 8px;
+}
+.choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.choices article {
+  border: 1px solid #dce5df;
+  border-radius: 8px;
+  padding: 24px;
+  background: #f8fbf9;
+}
+.choices article p {
+  font-size: 15px;
+}
+.status {
+  min-height: 24px;
+  margin-bottom: 0;
+  font-size: 13px;
+}
+.next {
+  margin-top: 36px;
+  padding-top: 12px;
+  border-top: 1px solid #dce5df;
+}
+pre {
+  padding: 16px;
+  background: #f2f6f3;
+  border-radius: 6px;
+  overflow-x: auto;
+  line-height: 1.8;
+}
+footer {
+  margin-top: 48px;
+  padding-top: 24px;
+  border-top: 1px solid #dce5df;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: #657269;
+}
+@media (max-width: 640px) {
+  main {
+    padding: 24px;
+  }
+  .choices {
+    grid-template-columns: 1fr;
+  }
+  .success {
+    padding-top: 40px;
+  }
+  header {
+    align-items: flex-start;
+  }
+}
+</style>

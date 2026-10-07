@@ -7,6 +7,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from flaxon.http import HTMLResponse
 
@@ -33,6 +34,12 @@ class Teloce:
         static_url: str = "/_flaxon",
         entry: str = "app.html",
         title: str | None = None,
+        favicon: str | None = None,
+        description: str | None = None,
+        lang: str = "en",
+        theme_color: str | None = None,
+        stylesheets: list[str | dict[str, Any]] | None = None,
+        scripts: list[str | dict[str, Any]] | None = None,
         options: dict[str, Any] | None = None,
     ) -> None:
         self.app = app
@@ -44,6 +51,21 @@ class Teloce:
         self.static_url = "/" + static_url.strip("/")
         self.entry = entry.replace("\\", "/").lstrip("/")
         self.title = title or app.name
+        if not isinstance(lang, str) or not lang.strip():
+            raise ValueError("lang must be a nonempty document language")
+        self.lang = lang
+        self.head_tags: list[str] = []
+        if favicon is not None:
+            self.head_tags.append(_resource_tag("link", {"rel": "icon", "href": favicon}))
+        for name, value in (("description", description), ("theme-color", theme_color)):
+            if value is not None:
+                self.head_tags.append(f'<meta name="{name}" content="{html.escape(value, quote=True)}">')
+        for resource in stylesheets or []:
+            attributes = {"href": resource} if isinstance(resource, str) else dict(resource)
+            self.head_tags.append(_resource_tag("link", {"rel": "stylesheet", **attributes}))
+        for resource in scripts or []:
+            attributes = {"src": resource} if isinstance(resource, str) else dict(resource)
+            self.head_tags.append(_resource_tag("script", attributes))
         self.options = dict(options or {})
         self.sources: list[TeloceSource] = []
         self.build_result: dict[str, Any] | None = None
@@ -55,7 +77,7 @@ class Teloce:
             self.register_source(source.name, source.directory, routes=source.routes)
 
         cache_control = (
-            "no-cache" if app.debug else "public, max-age=31536000, immutable"
+            "no-cache"
         )
         app.mount_static(self.static_url, str(self.build_dir), cache_control=cache_control)
         app.on_startup(self.build)
@@ -95,7 +117,7 @@ class Teloce:
             except ImportError as exc:
                 raise RuntimeError(
                     "Teloce support requires the optional dependency: "
-                    "pip install 'flaxon[teloce]'"
+                    "pip install --upgrade flaxon teloce-py"
                 ) from exc
 
             missing = [str(source.directory) for source in self.sources if not source.directory.is_dir()]
@@ -149,8 +171,15 @@ class Teloce:
                     mode=self.options.get("spa_mode", "history"),
                     base=self.options.get("spa_base", "/"),
                     route_overrides=route_overrides,
-                    minify=not self.app.debug,
+                    minify=False,
                 )
+                if not self.app.debug and self.options.get("minify", True):
+                    from minifyjs import minify
+                    optimized = minify(router_path.read_text(encoding="utf-8"),
+                                       compress=True, mangle=True, format="esm",
+                                       target=self.options.get("target") or "es2020",
+                                       source_name="router.js")
+                    router_path.write_text(optimized.code, encoding="utf-8")
                 self.router_output = router_path.relative_to(self.build_dir).as_posix()
 
             self._assert_entry_exists(self.entry)
@@ -186,9 +215,11 @@ class Teloce:
                 "window.__TELOCE_ROUTER__ = router;"
                 "document.addEventListener('click', event => {"
                 "const link = event.target.closest?.('a[data-teloce-link]');"
-                "if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;"
+                "if (!link || link.hasAttribute('download') || (link.target && link.target.toLowerCase() !== '_self') || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;"
                 "const url = new URL(link.href, location.href);"
-                "if (url.origin !== location.origin) return;"
+                "if (url.origin !== location.origin || !['http:', 'https:'].includes(url.protocol)) return;"
+                "if (url.pathname === location.pathname && url.search === location.search && url.hash) return;"
+                "if (!router.resolve(url.pathname + url.search)) return;"
                 "event.preventDefault(); router.push(url.pathname + url.search + url.hash);"
                 "});"
             )
@@ -199,13 +230,15 @@ class Teloce:
             for path in style_files
         ]
         css_link = "\n  ".join(css_links)
+        head_tags = "\n  ".join(self.head_tags)
         document = f"""<!doctype html>
-<html lang="en">
+<html lang="{html.escape(self.lang, quote=True)}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{html.escape(title or self.title)}</title>
   {css_link}
+  {head_tags}
 </head>
 <body>
   <div id="app"></div>
@@ -260,3 +293,32 @@ def install_teloce(
     integration = Teloce(app, **options)
     app.teloce = integration
     return integration
+
+
+def _resource_tag(tag: str, attributes: dict[str, Any]) -> str:
+    """Render explicitly supported resource attributes without accepting raw HTML."""
+    allowed = {"src", "type", "defer", "async", "integrity", "crossorigin", "referrerpolicy"} if tag == "script" else {"href", "rel", "type", "media", "integrity", "crossorigin", "referrerpolicy", "sizes"}
+    unknown = attributes.keys() - allowed
+    if unknown:
+        raise ValueError(f"Unsupported {tag} attributes: {', '.join(sorted(unknown))}")
+    key = "src" if tag == "script" else "href"
+    url = attributes.get(key)
+    if not isinstance(url, str) or not url.strip():
+        raise ValueError(f"{tag} requires a nonempty {key}")
+    if any(ord(char) < 32 for char in url) or "\\" in url:
+        raise ValueError("Resource URLs must not contain control characters or backslashes")
+    if urlsplit(url).scheme.lower() not in {"", "http", "https"}:
+        raise ValueError("Resource URLs must be relative, HTTP or HTTPS")
+    parts = []
+    for name, value in attributes.items():
+        if name in {"defer", "async"}:
+            if not isinstance(value, bool):
+                raise TypeError(f"{name} must be a boolean")
+            if value:
+                parts.append(name)
+        elif value is not None:
+            if not isinstance(value, str):
+                raise TypeError(f"{name} must be a string")
+            parts.append(f'{name}="{html.escape(value, quote=True)}"')
+    opening = f"<{tag} {' '.join(parts)}>"
+    return opening + ("</script>" if tag == "script" else "")

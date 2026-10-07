@@ -1,7 +1,7 @@
 
 # Flaxon & Plugins - Quick Reference Cheat Sheet
 
-A quick reference guide for the Flaxon Python backend framework and official plugins.
+A quick reference guide for the Flaxon Python full-stack framework and official plugins.
 
 ---
 

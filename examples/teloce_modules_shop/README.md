@@ -6,10 +6,12 @@ generates one collision-checked client router.
 
 ```bash
 pip install -e .
-pip install -e C:/Users/aldan/Downloads/teloce-python
+pip install --upgrade teloce-py
 cd examples/teloce_modules_shop
 flaxon run app:app
 ```
 
 Open `http://127.0.0.1:8000`. Edit any module's `.html` files and let
 `flaxon run app:app --reload` restart and rebuild the hidden `.flaxon/build` output.
+
+See [the integration API and five lessons](../../docs/api/teloce.md). Use a Teloce release containing the MinifyJS production integration; for unreleased changes, install from your local Teloce checkout. Sample data is in memory and is not a production database.

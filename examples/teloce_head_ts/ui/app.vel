@@ -1,0 +1,35 @@
+<template>
+  <main class="container py-5">
+    <h1>Pocket Converter</h1>
+    <p>{{ message }}</p>
+    <label for="miles">Miles</label>
+    <input id="miles" class="form-control" type="number" v-model="miles">
+    <button class="btn btn-primary mt-3" @click="convert">Convert</button>
+    <p role="status">{{ result }}</p>
+    <button class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#details">How it works</button>
+    <p id="details" class="collapse">The converter imports a typed function from units.ts.</p>
+  </main>
+</template>
+<script lang="ts">
+import { milesToKilometres } from "./units.ts";
+export default {
+  data() { return { miles: "1", result: "", message: "Loading…" }; },
+  methods: {
+    convert() {
+      const value: number = Number(this.miles);
+      this.result = Number.isFinite(value) ? `${milesToKilometres(value).toFixed(3)} km` : "Enter a number.";
+    }
+  },
+  async mounted() {
+    try {
+      const response = await fetch("/api/about");
+      if (!response.ok) throw new Error("Request failed");
+      this.message = (await response.json()).message;
+    } catch { this.message = "Could not load the server message."; }
+  }
+};
+</script>
+<style scoped>
+main { max-width: 640px; padding: 2rem; font-family: system-ui; }
+input { display: block; margin-top: .5rem; }
+</style>

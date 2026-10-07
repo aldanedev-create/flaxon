@@ -5,7 +5,7 @@
 
 Flaxon is built around a set of principles that guide its design, development, and long-term direction.
 
-The goal is to create a backend framework that is:
+The goal is to create a full-stack framework that is:
 
 - Simple to start
 - Powerful when applications grow
@@ -301,3 +301,11 @@ Powerful enough for production.
 Flexible enough for any technology stack.**
 
 
+
+## Integrated interfaces, explicit choices
+
+Teloce is Flaxon's integrated component/compiler path. Python routes, UI pages
+and scoped components can live in a single feature module. Jinax remains the
+server-template path, and external frontends remain possible. Full-stack here
+means an integrated application workflow, not automatic hosting, SSR or accounts.
+See the [ten lessons](fullstack/index.md).

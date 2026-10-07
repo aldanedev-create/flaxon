@@ -1,4 +1,4 @@
-"""Flaxon, an async-first Python backend framework."""
+"""Flaxon, an async-first Python full-stack framework."""
 
 from __future__ import annotations
 
