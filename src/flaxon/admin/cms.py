@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 14484)
-Total output lines: 1195
-
 """flaxon.admin.cms — a small, self-contained CMS for the Flaxon admin.
 
 
@@ -570,7 +567,163 @@ class CMS:
         )
         job.update(run_after=record["publish_at"], updated_at=time.time())
         if job.get("state") in {"completed", "canceled"}:
-…2484 tokens truncated… "en", "label": "English", "default": True}]
+            job["state"] = "queued"
+            job["attempts"] = 0
+            job.setdefault("history", []).append({"state": "queued", "at": time.time(), "reason": "schedule updated"})
+
+    def _record_scheduler_event(self, job_id: str, state: str, **details: Any) -> None:
+        job = self.scheduler_jobs.setdefault(job_id, {"id": job_id, "attempts": 0, "history": []})
+        job["state"] = state
+        job["updated_at"] = time.time()
+        if state == "retry":
+            job["attempts"] = int(job.get("attempts", 0)) + 1
+        job.setdefault("history", []).append({"state": state, "at": time.time(), **details})
+        del job["history"][:-100]
+
+    async def _save_scheduler_jobs(self) -> None:
+        if self.store:
+            self.store.set("cms", "scheduler_jobs", self.scheduler_jobs)
+        await self._save_database("cms", "scheduler_jobs", self.scheduler_jobs)
+
+    def _get_type(self, name: str) -> ContentType:
+        ct = self.content_types.get(name)
+        if ct is None:
+            raise NotFound(f"Unknown content type '{name}'.")
+        return ct
+
+    # -- routing -------------------------------------------------------
+
+    def _register_routes(self) -> None:
+        router = self.app.router
+        prefix = self.url_prefix
+
+        route_specs: list[tuple[str, set[str], Any]] = [
+            (f"{prefix}", {"GET"}, self.spa),
+            (f"{prefix}/", {"GET"}, self.spa),
+            (f"{prefix}/api/config", {"GET"}, self.api_config),
+            (f"{prefix}/api/stats", {"GET"}, self.api_stats),
+            (f"{prefix}/api/<type_name>/items", {"GET"}, self.api_list),
+            (f"{prefix}/api/<type_name>/items", {"POST"}, self.api_create),
+            (f"{prefix}/api/<type_name>/items/<item_id>", {"GET"}, self.api_get),
+            (f"{prefix}/api/<type_name>/items/<item_id>", {"PUT"}, self.api_update),
+            (f"{prefix}/api/<type_name>/items/<item_id>", {"DELETE"}, self.api_delete),
+            (f"{prefix}/api/<type_name>/items/<item_id>/history", {"GET"}, self.api_history),
+            (f"{prefix}/api/<type_name>/items/<item_id>/restore/<revision>", {"POST"}, self.api_restore),
+            (f"{prefix}/api/<type_name>/actions/<action_name>", {"POST"}, self.api_action),
+            (f"{prefix}/api/export/<type_name>", {"GET"}, self.api_export),
+            (f"{prefix}/api/import/<type_name>", {"POST"}, self.api_import),
+            (f"{prefix}/api/scheduler/jobs", {"GET"}, self.api_scheduler_jobs),
+            (f"{prefix}/api/scheduler/jobs/<job_id>/retry", {"POST"}, self.api_scheduler_retry),
+            (f"{prefix}/api/workspace/<section>", {"GET"}, self.api_workspace),
+            (f"{prefix}/api/media", {"GET"}, self.api_media),
+            (f"{prefix}/api/taxonomies", {"GET", "POST"}, self.api_taxonomies),
+            (f"{prefix}/api/taxonomies/<taxonomy_name>", {"POST", "PATCH", "DELETE"}, self.api_taxonomy),
+            (f"{prefix}/api/comments", {"GET", "POST"}, self.api_comments),
+            (f"{prefix}/api/comments/<comment_id>", {"PATCH", "DELETE"}, self.api_comment),
+            (f"{prefix}/api/menus/<menu_name>", {"GET", "PUT"}, self.api_menu),
+        ]
+        for path, methods, handler in route_specs:
+            router.route(path, methods=methods, name=handler.__name__)(handler)
+
+    # -- handlers --------------------------------------------------------
+
+    async def spa(self, request: Request) -> Response:
+        await self._require_user(request, "admin.view_dashboard")
+        html = self.template_path.read_text(encoding="utf-8")
+        html = html.replace("__CMS_API_BASE__", f"{self.url_prefix}/api")
+        html = html.replace("__CMS_TITLE__", self.title)
+        dashboard = getattr(self.app, "_flaxon_admin_dashboard", None)
+        html = html.replace("__CMS_CSRF_TOKEN__", dashboard.csrf_token() if dashboard else "")
+        return HTMLResponse(html)
+
+    async def api_config(self, request: Request) -> Response:
+        user = await self._require_user(request, "admin.view_dashboard")
+        types = []
+        for content_type in self.content_types.values():
+            schema = content_type.schema()
+            schema["filter_options"] = {
+                field: (
+                    list(content_type.statuses)
+                    if field == "status" and content_type.has_status
+                    else sorted({str(item.get(field, "")) for item in content_type.items.values() if item.get(field, "") != ""})[:100]
+                )
+                for field in content_type.list_filter
+            }
+            capabilities = {}
+            for action in ("read", "create", "update", "delete"):
+                try:
+                    await self.auth.authorize_async(user, canonical_model_permission(content_type.name, action))
+                    capabilities[action] = True
+                except Forbidden:
+                    capabilities[action] = False
+            schema["capabilities"] = capabilities
+            types.append(schema)
+        return JSONResponse({
+            "title": self.title,
+            "types": types,
+        })
+
+    async def api_stats(self, request: Request) -> Response:
+        await self._require_user(request, "admin.view_dashboard")
+        return JSONResponse({name: ct.stats() for name, ct in self.content_types.items()})
+
+    async def api_workspace(self, request: Request, section: str) -> Response:
+        """Return persistent data for the CMS editorial workspaces.
+
+        The SPA uses one stable endpoint so new workspace views do not need a
+        second API contract. Each response is derived from CMS resources or
+        the configured Admin services; empty sections are explicit rather than
+        pretending that an integration exists.
+        """
+
+        user = await self._require_user(request, "admin.view_dashboard")
+        section = section.strip().lower().replace("_", "-")
+        records = [record | {"content_type": name} for name, content_type in self.content_types.items() for record in content_type.items.values()]
+        if section == "media":
+            dashboard = getattr(self.app, "_flaxon_admin_dashboard", None)
+            if dashboard is None:
+                return JSONResponse({"section": section, "items": [], "stats": {}})
+            dashboard.auth.authorize(user, "media.manage_library")
+            items = await dashboard._media_files()
+            return JSONResponse({"section": section, "items": items, "stats": {"total": len(items)}})
+        if section in {"calendar", "publishing"}:
+            items = sorted(self.scheduler_jobs.values(), key=lambda item: item.get("run_after", ""))
+            return JSONResponse({"section": section, "items": items, "stats": {"scheduled": len(items), "failed": sum(item.get("state") == "retry" for item in items)}})
+        if section in {"board", "review"}:
+            statuses = {status: [item for item in records if item.get("status") == status] for status in ("draft", "review", "approved", "published", "archived", "scheduled")}
+            items = records if section == "board" else statuses.get("review", []) + statuses.get("pending", [])
+            return JSONResponse({"section": section, "items": items, "columns": statuses, "stats": {key: len(value) for key, value in statuses.items()}})
+        if section in {"comments", "moderation"}:
+            return JSONResponse({"section": section, "items": self.comments, "stats": {status: sum(item.get("status") == status for item in self.comments) for status in _COMMENT_STATUSES}})
+        if section in {"taxonomies", "categories", "tags"}:
+            return JSONResponse({"section": section, "items": self.taxonomies, "stats": {"taxonomies": len(self.taxonomies)}})
+        if section in {"menus", "menu"}:
+            return JSONResponse({"section": section, "items": self.menus, "stats": {"menus": len(self.menus)}})
+        if section in {"models", "model-builder", "model-versions"}:
+            items = [{"name": ct.name, "label": ct.label, "fields": [field.to_dict() for field in ct.fields], "records": len(ct.items), "revisions": len(ct.revisions)} for ct in self.content_types.values()]
+            return JSONResponse({"section": section, "items": items, "stats": {"models": len(items)}})
+        if section in {"seo", "search-index"}:
+            items = [{"content_type": item["content_type"], "id": item["id"], "title": item.get("title", ""), "slug": item.get("slug", ""), "indexed": True} for item in records]
+            return JSONResponse({"section": section, "items": items, "stats": {"indexed": len(items)}})
+        if section == "audit":
+            dashboard = getattr(self.app, "_flaxon_admin_dashboard", None)
+            items = dashboard.store.get("audit", "entries", []) if dashboard and dashboard.store and dashboard.audit_log else []
+            return JSONResponse({"section": section, "items": items, "stats": {"total": len(items)}})
+        if section == "references":
+            references = []
+            for item in records:
+                for key, value in item.items():
+                    if isinstance(value, str) and key.endswith(("_id", "_ids")):
+                        references.append({"content_type": item["content_type"], "record_id": item["id"], "field": key, "value": value})
+            return JSONResponse({"section": section, "items": references, "stats": {"total": len(references)}})
+        if section == "trash":
+            items = [item for item in records if item.get("status") in {"trash", "deleted", "archived"}]
+            return JSONResponse({"section": section, "items": items, "stats": {"total": len(items)}})
+        if section in {"sites", "locales", "previews", "integrations", "transfers"}:
+            dashboard = getattr(self.app, "_flaxon_admin_dashboard", None)
+            stored = self.store.get("cms", section, []) if self.store else []
+            if section == "locales" and not stored:
+                stored = [{"code": "en", "label": "English", "default": True}]
             if section == "integrations":
                 stored = [{"name": name, "handlers": len(callbacks)} for name, callbacks in self.hooks.items()]
             if section == "transfers" and dashboard and dashboard.job_store:
