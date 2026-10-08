@@ -101,7 +101,7 @@
                 <nav class="space-y-1 p-4" aria-label="Mobile Admin navigation">
                     <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/" class="mobile-menu-link"><i class="fas fa-th-large"></i>Dashboard</a>
                     {% set mobile_models = models if models is defined and models else (dashboard.registry.get_all() if dashboard else []) %}
-                    {% for model_item in mobile_models %}<a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/{{ model_item.get_name() }}" class="mobile-menu-link"><i class="fas fa-table"></i>{{ model_item.get_verbose_name_plural() }}</a>{% endfor %}
+                    {% for model_item in mobile_models %}{% if not dashboard or dashboard.can_access_model(dashboard.navigation_user(), model_item.get_name()) %}<a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/{{ model_item.get_name() }}" class="mobile-menu-link"><i class="fas fa-table"></i>{{ model_item.get_verbose_name_plural() }}</a>{% endif %}{% endfor %}
                     {% if dashboard %}{% for custom_view in dashboard.custom_views %}<a href="{{ custom_view.url }}" class="mobile-menu-link"><i class="fas {{ custom_view.icon }}"></i>{{ custom_view.name }}</a>{% endfor %}{% endif %}
                     <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/users" class="mobile-menu-link"><i class="fas fa-users"></i>Users</a>
                     <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/roles" class="mobile-menu-link"><i class="fas fa-shield-halved"></i>Roles &amp; permissions</a>
@@ -109,13 +109,19 @@
                     <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/settings" class="mobile-menu-link"><i class="fas fa-gear"></i>Settings</a>
                     <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/activity" class="mobile-menu-link"><i class="fas fa-clock-rotate-left"></i>Activity</a>
                     <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/operations" class="mobile-menu-link"><i class="fas fa-heart-pulse"></i>Operations</a>
+                    {% if dashboard and dashboard.control_plane %}
                     <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/services" class="mobile-menu-link"><i class="fas fa-diagram-project"></i>Services</a>
+                    {% endif %}
+                    {% if dashboard and dashboard.control_plane %}
                     <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/health" class="mobile-menu-link"><i class="fas fa-heart-pulse"></i>Fleet health</a>
+                    {% endif %}
+                    {% if dashboard and dashboard.control_plane %}
                     <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/notifications" class="mobile-menu-link"><i class="fas fa-bell"></i>Notifications</a>
+                    {% endif %}
                     <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/profile" class="mobile-menu-link"><i class="fas fa-user"></i>Profile</a>
                     <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/logout" class="mobile-menu-link text-red-400"><i class="fas fa-right-from-bracket"></i>Log out</a>
-                    {% if dashboard and dashboard.url_prefix == '/admin' %}
-                    <a href="/admin/cms/" class="mobile-menu-link"><i class="fas fa-pen-to-square"></i>CMS</a>{% endif %}
+                    {% if dashboard and dashboard.app._flaxon_cms is defined %}
+                    <a href="{{ dashboard.app._flaxon_cms.url_prefix }}/" class="mobile-menu-link"><i class="fas fa-pen-to-square"></i>CMS</a>{% endif %}
                 </nav>
             </aside>
         </div>
@@ -168,8 +174,12 @@
                         <a href="{{ base_prefix }}/settings" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas fa-gear w-5"></i><span>Settings</span></a>
                         <a href="{{ base_prefix }}/activity" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas fa-clock-rotate-left w-5"></i><span>Activity</span></a>
                         <a href="{{ base_prefix }}/operations" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas fa-heart-pulse w-5"></i><span>Operations</span></a>
+                    {% if dashboard and dashboard.control_plane %}
                         <a href="{{ base_prefix }}/services" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas fa-diagram-project w-5"></i><span>Services</span></a>
+                    {% endif %}
+                    {% if dashboard and dashboard.control_plane %}
                         <a href="{{ base_prefix }}/health" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas fa-heart-pulse w-5"></i><span>Fleet health</span></a>
+                    {% endif %}
                         <a href="{{ base_prefix }}/logout" class="flex items-center gap-3 px-3 py-2 rounded-lg text-red-400 hover:bg-red-500/10 transition"><i class="fas fa-right-from-bracket w-5"></i><span>Log out</span></a>
                     </div>
                 </div>

@@ -1,10 +1,23 @@
-"""Settings shared by the web app and management commands."""
-
-import os
+"""Configuration shared by app.py and management.py. Secrets belong in .env."""
 from pathlib import Path
+from flaxon.config import env
 
-ROOT = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent
+ROOT = BASE_DIR
+DATA_DIR = BASE_DIR / "data"
+env.load(BASE_DIR / ".env")
+
 PROJECT_NAME = __PROJECT_NAME_LITERAL__
-DATA_DIR = ROOT / "data"
-DATABASE_PATH = DATA_DIR / "app.sqlite3"
-DEBUG = os.getenv("FLAXON_DEBUG", "1") == "1"
+DEBUG = env.bool("FLAXON_DEBUG", default=True)
+SECRET_KEY = env.str("FLAXON_SECRET_KEY")
+ALLOWED_HOSTS = env.list("FLAXON_ALLOWED_HOSTS", default=["localhost", "127.0.0.1", "testserver"])
+CSRF_TRUSTED_ORIGINS = env.list("FLAXON_CSRF_TRUSTED_ORIGINS", default=[])
+DATABASE_URL = env.str("DATABASE_URL", default=f"sqlite://{DATA_DIR / 'app.sqlite3'}")
+TIME_ZONE = "UTC"
+
+ADMIN_ENABLED = True
+CMS_ENABLED = True
+ADMIN_SERVICES_ENABLED = False
+# Staff accounts and CMS metadata use Flaxon's existing durable AdminStore.
+# Keep this file on persistent storage alongside the application database.
+ADMIN_STORAGE_PATH = DATA_DIR / "admin.sqlite3"

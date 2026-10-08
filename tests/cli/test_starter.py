@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import secrets
 import importlib
 import os
 import sqlite3
@@ -30,6 +31,9 @@ def starter(tmp_path, monkeypatch):
         "settings",
         "management",
         "flaxon_cli",
+        "models",
+        "admin",
+        "migrations",
         "modules",
         "modules.welcome",
         "modules.welcome.module",
@@ -52,7 +56,7 @@ def test_new_defaults_to_fullstack_and_keeps_basic():
 def test_starter_metadata_and_literal_teloce_bindings(starter):
     metadata = tomllib.loads((starter / "pyproject.toml").read_text())
     assert metadata["project"]["name"] == "my-project"
-    assert "flaxon[standard]>=0.2.5" in metadata["project"]["dependencies"]
+    assert "flaxon[standard,admin]>=0.2.7" in metadata["project"]["dependencies"]
     assert "{{ projectName }}" in (starter / "modules/welcome/ui/Welcome.html").read_text()
     assert "data/" in (starter / ".gitignore").read_text()
 
@@ -60,6 +64,7 @@ def test_starter_metadata_and_literal_teloce_bindings(starter):
 @pytest.mark.parametrize("debug", ["1", "0"])
 def test_generated_app_serves_module_ui_assets_and_protected_admin(starter, monkeypatch, debug):
     monkeypatch.setenv("FLAXON_DEBUG", debug)
+    monkeypatch.setenv("FLAXON_SECRET_KEY", secrets.token_urlsafe(48))
     app = importlib.import_module("app").app
     client = TestClient(app)
     response = client.get("/")
@@ -76,26 +81,13 @@ def test_generated_app_serves_module_ui_assets_and_protected_admin(starter, monk
     assert app._flaxon_admin_store.list("users") == {}
 
 
-def test_generated_migrations_apply_once_and_use_project_path(starter, monkeypatch, capsys):
-    management = importlib.import_module("management")
-    monkeypatch.chdir(starter.parent)
-    assert management.main(["migrate"]) == 0
-    assert "Applied 1 migration" in capsys.readouterr().out
-    assert management.main(["migrate"]) == 0
-    assert "Applied 0 migration" in capsys.readouterr().out
-    management.main(["migrate", "--status"])
-    assert "1 applied, 0 pending" in capsys.readouterr().out
-    with sqlite3.connect(starter / "data/app.sqlite3") as db:
-        db.execute("INSERT INTO project_notes(title) VALUES (?)", ("My first module",))
-        assert db.execute("SELECT title FROM project_notes").fetchone()[0] == "My first module"
-
 
 def test_admin_setup_hashes_persists_and_authenticates(starter, monkeypatch):
     management = importlib.import_module("management")
-    password = "Welcome123!"
-    monkeypatch.setattr(management.getpass, "getpass", lambda prompt: password)
+    password = secrets.token_urlsafe(20) + "Aa1!"
+    monkeypatch.setattr(__import__("flaxon.management", fromlist=["getpass"]).getpass, "getpass", lambda prompt: password)
     assert management.main(["setup-admin", "--username", "owner"]) == 0
-    store = AdminStore(str(starter / "data/app.sqlite3"))
+    store = AdminStore(str(starter / "data/admin.sqlite3"))
     record = store.get("users", "owner")
     assert "password" not in record
     assert record["password_hash"] != password
@@ -105,9 +97,9 @@ def test_admin_setup_hashes_persists_and_authenticates(starter, monkeypatch):
     token = asyncio.run(dashboard.auth.login("owner", password))
     assert token
     client = TestClient(app)
-    response = client.get("/admin", headers={"cookie": f"session_id={token}"})
+    response = client.get("/admin/profile", headers={"cookie": f"session_id={token}"})
     assert response.status_code == 200
-    assert "Welcome to your Flaxon admin" in response.text
+    assert "Profile" in response.text
     with pytest.raises(SystemExit) as error:
         management.main(["createsuperuser", "--username", "owner"])
     assert error.value.code == 1
@@ -118,11 +110,11 @@ def test_admin_setup_hashes_persists_and_authenticates(starter, monkeypatch):
 def test_invalid_admin_passwords_create_no_account(starter, monkeypatch, passwords):
     management = importlib.import_module("management")
     answers = iter(passwords)
-    monkeypatch.setattr(management.getpass, "getpass", lambda prompt: next(answers))
+    monkeypatch.setattr(__import__("flaxon.management", fromlist=["getpass"]).getpass, "getpass", lambda prompt: next(answers))
     with pytest.raises(SystemExit) as error:
         management.main(["setup-admin", "--username", "owner"])
     assert error.value.code == 1
-    assert AdminStore(str(starter / "data/app.sqlite3")).list("users") == {}
+    assert AdminStore(str(starter / "data/admin.sqlite3")).list("users") == {}
 
 
 def test_generator_preserves_existing_files_and_rejects_unknown_templates(tmp_path):

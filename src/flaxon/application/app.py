@@ -108,6 +108,25 @@ class Flaxon:
             options = dict(openapi) if isinstance(openapi, dict) else {}
             self.enable_openapi(**options)
 
+    @classmethod
+    def from_settings(cls, source="settings", *, openapi=True):
+        """Create an ORM application from shared project settings."""
+        from flaxon.config import Settings, management_mode
+        from flaxon.db.integration import Database, DatabaseMiddleware
+        settings = Settings(source)
+        app = cls(settings.PROJECT_NAME, debug=settings.DEBUG, config=settings.values, openapi=openapi)
+        app.config.update(settings.values)
+        app.settings = settings
+        app.is_management = management_mode.get()
+        app.db = Database(app, settings)
+        app.container.register_instance("db", app.db)
+        app.on_startup(app.db.initialize)
+        app.on_shutdown(app.db.close)
+        app.add_middleware(DatabaseMiddleware, database=app.db)
+        from flaxon.middleware import TrustedHostsMiddleware
+        app.add_middleware(TrustedHostsMiddleware, allowed_hosts=settings.ALLOWED_HOSTS)
+        return app
+
     # ============================================================
     # SYSTEM & DIAGNOSTIC ENDPOINTS
     # ============================================================

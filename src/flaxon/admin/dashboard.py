@@ -12,6 +12,7 @@ import hashlib
 import mimetypes
 from io import BytesIO
 from pathlib import Path
+from contextvars import ContextVar
 from typing import Any
 
 from flaxon.exceptions import BadRequest, Forbidden, NotFound
@@ -24,7 +25,7 @@ from flaxon.jinax import Jinax
 
 from .config import AdminConfig
 from .authorization import AuthorizationProvider, PermissionCatalog, canonical_model_permission, default_group_definitions
-from .registry import Registry, default_registry
+from .registry import Registry, default_registry, evaluate_permission_hook
 from .views import ChangeListView, CreateView, DeleteView, DetailView, UpdateView
 from .services import AdminActivity, AdminAuth, AdminRateLimit, AdminStore, AdminStoreSessionBackend, RedisAdminSessionBackend
 from .production import DurableJobStore, DurableJobWorker, ImmutableAuditLog, NotificationService, ResumableUploadStore, WebAuthnService
@@ -66,12 +67,14 @@ class AdminDashboard:
         password_hasher: PasswordHasher | None = None,
         microservices: bool | dict[str, Any] = True,
         cookie_secure: bool | None = None,
+        session_bound_csrf: bool = False,
     ) -> None:
+        self._navigation_user = ContextVar("flaxon_admin_navigation_user", default=None)
         self.app = app
         self.config = config or AdminConfig()
         self.url_prefix = url_prefix.rstrip("/")
         self.strict_permissions = strict_permissions
-        self.registry = registry or default_registry
+        self.registry = registry if registry is not None else default_registry
         self.permission_catalog = PermissionCatalog()
         self.widgets: list[Any] = []
         self.custom_views: list[dict[str, Any]] = []
@@ -116,7 +119,14 @@ class AdminDashboard:
         self._redis_url = redis_url
         self._redis_protocol = redis_protocol
         self._redis_max_connections = redis_max_connections
-        self.csrf = CSRF(secrets.token_urlsafe(32))
+        self.session_bound_csrf = session_bound_csrf
+        secret = self.app.config.get("SECRET_KEY") or secrets.token_urlsafe(32)
+        if session_bound_csrf:
+            from .csrf import AdminCSRF, AdminCSRFMiddleware
+            self.csrf = AdminCSRF(secret)
+            self.app.add_middleware(AdminCSRFMiddleware, dashboard=self)
+        else:
+            self.csrf = CSRF(secret)
         self._csrf_token = self.csrf.generate_token()
         setattr(self.app, "_flaxon_admin_auth", self.auth)
         setattr(self.app, "_flaxon_admin_dashboard", self)
@@ -434,6 +444,10 @@ class AdminDashboard:
         """Unregister a model from the dashboard's registry."""
         self.registry.unregister(model)
 
+    def navigation_user(self):
+        """Current request's staff identity, including views with sparse contexts."""
+        return self._navigation_user.get()
+
     def can_access_model(self, user: Any, model_name: str, action: str = "read") -> bool:
         """Return whether a template or extension may show a model action."""
 
@@ -443,11 +457,17 @@ class AdminDashboard:
         user = await self._require_user(request, "admin.view_dashboard")
         counts = {}
         total = 0
-        models = [model for model in self.registry.get_all() if self.can_access_model(user, model.get_name(), "read")]
+        models = []
+        for model in self.registry.get_all():
+            if await self.auth.has_permission_async(user, self.permission_for_action(model.get_name(), "read")):
+                models.append(model)
         for model in models:
-            values = await self._instances(model.model)
-            counts[model.get_name()] = len(values)
-            total += len(values)
+            if hasattr(model.model, "count") and model.get_permission_hook("read") is None:
+                count = await model.model.count()
+            else:
+                count = len(await self._visible_instances(model, user))
+            counts[model.get_name()] = count
+            total += count
         context = {
             "title": self.config.site_title,
             "models": models,
@@ -524,6 +544,11 @@ class AdminDashboard:
         else:
             selected = form.get("ids", [])
             ids = selected if isinstance(selected, list) else ([selected] if selected else [])
+        if len(ids) > 1000:
+            raise BadRequest("Select at most 1000 records per action")
+        ids = list(dict.fromkeys(str(value) for value in ids))
+        for object_id in ids:
+            await self._require_model_user(request, model_name, "delete" if action_name == "delete" else "update", object_id)
         result = action(ids) if callable(action) else None
         if hasattr(result, "__await__"):
             await result
@@ -536,6 +561,7 @@ class AdminDashboard:
     async def _require_user(self, request: Request, permission: str | None = None) -> Any:
         await self._load_database()
         user = await self.auth.current_user(request)
+        self._navigation_user.set(user)
         if permission:
             await self.auth.authorize_async(user, permission)
         return user
@@ -640,9 +666,7 @@ class AdminDashboard:
                 target = admin_model.model.get_instance(object_id)
                 if hasattr(target, "__await__"):
                     target = await target
-            allowed = hook(user, target) if object_id is not None else hook(user)
-            if hasattr(allowed, "__await__"):
-                allowed = await allowed
+            allowed = await evaluate_permission_hook(hook, user, target)
             if not allowed:
                 raise Forbidden("Insufficient model permissions")
         return user
@@ -653,7 +677,34 @@ class AdminDashboard:
         result = model.get_instances()
         return list(await result if hasattr(result, "__await__") else result)
 
+    @staticmethod
+    def _safe_record(value: Any) -> Any:
+        """Exclude credentials from search, exports, notifications and audit snapshots."""
+        if isinstance(value, dict):
+            return {
+                key: ("[redacted]" if any(part in key.lower() for part in ("password", "secret", "token", "api_key", "recovery_code")) else AdminDashboard._safe_record(item))
+                for key, item in value.items()
+            }
+        if isinstance(value, (list, tuple)):
+            return [AdminDashboard._safe_record(item) for item in value]
+        return value
+
+    async def _visible_instances(self, admin_model: Any, user: Any) -> list[Any]:
+        if not await self.auth.has_permission_async(user, self.permission_for_action(admin_model.get_name(), "read")):
+            return []
+        values = await self._instances(admin_model.model)
+        hook = admin_model.get_permission_hook("read")
+        if hook is None:
+            return values
+        visible = []
+        for value in values:
+            allowed = await evaluate_permission_hook(hook, user, value)
+            if allowed:
+                visible.append(value)
+        return visible
+
     def record_activity(self, action: str, resource: str, request: Request, record_id: str | None = None, **details: Any) -> None:
+        details = self._safe_record(details)
         user = getattr(request, "user", None)
         username = getattr(user, "username", "system")
         timestamp = time.time()
@@ -685,7 +736,7 @@ class AdminDashboard:
             self.store.set("meta", "notifications", self.notifications[-1000:])
 
     def csrf_token(self) -> str:
-        return self._csrf_token
+        return self.csrf.generate_token()
 
     @staticmethod
     def _form_dict(form: Any) -> dict[str, Any]:
@@ -1435,13 +1486,13 @@ class AdminDashboard:
         return JSONResponse({"name": new_name, "url": url, "metadata": metadata})
 
     async def search(self, request: Request) -> Response:
-        await self._require_user(request, "admin.view_dashboard")
+        user = await self._require_user(request, "admin.view_dashboard")
         needle = request.query.get("q", "").lower().strip()
         results = []
         if needle:
             for model in self.registry.get_all():
-                for obj in await self._instances(model.model):
-                    values = obj if isinstance(obj, dict) else getattr(obj, "__dict__", {})
+                for obj in await self._visible_instances(model, user):
+                    values = self._safe_record(UpdateView._snapshot(obj))
                     if needle in " ".join(str(v) for v in values.values()).lower():
                         results.append({"model": model.get_name(), "label": model.get_verbose_name(), "id": values.get("id", ""), "values": values})
         return await self.jinax.render_response("admin/search.html", {"query": needle, "results": results, "models": self.registry.get_all()})
@@ -1451,8 +1502,8 @@ class AdminDashboard:
         admin_model = self.registry.get(model_name)
         if not admin_model:
             return await self._not_found()
-        values = await self._instances(admin_model.model)
-        records = [value if isinstance(value, dict) else getattr(value, "__dict__", {}) for value in values]
+        values = await self._visible_instances(admin_model, request.user)
+        records = [self._safe_record(UpdateView._snapshot(value)) for value in values]
         fmt = request.query.get("format", "json").lower()
         if fmt == "csv":
             output = io.StringIO()

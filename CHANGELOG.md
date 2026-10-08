@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.7] — Unreleased
+
+- Integrate pinned Tortoise ORM through flaxon.db and shared typed settings.
+- Add model-driven Python migrations and project management commands; preserve legacy adapters/JSON runners.
+- Discover model/Admin metadata from explicitly mounted modules without frontend compilation in management mode.
+- Add ORM Admin CRUD, typed fields, bounded relationships, validation and project registry isolation.
+- Repair disabled-feature navigation and expired/shared-worker CSRF handling in new starters.
+- Enforce model/object permissions in global search, exports and bulk actions; redact credentials in snapshots.
+- Require CMS authentication by default and publishing rights across writes/imports/restores; support async authorization.
+
+
 ## 2.6
 
 - Add synchronous and asynchronous module-owned starter commands, exposed through project CLI discovery.
