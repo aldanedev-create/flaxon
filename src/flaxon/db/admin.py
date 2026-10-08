@@ -1,34 +1,52 @@
 """Adapt explicitly registered Tortoise models to Flaxon's Admin CRUD contract."""
+
 from __future__ import annotations
 
 import importlib
 import json
+import hashlib
+from contextvars import ContextVar
+from tortoise.transactions import in_transaction
 from typing import Any
 from tortoise import fields
-from tortoise.fields.relational import BackwardFKRelation, BackwardOneToOneRelation, ManyToManyFieldInstance, ForeignKeyFieldInstance
+from tortoise.fields.relational import (
+    BackwardFKRelation,
+    BackwardOneToOneRelation,
+    ManyToManyFieldInstance,
+    ForeignKeyFieldInstance,
+)
 from tortoise.exceptions import IntegrityError, ValidationError
 from tortoise.expressions import Q
 from tortoise.models import Model
-from flaxon.exceptions import BadRequest, Conflict, NotFound
+from flaxon.exceptions import BadRequest, Conflict, NotFound, Forbidden
 from .integration import optional_module
+
+
+admin_context = ContextVar("flaxon_admin_context", default=None)
 
 
 def model_adapter(model: type[Model], options: dict[str, Any]):
     columns = {}
+    relations = {}
     readonly = set(options.get("readonly_fields") or [])
     for name, field in model._meta.fields_map.items():
-        if isinstance(field, (BackwardFKRelation, BackwardOneToOneRelation, ManyToManyFieldInstance)):
+        if isinstance(field, ManyToManyFieldInstance):
+            relations[name] = field
+            continue
+        if isinstance(field, (BackwardFKRelation, BackwardOneToOneRelation)):
             continue
         if isinstance(field, ForeignKeyFieldInstance):
             columns[field.source_field or f"{name}_id"] = field
-        else:
+        elif name not in columns:
             columns[name] = field
         if field.pk or getattr(field, "auto_now", False) or getattr(field, "auto_now_add", False):
             readonly.add(name)
-    visible = options.setdefault("fields", list(columns))
+    visible = options.setdefault("fields", list(columns) + list(relations))
     writable = set(visible) & set(columns) - readonly
     options["readonly_fields"] = sorted(readonly)
-    options.setdefault("list_display", [model._meta.pk_attr or "id", *[n for n in columns if n not in readonly][:2]])
+    options.setdefault(
+        "list_display", [model._meta.pk_attr or "id", *[n for n in columns if n not in readonly][:2]]
+    )
     search = options.get("search_fields") or []
     filters = options.get("list_filter") or []
     for name in [*search, *filters, *(options.get("ordering") or [])]:
@@ -36,7 +54,12 @@ def model_adapter(model: type[Model], options: dict[str, Any]):
             raise ValueError(f"Unknown Admin field {name!r} on {model.__name__}")
 
     def payload(data):
-        unknown = set(data) - set(columns)
+        unknown = (
+            set(data)
+            - set(columns)
+            - set(relations)
+            - {f"_inline_{name}" for name in options.get("inlines", {})}
+        )
         if unknown:
             raise BadRequest(f"Unknown model fields: {', '.join(sorted(unknown))}")
         result = {}
@@ -65,13 +88,214 @@ def model_adapter(model: type[Model], options: dict[str, Any]):
                 field.validate(value)
                 result[name] = value
             except (ValueError, TypeError, ValidationError) as exc:
-                raise BadRequest(f"Invalid value for {name}") from exc
+                error = BadRequest(f"Invalid value for {name}")
+                error.field_errors = {name: "Enter a valid value."}
+                raise error from exc
         return result
 
     class Adapter:
         orm_model = model
+        relationship_fields = {
+            **{name: field for name, field in columns.items() if isinstance(field, ForeignKeyFieldInstance)},
+            **relations,
+        }
         field_metadata = columns
+        admin_options = options
+        registry = None
+
+        @classmethod
+        def transaction(cls):
+            return in_transaction()
+
+        @classmethod
+        async def version(cls, obj):
+            values = {name: getattr(obj, name, None) for name in model._meta.fields_db_projection}
+            for name in relations:
+                values[name] = sorted(str(row.pk) for row in await getattr(obj, name).all())
+            return hashlib.sha256(json.dumps(values, sort_keys=True, default=str).encode()).hexdigest()
+
+        @classmethod
+        async def authorize(cls, action, target):
+            context = admin_context.get()
+            if context is None:
+                return
+            dashboard, user = context
+            registered = cls.registry.get_by_model(model)
+            if registered is None:
+                raise Forbidden("Model is not registered")
+            await dashboard.auth.authorize_async(
+                user, dashboard.permission_for_action(registered.get_name(), action)
+            )
+            from flaxon.admin.registry import evaluate_permission_hook
+
+            if not await evaluate_permission_hook(registered.get_permission_hook(action), user, target):
+                raise Forbidden("This record operation is not permitted")
+
+        @classmethod
+        async def visible_query(cls):
+            query = model.all()
+            context = admin_context.get()
+            hook = options.get("queryset")
+            if hook and context:
+                query = hook(context[1], query)
+                from tortoise.queryset import QuerySet
+
+                if not isinstance(query, QuerySet) and hasattr(query, "__await__"):
+                    query = await query
+            return query
+
+        @classmethod
+        async def related_rows(cls, field, needle=""):
+            context = admin_context.get()
+            if not context or cls.registry is None:
+                raise Forbidden("Relationship selection requires an authenticated Admin request")
+            dashboard, user = context
+            registered = cls.registry.get_by_model(field.related_model)
+            if registered is None:
+                raise Forbidden("Register related models to select their records")
+            await dashboard.auth.authorize_async(
+                user, dashboard.permission_for_action(registered.get_name(), "read")
+            )
+            query = await registered.model.visible_query()
+            if needle and registered.search_fields:
+                conditions = Q()
+                for name in registered.search_fields:
+                    conditions |= Q(**{f"{name}__icontains": needle})
+                query = query.filter(conditions)
+            from flaxon.admin.registry import evaluate_permission_hook
+
+            return (
+                [
+                    row
+                    async for row in query
+                    if await evaluate_permission_hook(registered.get_permission_hook("read"), user, row)
+                ]
+                if registered.get_permission_hook("read")
+                else await query
+            )
+
+        @classmethod
+        async def validate_relations(cls, data):
+            for name, field in {**columns, **relations}.items():
+                if (
+                    not isinstance(field, (ForeignKeyFieldInstance, ManyToManyFieldInstance))
+                    or name not in data
+                ):
+                    continue
+                values = data[name]
+                if isinstance(field, ManyToManyFieldInstance):
+                    if isinstance(values, str):
+                        try:
+                            values = json.loads(values or "[]")
+                        except ValueError as exc:
+                            raise BadRequest("Relationship IDs must be a JSON list") from exc
+                    if not isinstance(values, list) or len(values) > 200:
+                        raise BadRequest("Select at most 200 related records")
+                else:
+                    values = [values[-1] if isinstance(values, list) else values]
+                selected = {str(value) for value in values if value not in (None, "")}
+                allowed = {str(row.pk) for row in await cls.related_rows(field)}
+                if not selected <= allowed:
+                    raise Forbidden("A selected relationship is unavailable")
+
+        @classmethod
+        async def save_relations(cls, obj, data):
+            for name, field in relations.items():
+                if name in data:
+                    values = json.loads(data[name] or "[]") if isinstance(data[name], str) else data[name]
+                    rows = await field.related_model.filter(pk__in=values)
+                    await getattr(obj, name).clear()
+                    if rows:
+                        await getattr(obj, name).add(*rows)
+
         __name__ = model.__name__
+
+        @classmethod
+        async def inline_schema(cls, obj=None):
+            schema = {}
+            context = admin_context.get()
+            if not context:
+                return schema
+            dashboard, user = context
+            for name, config in options.get("inlines", {}).items():
+                registered = cls.registry.get_by_model(config["model"])
+                if not registered:
+                    raise ValueError("Inline models must be registered")
+                await dashboard.auth.authorize_async(
+                    user, dashboard.permission_for_action(registered.get_name(), "read")
+                )
+                adapter = registered.model
+                fields_to_show = [
+                    field
+                    for field in registered.fields
+                    if field not in registered.readonly_fields and field != config["fk"]
+                ]
+                rows = []
+                if obj:
+                    query = await adapter.visible_query()
+                    from flaxon.admin.registry import evaluate_permission_hook
+
+                    for row in await query.filter(**{config["fk"]: obj.pk}).limit(101):
+                        if await evaluate_permission_hook(registered.get_permission_hook("read"), user, row):
+                            rows.append({
+                                "id": str(row.pk),
+                                "_version": await adapter.version(row),
+                                **{field: getattr(row, field, None) for field in fields_to_show},
+                            })
+                    if len(rows) > 100:
+                        raise BadRequest("Use the child model list to edit more than 100 records")
+                schema[name] = {"fields": fields_to_show, "rows": json.dumps(rows, default=str)}
+            return schema
+
+        @classmethod
+        async def save_inlines(cls, obj, data):
+            context = admin_context.get()
+            for name, config in options.get("inlines", {}).items():
+                key = f"_inline_{name}"
+                if key not in data:
+                    continue
+                try:
+                    rows = json.loads(data[key]) if isinstance(data[key], str) else data[key]
+                except ValueError as exc:
+                    raise BadRequest("Invalid child records") from exc
+                if not isinstance(rows, list) or len(rows) > 100:
+                    raise BadRequest("At most 100 child records can be edited together")
+                if not context:
+                    raise Forbidden("Inline editing requires Admin authentication")
+                dashboard, user = context
+                registered = cls.registry.get_by_model(config["model"])
+                if not registered:
+                    raise Forbidden("Register the inline model")
+                adapter = registered.model
+                from flaxon.admin.registry import evaluate_permission_hook
+
+                for raw in rows:
+                    if not isinstance(raw, dict):
+                        raise BadRequest("Invalid child record")
+                    values = dict(raw)
+                    identifier = values.pop("id", None)
+                    deleting = values.pop("_delete", False)
+                    expected = values.pop("_version", None)
+                    child = await adapter.get_instance(identifier) if identifier else None
+                    if child and str(getattr(child, config["fk"])) != str(obj.pk):
+                        raise Forbidden("Child record belongs to another parent")
+                    action = "delete" if deleting else "update" if child else "create"
+                    await dashboard.auth.authorize_async(
+                        user, dashboard.permission_for_action(registered.get_name(), action)
+                    )
+                    if not await evaluate_permission_hook(
+                        registered.get_permission_hook(action), user, child or values
+                    ):
+                        raise Forbidden("Child operation is not permitted")
+                    if deleting:
+                        if child:
+                            await adapter.delete_instance(identifier)
+                    else:
+                        values[config["fk"]] = obj.pk
+                        if child:
+                            await adapter.update_instance(identifier, values, expected_version=expected)
+                        else:
+                            await adapter.create_instance(values)
 
         @classmethod
         async def form_schema(cls):
@@ -81,11 +305,12 @@ def model_adapter(model: type[Model], options: dict[str, Any]):
                 choices = None
                 if isinstance(field, ForeignKeyFieldInstance):
                     kind = "number"
-                    related = field.related_model
-                    rows = await related.all().limit(101)
+                    rows = await cls.related_rows(field)
                     if len(rows) <= 100:
                         kind = "select"
                         choices = [(str(row.pk), str(row)) for row in rows]
+                    else:
+                        kind = "autocomplete"
                 elif isinstance(field, fields.BooleanField):
                     kind = "checkbox"
                 elif isinstance(field, fields.JSONField):
@@ -100,15 +325,26 @@ def model_adapter(model: type[Model], options: dict[str, Any]):
                     kind = "number"
                 default = field.default() if callable(field.default) else field.default
                 schema[name] = {
-                    "kind": kind, "choices": choices, "default": default,
+                    "kind": kind,
+                    "choices": choices,
+                    "default": default,
                     "required": not field.null and field.default is None and name not in readonly,
                     "max_length": getattr(field, "max_length", None),
+                    "widget": (options.get("widgets") or {}).get(name),
+                }
+            for name in relations:
+                rows = await cls.related_rows(relations[name])
+                schema[name] = {
+                    "kind": "autocomplete-many" if len(rows) > 100 else "many",
+                    "required": False,
+                    "default": "[]",
+                    "choices": [(str(row.pk), str(row)) for row in rows[:100]],
                 }
             return schema
 
         @classmethod
         async def query(cls, q=None, page=1, per_page=25, query_params=None):
-            query = model.all()
+            query = await cls.visible_query()
             params = query_params or {}
             if q and search:
                 conditions = Q()
@@ -126,14 +362,40 @@ def model_adapter(model: type[Model], options: dict[str, Any]):
                 query = query.order_by(ordering)
             elif options.get("ordering"):
                 query = query.order_by(*options["ordering"])
+            else:
+                query = query.order_by(model._meta.pk_attr)
+            context = admin_context.get()
+            read_hook = options.get("can_view")
+            if read_hook and context:
+                from flaxon.admin.registry import evaluate_permission_hook
+
+                visible = [
+                    row async for row in query if await evaluate_permission_hook(read_hook, context[1], row)
+                ]
+                total = len(visible)
+                items = visible[(page - 1) * per_page : page * per_page]
+                return {
+                    "items": items,
+                    "total": total,
+                    "pages": max(1, (total + per_page - 1) // per_page),
+                    "page": page,
+                    "per_page": per_page,
+                }
             total = await query.count()
             items = await query.offset((page - 1) * per_page).limit(per_page)
-            return {"items": items, "total": total, "pages": max(1, (total + per_page - 1) // per_page), "page": page, "per_page": per_page}
+            return {
+                "items": items,
+                "total": total,
+                "pages": max(1, (total + per_page - 1) // per_page),
+                "page": page,
+                "per_page": per_page,
+            }
 
         @classmethod
         async def get_instance(cls, object_id):
             try:
-                obj = await model.get_or_none(pk=object_id)
+                query = await cls.visible_query()
+                obj = await query.get_or_none(pk=object_id)
             except (ValueError, TypeError) as exc:
                 raise NotFound("Record not found") from exc
             if obj is None:
@@ -142,20 +404,64 @@ def model_adapter(model: type[Model], options: dict[str, Any]):
 
         @classmethod
         async def create_instance(cls, data):
+            await cls.authorize("create", data)
             try:
-                return await model.create(**payload(data))
+                missing = {
+                    name: "This field is required."
+                    for name, field in columns.items()
+                    if name in writable
+                    and not field.null
+                    and field.default is None
+                    and not getattr(field, "generated", False)
+                    and name not in data
+                }
+                if missing:
+                    error = BadRequest("Complete the required fields.")
+                    error.field_errors = missing
+                    raise error
+                await cls.validate_relations(data)
+                async with in_transaction():
+                    obj = await model.create(**payload(data))
+                    await cls.save_relations(obj, data)
+                    await cls.save_inlines(obj, data)
+                    return obj
             except IntegrityError as exc:
                 raise Conflict("A unique value already exists or a related record is invalid") from exc
             except (ValidationError, ValueError, TypeError) as exc:
                 raise BadRequest("Invalid model data; check required fields and values") from exc
 
         @classmethod
-        async def update_instance(cls, object_id, data):
+        async def update_instance(cls, object_id, data, expected_version=None):
             obj = await cls.get_instance(object_id)
+            await cls.authorize("update", obj)
             values = payload(data)
+            await cls.validate_relations(data)
             try:
-                obj.update_from_dict(values)
-                await obj.save()
+                async with in_transaction():
+                    obj = await model.select_for_update().get(pk=object_id)
+                    if expected_version and await cls.version(obj) != expected_version:
+                        raise Conflict("This record changed. Reload before saving.")
+                    from datetime import datetime, timezone
+
+                    for name, field in columns.items():
+                        if getattr(field, "auto_now", False):
+                            values[name] = datetime.now(timezone.utc)
+                    original = {name: getattr(obj, name) for name in model._meta.fields_db_projection}
+                    obj.update_from_dict(values)
+                    changed = (
+                        await model.filter(
+                            pk=object_id,
+                            **{
+                                name: value for name, value in original.items() if name != model._meta.pk_attr
+                            },
+                        ).update(**values)
+                        if values
+                        else 1
+                    )
+                    if not changed:
+                        raise Conflict("This record changed. Reload before saving.")
+                    await cls.save_relations(obj, data)
+                    await cls.save_inlines(obj, data)
             except IntegrityError as exc:
                 raise Conflict("A unique value already exists or a related record is invalid") from exc
             except (ValidationError, ValueError, TypeError) as exc:
@@ -163,20 +469,92 @@ def model_adapter(model: type[Model], options: dict[str, Any]):
             return obj
 
         @classmethod
+        async def deletion_preview(cls, object_id):
+            obj = await cls.get_instance(object_id)
+            dependencies = []
+            for name, field in model._meta.fields_map.items():
+                if isinstance(field, (BackwardFKRelation, BackwardOneToOneRelation)):
+                    count = await field.related_model.filter(**{field.relation_field: obj.pk}).count()
+                    if count:
+                        dependencies.append({
+                            "relation": name,
+                            "count": count,
+                            "behavior": str(
+                                next(
+                                    (
+                                        relation.on_delete
+                                        for relation in field.related_model._meta.fields_map.values()
+                                        if isinstance(relation, ForeignKeyFieldInstance)
+                                        and relation.source_field == field.relation_field
+                                    ),
+                                    "DATABASE",
+                                )
+                            ),
+                        })
+            return dependencies
+
+        @classmethod
+        async def authorize_cascade(cls, obj, visited=None):
+            visited = visited if visited is not None else set()
+            identity = (type(obj), str(obj.pk))
+            if identity in visited:
+                return
+            visited.add(identity)
+            context = admin_context.get()
+            for field in obj._meta.fields_map.values():
+                if not isinstance(field, (BackwardFKRelation, BackwardOneToOneRelation)):
+                    continue
+                forward = next(
+                    (
+                        relation
+                        for relation in field.related_model._meta.fields_map.values()
+                        if isinstance(relation, ForeignKeyFieldInstance)
+                        and relation.source_field == field.relation_field
+                    ),
+                    None,
+                )
+                if forward is None or str(forward.on_delete) != "CASCADE":
+                    continue
+                children = field.related_model.filter(**{field.relation_field: obj.pk})
+                if not await children.exists():
+                    continue
+                if not context:
+                    raise Forbidden("Cascade deletion requires authenticated Admin permissions")
+                dashboard, user = context
+                registered = cls.registry.get_by_model(field.related_model)
+                if registered is None:
+                    raise Forbidden("Register dependent models before cascading deletion")
+                await dashboard.auth.authorize_async(
+                    user, dashboard.permission_for_action(registered.get_name(), "delete")
+                )
+                from flaxon.admin.registry import evaluate_permission_hook
+
+                async for child in children:
+                    if not await evaluate_permission_hook(
+                        registered.get_permission_hook("delete"), user, child
+                    ):
+                        raise Forbidden("Deletion of a dependent record is not permitted")
+                    await cls.authorize_cascade(child, visited)
+
+        @classmethod
         async def delete_instance(cls, object_id):
             obj = await cls.get_instance(object_id)
+            await cls.authorize("delete", obj)
             try:
-                await obj.delete()
+                async with in_transaction():
+                    obj = await model.select_for_update().get(pk=object_id)
+                    await cls.authorize_cascade(obj)
+                    await obj.delete()
             except IntegrityError as exc:
                 raise Conflict("This record is referenced by another record") from exc
 
         @classmethod
         async def get_instances(cls):
-            return await model.all()
+            return await (await cls.visible_query())
 
         @classmethod
         async def count(cls):
-            return await model.all().count()
+            return await (await cls.visible_query()).count()
 
     Adapter.__name__ = model.__name__
     return Adapter
@@ -203,25 +581,46 @@ def configure_admin(app):
     from flaxon.admin import AdminConfig, AdminDashboard
     from flaxon.admin.registry import Registry
     from flaxon.management import admin_store
+
     settings = app.settings
     if not settings.ADMIN_ENABLED:
         return None
     registry = Registry()
     register_project_models(app, registry)
     store = admin_store(settings)
+    if hasattr(store, "close"):
+        import asyncio
+
+        async def close_store():
+            await asyncio.to_thread(store.close)
+
+        app.on_shutdown(close_store)
     dashboard = AdminDashboard(
-        app, config=AdminConfig(site_title=f"{settings.PROJECT_NAME} admin", timezone=settings.TIME_ZONE),
-        registry=registry, store=store, users=[], strict_permissions=True,
+        app,
+        config=AdminConfig(site_title=f"{settings.PROJECT_NAME} admin", timezone=settings.TIME_ZONE),
+        registry=registry,
+        store=store,
+        users=[],
+        strict_permissions=True,
         upload_dir=str(settings.root / "data/uploads"),
-        microservices=settings.ADMIN_SERVICES_ENABLED, session_bound_csrf=True,
+        microservices=settings.ADMIN_SERVICES_ENABLED,
+        session_bound_csrf=True,
     )
     # ORM is used by registered models. The existing Admin metadata store remains
     # separate; don't treat Database (the ORM lifecycle) as a raw SQL adapter.
     dashboard.database = None
     if settings.CMS_ENABLED:
         from flaxon.admin.cms import CMS, ContentType, CMSField
+
         cms = CMS(app, auth=dashboard.auth)
         cms.database = None
-        cms.register(ContentType("page", label="Page", label_plural="Pages", fields=[CMSField("title", required=True), CMSField("body", type="richtext")]))
+        cms.register(
+            ContentType(
+                "page",
+                label="Page",
+                label_plural="Pages",
+                fields=[CMSField("title", required=True), CMSField("body", type="richtext")],
+            )
+        )
         app.cms = cms
     return dashboard

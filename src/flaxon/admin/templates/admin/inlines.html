@@ -1,0 +1,26 @@
+{% for name, inline in inline_schema.items() %}
+<section data-inline-editor><h3>{{ name|replace('_', ' ')|title }}</h3>
+<input type="hidden" name="_inline_{{ name }}" value="{{ inline.rows }}" data-inline-value>
+<template data-inline-fields>{% for field in inline.fields %}<label>{{ field|replace('_', ' ')|title }}<input data-child-field="{{ field }}"></label>{% endfor %}<label>Delete <input type="checkbox" data-child-delete></label></template>
+<div data-inline-rows></div><button type="button" data-inline-add>Add {{ name|replace('_', ' ') }}</button>
+</section>{% endfor %}
+<script>
+for (const editor of document.querySelectorAll('[data-inline-editor]')) {
+  const hidden = editor.querySelector('[data-inline-value]');
+  const rows = JSON.parse(hidden.value || '[]');
+  const area = editor.querySelector('[data-inline-rows]');
+  function save() {hidden.value = JSON.stringify(rows);}
+  function add(row) {
+    const box = document.createElement('fieldset');
+    box.append(editor.querySelector('template').content.cloneNode(true));
+    for (const input of box.querySelectorAll('[data-child-field]')) {
+      input.value = row[input.dataset.childField] ?? '';
+      input.addEventListener('input', () => {row[input.dataset.childField] = input.value; save();});
+    }
+    box.querySelector('[data-child-delete]').addEventListener('change', event => {row._delete = event.target.checked; save();});
+    area.append(box);
+  }
+  for (const row of rows) add(row);
+  editor.querySelector('[data-inline-add]').addEventListener('click', () => {if (rows.length >= 100) return; const row = {}; rows.push(row); add(row); save();});
+}
+</script>

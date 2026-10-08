@@ -1,6 +1,20 @@
 {# Typed ORM fields; legacy custom models retain their existing templates. #}
 {% if is_readonly %}
 <input name="{{ field_name }}" value="{{ current_value }}" readonly>
+{% elif schema.widget is defined and schema.widget %}
+{% include schema.widget %}
+{% elif schema.kind in ['autocomplete', 'autocomplete-many'] %}
+{% if schema.kind == 'autocomplete-many' %}<input type="hidden" name="{{ field_name }}" value="{{ current_value or '[]' }}" data-related-many>{% endif %}
+<span data-related-picker>
+<input type="search" aria-label="Search related records" data-related-search data-url="{{ prefix }}/{{ model.get_name() }}/relationships/{{ field_name }}">
+<select {% if schema.kind == "autocomplete-many" %}multiple{% else %}name="{{ field_name }}"{% endif %} data-related-results{% if schema.required %} required{% endif %}><option value="{{ current_value }}">{{ current_value or 'Select a record' }}</option></select>
+<button type="button" data-related-more hidden>More results</button><small role="status" data-related-status></small>
+</span>
+{% elif schema.kind == 'many' %}
+<input type="hidden" name="{{ field_name }}" value="{{ current_value or '[]' }}" data-many-value>
+<select multiple aria-label="Related records" data-many-picker>
+{% for value, label in schema.choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+</select>
 {% elif schema.kind == 'checkbox' %}
 <input type="hidden" name="{{ field_name }}" value="false">
 <input type="checkbox" name="{{ field_name }}" value="true"{% if current_value|string|lower in ['true', '1'] %} checked{% endif %}>
@@ -12,5 +26,5 @@
 {% for value, label in schema.choices %}<option value="{{ value }}"{% if current_value|string == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
 </select>
 {% else %}
-<input name="{{ field_name }}" type="{{ schema.kind }}" value="{{ current_value }}"{% if schema.required %} required{% endif %}{% if schema.max_length %} maxlength="{{ schema.max_length }}"{% endif %}{% if schema.kind == 'number' %} step="any"{% endif %}>
+<input name="{{ field_name }}" type="{{ schema.kind }}" value="{{ (current_value|string|replace(' ', 'T'))[:16] if schema.kind == 'datetime-local' else current_value }}"{% if schema.required %} required{% endif %}{% if schema.max_length %} maxlength="{{ schema.max_length }}"{% endif %}{% if schema.kind == 'number' %} step="any"{% endif %}>
 {% endif %}

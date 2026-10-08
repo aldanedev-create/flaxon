@@ -4,7 +4,7 @@ import json
 from typing import Any
 
 from flaxon.http import HTMLResponse, RedirectResponse, Request
-from flaxon.exceptions import Conflict
+from flaxon.exceptions import Conflict, BadRequest
 from .registry import evaluate_permission_hook
 
 class AdminView:
@@ -12,6 +12,32 @@ class AdminView:
         self.admin_model = admin_model
         self.request = request
         self.dashboard = dashboard
+
+    async def invalid_form(self, error, data, template, obj=None):
+        adapter = self.admin_model.model
+        schema = await adapter.form_schema() if hasattr(adapter, "form_schema") else {}
+        context = {"model": self.admin_model, "models": self.dashboard.registry.get_all(),
+                   "verbose_name": self.admin_model.get_verbose_name(), "fields": self.admin_model.fields,
+                   "readonly_fields": self.admin_model.readonly_fields, "form_schema": schema,
+                   "field_values": data, "field_raw_values": data,
+                   "field_errors": getattr(error, "field_errors", {}), "form_error": str(error),
+                   "user": getattr(self.request, "user", None), "object": obj,
+                   "object_id": getattr(self, "object_id", ""),
+                   "version": await adapter.version(obj) if obj is not None and hasattr(adapter, "version") else "",
+                   "verbose_name_plural": self.admin_model.get_verbose_name_plural(),
+                   "record_label": str(getattr(obj, "pk", "")), "history_count": 0, "history_entries": [],
+                   "last_modified": "", "can_delete": False,
+                   "inline_schema": await adapter.inline_schema(obj) if hasattr(adapter, "inline_schema") else {}}
+        for name, inline in context["inline_schema"].items():
+            submitted = data.get(f"_inline_{name}")
+            if isinstance(submitted, str):
+                try:
+                    rows = json.loads(submitted)
+                    if isinstance(rows, list) and len(rows) <= 100:
+                        inline["rows"] = json.dumps(rows)
+                except ValueError:
+                    pass
+        return await self.dashboard.jinax.render_response(template, context, status_code=400)
 
     async def render(self) -> HTMLResponse | RedirectResponse:
         raise NotImplementedError
@@ -68,7 +94,7 @@ class ChangeListView(AdminView):
         # Object-level read rules are applied after the adapter query so
         # custom Admin models can keep their data source unchanged.
         hook = self.admin_model.get_permission_hook("read")
-        if hook is not None:
+        if hook is not None and not hasattr(model_class, "orm_model"):
             visible = []
             for obj in objects:
                 allowed = await evaluate_permission_hook(hook, getattr(self.request, "user", None), obj)
@@ -79,7 +105,6 @@ class ChangeListView(AdminView):
                 query_result = {**query_result, "total": len(visible), "pages": page + int(len(objects) == per_page)}
 
         context = {
-            "form_schema": await self.admin_model.model.form_schema() if hasattr(self.admin_model.model, "form_schema") else {},
             "model": self.admin_model,
             "models": self.dashboard.registry.get_all(),
             "objects": objects,
@@ -135,7 +160,6 @@ class DetailView(AdminView):
             obj = await result if hasattr(result, "__await__") else result
 
         context = {
-            "form_schema": await self.admin_model.model.form_schema() if hasattr(self.admin_model.model, "form_schema") else {},
             "model": self.admin_model,
             "models": self.dashboard.registry.get_all(),
             "object": obj,
@@ -165,9 +189,12 @@ class CreateView(AdminView):
             model_class = self.admin_model.model
             result = None
             if hasattr(model_class, "create_instance"):
-                result = model_class.create_instance(form_data)
-                if hasattr(result, "__await__"):
-                    result = await result
+                try:
+                    result = model_class.create_instance(form_data)
+                    if hasattr(result, "__await__"):
+                        result = await result
+                except BadRequest as exc:
+                    return await self.invalid_form(exc, form_data, "admin/add.html")
             record_id = str(result.get("id", "")) if isinstance(result, dict) else str(getattr(result, "pk", ""))
             self.dashboard.record_activity("created", self.admin_model.get_name(), self.request, record_id)
 
@@ -177,6 +204,7 @@ class CreateView(AdminView):
             )
 
         context = {
+            "inline_schema": await self.admin_model.model.inline_schema(locals().get("obj")) if hasattr(self.admin_model.model, "inline_schema") else {},
             "form_schema": await self.admin_model.model.form_schema() if hasattr(self.admin_model.model, "form_schema") else {},
             "model": self.admin_model,
             "models": self.dashboard.registry.get_all(),
@@ -244,11 +272,13 @@ class UpdateView(AdminView):
             }
 
             expected_version = form_data.pop("_version", None)
+            if hasattr(model_class, "version") and not expected_version:
+                raise BadRequest("Reload the edit form before saving; its record version is required")
             save_mode = str(form_data.pop("_save", "list"))
             readonly_fields = set(self.admin_model.readonly_fields) | {"id"}
             form_data = {key: value for key, value in form_data.items() if key not in readonly_fields}
             current = await self._get_object()
-            if expected_version not in (None, ""):
+            if expected_version not in (None, "") and not hasattr(model_class, "version"):
                 current_version = current.get("updated_at") if isinstance(current, dict) else getattr(current, "updated_at", None) if current is not None else None
                 if str(expected_version) != str(current_version):
                     raise Conflict("This record was changed by another user. Reload before saving.")
@@ -256,9 +286,12 @@ class UpdateView(AdminView):
             before = self._snapshot(current)
             result = None
             if hasattr(model_class, "update_instance"):
-                result = model_class.update_instance(self.object_id, form_data)
-                if hasattr(result, "__await__"):
-                    result = await result
+                try:
+                    result = model_class.update_instance(self.object_id, form_data, expected_version=expected_version) if hasattr(model_class, "version") else model_class.update_instance(self.object_id, form_data)
+                    if hasattr(result, "__await__"):
+                        result = await result
+                except BadRequest as exc:
+                    return await self.invalid_form(exc, form_data, "admin/edit.html", current)
             after = self._snapshot(result if result is not None else await self._get_object())
             details = {"before": before, "after": after} if before or after else {}
             self.dashboard.record_activity(
@@ -293,6 +326,11 @@ class UpdateView(AdminView):
             else:
                 field_values[field] = str(value)
 
+        if hasattr(model_class, "relationship_fields"):
+            from tortoise.fields.relational import ManyToManyFieldInstance
+            for name, relation in model_class.relationship_fields.items():
+                if isinstance(relation, ManyToManyFieldInstance):
+                    field_values[name] = json.dumps([str(row.pk) for row in await getattr(obj, name).all()])
         entries = [
             item.to_dict()
             for item in self.dashboard.activities
@@ -306,6 +344,7 @@ class UpdateView(AdminView):
         last_modified = field_values.get("updated_at") or field_values.get("created_at") or ""
 
         context = {
+            "inline_schema": await self.admin_model.model.inline_schema(locals().get("obj")) if hasattr(self.admin_model.model, "inline_schema") else {},
             "form_schema": await self.admin_model.model.form_schema() if hasattr(self.admin_model.model, "form_schema") else {},
             "model": self.admin_model,
             "models": self.dashboard.registry.get_all(),
@@ -315,7 +354,7 @@ class UpdateView(AdminView):
             "fields": self.admin_model.fields,
             "verbose_name_plural": self.admin_model.get_verbose_name_plural(),
             "readonly_fields": self.admin_model.readonly_fields,
-            "version": (obj.get("updated_at") if isinstance(obj, dict) else getattr(obj, "updated_at", "")) if obj is not None else "",
+            "version": await model_class.version(obj) if hasattr(model_class, "version") else (obj.get("updated_at") if isinstance(obj, dict) else getattr(obj, "updated_at", "")) if obj is not None else "",
             "user": getattr(self.request, "user", None),
             "can_delete": self.dashboard.can_access_model(getattr(self.request, "user", None), self.admin_model.get_name(), "delete"),
             "field_values": field_values,
@@ -357,12 +396,12 @@ class DeleteView(AdminView):
             obj = await result if hasattr(result, "__await__") else result
 
         context = {
-            "form_schema": await self.admin_model.model.form_schema() if hasattr(self.admin_model.model, "form_schema") else {},
             "model": self.admin_model,
             "models": self.dashboard.registry.get_all(),
             "verbose_name": self.admin_model.get_verbose_name(),
             "object_id": self.object_id,
             "object": obj,
+            "deletion_preview": await model_class.deletion_preview(self.object_id) if hasattr(model_class, "deletion_preview") else [],
             "fields": self.admin_model.fields,
             "user": getattr(self.request, "user", None),
         }

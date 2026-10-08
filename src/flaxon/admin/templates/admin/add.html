@@ -27,9 +27,11 @@
           <p class="corporate-muted">Use plain values for scalar fields. JSON, relationship, and repeater fields accept valid JSON.</p>
         </div>
       </div>
+      {% if form_error is defined and form_error %}<p role="alert">{{ form_error }}</p>{% endif %}
       <div class="record-fields">
         {% for field in form_fields %}
         {% set field_name = field|string %}
+        {% for group, names in model.fieldsets.items() %}{% if field_name == names[0] %}<h3>{{ group }}</h3>{% endif %}{% endfor %}
         {% set field_key = field_name|lower %}
         {% set is_readonly = (readonly_fields is defined and field_name in readonly_fields) or field_key == 'id' %}
         {% set is_long = field_key in ['description', 'content', 'body', 'notes', 'excerpt', 'summary'] %}
@@ -40,8 +42,9 @@
         </span>
         {% if field_name in form_schema %}
         {% set schema = form_schema[field_name] %}
-        {% set current_value = schema.default if schema.default is not none else "" %}
+        {% set current_value = field_values.get(field_name, schema.default if schema.default is not none else "") if field_values is defined else (schema.default if schema.default is not none else "") %}
         {% include "admin/orm_field.html" %}
+        {% if field_errors is defined and field_name in field_errors %}<small role="alert">{{ field_errors[field_name] }}</small>{% endif %}
         {% elif is_long or is_json %}
         <textarea name="{{ field_name }}" rows="6" {% if is_readonly %}readonly{% endif %} placeholder="{% if is_json %}{&quot;key&quot;: &quot;value&quot;}
         {% else %}Enter {{ field_name|replace('_', ' ') }}...{% endif %}"{% if is_json %} data-json-field{% endif %}>
@@ -76,6 +79,7 @@
       {% endfor %}
     
     </div>
+    {% if inline_schema is defined %}{% include "admin/inlines.html" %}{% endif %}
     <div class="corporate-form-actions">
       <button type="submit" class="corporate-button corporate-button-primary">
         <i class="fas fa-plus"></i>
@@ -106,4 +110,5 @@
 {% endblock %}
 {% block extra_scripts %}<script>
 document.querySelectorAll('[data-json-field]').forEach(field => field.addEventListener('blur', () => { if (!field.value.trim()) { field.setCustomValidity(''); return; } try { JSON.parse(field.value); field.setCustomValidity(''); } catch (_) { field.setCustomValidity('Enter valid JSON before saving.'); } }));
-</script>{% endblock %}
+</script>{% include "admin/relationship_script.html" %}
+{% endblock %}

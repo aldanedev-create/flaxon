@@ -37,9 +37,11 @@
           <div><p class="corporate-kicker">Record details</p><h2>Editable fields</h2><p class="corporate-muted">Changes are checked again by the server before they are saved.</p></div>
           <span class="corporate-badge corporate-badge-neutral">ID {{ object_id }}</span>
         </div>
-        <div class="record-fields">
+        {% if form_error is defined and form_error %}<p role="alert">{{ form_error }}</p>{% endif %}
+      <div class="record-fields">
           {% for field in form_fields %}
           {% set field_name = field|string %}
+        {% for group, names in model.fieldsets.items() %}{% if field_name == names[0] %}<h3>{{ group }}</h3>{% endif %}{% endfor %}
           {% set field_key = field_name|lower %}
           {% set current_value = field_values.get(field_name, '') %}
           {% set raw_value = field_raw_values.get(field_name) %}
@@ -56,6 +58,7 @@
             {% if field_name in form_schema %}
             {% set schema = form_schema[field_name] %}
             {% include "admin/orm_field.html" %}
+        {% if field_errors is defined and field_name in field_errors %}<small role="alert">{{ field_errors[field_name] }}</small>{% endif %}
             {% elif is_readonly %}
             <div class="edit-readonly-value" id="edit-{{ field_key }}">{{ current_value or 'Not set' }}</div>
             {% elif is_boolean %}
@@ -89,7 +92,8 @@
 
       <div class="edit-save-bar">
         <div><strong>Ready to save?</strong><span data-dirty-indicator>No unsaved changes</span></div>
-        <div class="corporate-form-actions">
+        {% if inline_schema is defined %}{% include "admin/inlines.html" %}{% endif %}
+    <div class="corporate-form-actions">
           <button type="submit" name="_save" value="continue" class="corporate-button corporate-button-muted"><i class="fas fa-check-double"></i><span>Save and continue</span></button>
           <button type="submit" name="_save" value="add" class="corporate-button corporate-button-muted"><i class="fas fa-plus"></i><span>Save and add another</span></button>
           <button type="submit" name="_save" value="list" class="corporate-button corporate-button-primary"><i class="fas fa-save"></i><span>Save changes</span></button>
@@ -176,4 +180,5 @@
   });
 }());
 </script>
+{% include "admin/relationship_script.html" %}
 {% endblock %}

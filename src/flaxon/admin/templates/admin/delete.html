@@ -62,4 +62,5 @@ Delete {{ verbose_name }}
 const acknowledgement = document.getElementById('delete-acknowledge'); 
 const submit = document.getElementById('delete-submit');
  acknowledgement.addEventListener('change', () => { submit.disabled = !acknowledgement.checked; });
-</script>{% endblock %}
+</script>{% if deletion_preview is defined and deletion_preview %}<section><h2>Related records affected</h2><ul>{% for item in deletion_preview %}<li>{{ item.relation }}: {{ item.count }} ({{ item.behavior }})</li>{% endfor %}</ul><p>Database relationship rules determine whether deletion is allowed.</p></section>{% endif %}
+{% endblock %}

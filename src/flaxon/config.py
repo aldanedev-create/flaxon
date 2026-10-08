@@ -57,6 +57,7 @@ class Settings:
         self.values.setdefault("ADMIN_ENABLED", True)
         self.values.setdefault("CMS_ENABLED", True)
         self.values.setdefault("ADMIN_SERVICES_ENABLED", False)
+        self.values.setdefault("ADMIN_STORE_BACKEND", "sqlite")
         self.values.setdefault("ADMIN_STORAGE_PATH", self.root / "data/admin.sqlite3")
         self.validate()
 
@@ -67,6 +68,8 @@ class Settings:
             raise AttributeError(key) from exc
 
     def validate(self) -> None:
+        if self.ADMIN_STORE_BACKEND not in {"sqlite", "orm"}:
+            raise ValueError("ADMIN_STORE_BACKEND must be sqlite or orm")
         if type(self.DEBUG) is not bool:
             raise ValueError("DEBUG must be a bool; use env.bool()")
         if not isinstance(self.ALLOWED_HOSTS, (list, tuple)) or not self.ALLOWED_HOSTS:

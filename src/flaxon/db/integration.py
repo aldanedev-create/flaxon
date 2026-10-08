@@ -39,6 +39,8 @@ class Database:
                 "default_connection": "default",
                 "migrations": module.migrations_module or f"{module.models_module.rsplit('.', 1)[0]}.migrations",
             }
+        if getattr(self.settings, "ADMIN_STORE_BACKEND", "sqlite") == "orm":
+            apps["flaxon_admin"] = {"models": ["flaxon.db.storemodels"], "default_connection": "default", "migrations": "admin_migrations"}
         if not apps:
             raise ValueError("Create models.py or declare models_module on a mounted FlaxonModule")
         return {"connections": {"default": self.settings.DATABASE_URL}, "apps": apps, "use_tz": True, "timezone": self.settings.TIME_ZONE}

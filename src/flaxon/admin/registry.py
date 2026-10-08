@@ -22,7 +22,15 @@ class AdminModel:
         can_change: Any | None = None,
         can_delete: Any | None = None,
         validate_import: Any | None = None,
+        queryset: Any | None = None,
+        fieldsets: dict[str, list[str]] | None = None,
+        widgets: dict[str, str] | None = None,
+        inlines: dict[str, Any] | None = None,
     ) -> None:
+        self.fieldsets = fieldsets or {}
+        self.widgets = widgets or {}
+        self.inlines = inlines or {}
+        self.queryset = queryset
         self.model = model
         self.list_display = list_display or ["__str__"]
         self.list_filter = list_filter or []
@@ -86,6 +94,8 @@ class Registry:
         if isinstance(model, type) and issubclass(model, Model):
             from flaxon.db.admin import model_adapter
             model = model_adapter(model, options)
+        if hasattr(model, "orm_model"):
+            model.registry = self
         admin_model = AdminModel(model, **options)
         self._models[admin_model.get_name()] = admin_model
         self._model_classes[model] = admin_model.get_name()
@@ -120,6 +130,8 @@ default_registry = Registry()
 
 async def evaluate_permission_hook(hook, user, target=None):
     """Support both model hooks (user) and object hooks (user, object)."""
+    if hook is None:
+        return True
     import inspect
     signature = inspect.signature(hook)
     if target is None:
