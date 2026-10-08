@@ -25,16 +25,16 @@ class Console:
         return f"{self._colors.get(color, '')}{text}{self._colors['reset']}"
 
     def info(self, message: str) -> None:
-        print(self._colorize(message, "blue"))
+        print(self._colorize(message, "blue"), flush=True)
 
     def success(self, message: str) -> None:
-        print(self._colorize(message, "green"))
+        print(self._colorize(message, "green"), flush=True)
 
     def warning(self, message: str) -> None:
-        print(self._colorize(message, "yellow"))
+        print(self._colorize(message, "yellow"), flush=True)
 
     def error(self, message: str) -> None:
-        print(self._colorize(message, "red"), file=sys.stderr)
+        print(self._colorize(message, "red"), file=sys.stderr, flush=True)
 
     def debug(self, message: str) -> None:
         print(self._colorize(message, "cyan"))

@@ -288,3 +288,12 @@ Admin bundles Alpine.js 3.14.3 with its MIT license so the CMS and core Admin
 interactions do not require downloading that runtime from a CDN. Cosmetic fonts,
 icons and Tailwind enhancements still reference external assets. Browser
 regression tests block those external requests and exercise the local controls.
+
+
+## Admin/CMS and database adapters
+
+The ORM lifecycle object at `app.db` is not the older SQL adapter interface.
+Admin and CMS use their durable AdminStore by default; they only automatically
+use a legacy database object implementing both `execute()` and `fetch_all()`.
+Choose `ADMIN_STORE_BACKEND = "orm"` explicitly to store metadata through the ORM.
+Do not pass the lifecycle object as `database=` to AdminDashboard or CMS.

@@ -1,5 +1,49 @@
 # Configuration
 
+## Generated projects: settings.py
+
+Use `Flaxon.from_settings("settings")` in `app.py`. Both the application and
+`management.py` read this same module. `env.load()` reads `.env`; existing process
+environment variables take precedence. Only values read with `env.str()`,
+`env.bool()`, or `env.list()` are taken from the environment in this workflow.
+Do not assume every setting automatically maps to a `FLAXON_` variable.
+
+```python
+from pathlib import Path
+from flaxon.config import env
+
+BASE_DIR = Path(__file__).resolve().parent
+env.load(BASE_DIR / ".env")
+PROJECT_NAME = "project_manager"
+DEBUG = env.bool("FLAXON_DEBUG", default=True)
+SECRET_KEY = env.str("FLAXON_SECRET_KEY")
+DATABASE_URL = env.str("DATABASE_URL", default=f"sqlite://{BASE_DIR / 'data/app.sqlite3'}")
+ALLOWED_HOSTS = env.list("FLAXON_ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
+CSRF_TRUSTED_ORIGINS = env.list("FLAXON_CSRF_TRUSTED_ORIGINS", default=[])
+TIME_ZONE = "UTC"
+ADMIN_ENABLED = True
+CMS_ENABLED = True
+ADMIN_SERVICES_ENABLED = False
+ADMIN_STORE_BACKEND = "sqlite"
+ADMIN_STORAGE_PATH = BASE_DIR / "data/admin.sqlite3"
+```
+
+`DEBUG=False` requires a persistent secret of at least 32 characters and explicit
+allowed hosts. Origins include the scheme and host, without a path. Starting the
+server opens connections and never changes the model schema. Run `makemigrations`,
+review and commit Python migrations, then run `migrate`.
+
+Use `app.settings` for validated project settings. Mount feature modules explicitly
+in `app.py`; do not put executable module composition in `settings.py`.
+
+See [ORM and management](guides/orm.md) for PostgreSQL, model discovery, transactions,
+Admin registration and the optional ORM metadata store.
+
+## Lower-level configuration
+
+The sections below describe the independent `Flaxon(...)` / `Config` API, retained
+for backend-only applications. They do not replace the generated settings workflow.
+
 ## Overview
 
 Flaxon provides a flexible configuration system designed for development and production environments.

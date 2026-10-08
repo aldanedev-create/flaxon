@@ -1,11 +1,47 @@
 
 # Databases
 
+## Default project workflow
+
+Generated projects use Flaxon's thin Tortoise ORM integration. Define tables in
+root `models.py` or declare a mounted module's `models_module`. Configure
+`DATABASE_URL` in `settings.py` and construct the application with
+`Flaxon.from_settings()`. The connection lifecycle belongs to the application.
+
+```python
+from flaxon.db import Model, fields
+
+class Project(Model):
+    id = fields.IntField(primary_key=True)
+    name = fields.CharField(max_length=120)
+```
+
+```bash
+python management.py check
+python management.py makemigrations
+python management.py migrate --plan
+python management.py migrate
+python management.py migrate --status
+```
+
+```python
+project = await Project.create(name="First project")
+projects = await Project.all().order_by("-id")
+```
+
+Read the [complete ORM guide](orm.md) before configuring relationships, transactions
+or Admin. Commit generated Python migrations. Server startup never creates or
+changes domain tables. JSON migrations belong to the older adapter workflow below;
+they are not needed by a new ORM project. Existing populated databases require a
+planned migration transition and backups, rather than replacing their history.
+
+## Other database approaches
+
 ## Overview
 
 Flaxon is database-agnostic.
 
-It does not force a specific database, ORM, or data access pattern. Developers can use any database technology that works with Python.
+The default starter uses Tortoise; backend-only applications may choose another database, ORM, or data access pattern. Developers can use any database technology that works with Python.
 
 Supported approaches include:
 

@@ -62,7 +62,7 @@ Result: 1 warning(s), 0 failure(s)
 
 Scaffolds a modular Flaxon + Teloce welcome application by default, including TypeScript, scoped component styles, a Python API, SQLite migrations, and a protected admin.
 
-After generation, install the project, run `python management.py migrate`, and create your administrator with `python management.py setup-admin`. There is no default password. The generated project also includes `flaxon welcome` and `flaxon welcome-status`, registered by its welcome module through `flaxon_cli.py`. Use `--template basic` for the smaller API-only starter. See [getting started](../getting-started.md) for the complete workflow.
+After generation, install the project, run `python management.py makemigrations` and `python management.py migrate`, and create your administrator with `python management.py setup-admin`. There is no default password. The generated project also includes `flaxon welcome` and `flaxon welcome-status`, registered by its welcome module through `flaxon_cli.py`. Use `--template basic` for the smaller API-only starter. See [getting started](../getting-started.md) for the complete workflow.
 
 ```bash
 flaxon new my-project
@@ -199,3 +199,17 @@ Prints the installed version.
 $ flaxon --version
 Flaxon 0.1.4
 ```
+
+## Project creation progress
+
+`flaxon new` generates files locally and creates a virtual environment. It does
+not download application dependencies: the printed `pip install -e .` step does
+that separately. Environment creation prints a heartbeat while Python installs
+pip and stops after 120 seconds with recovery instructions. The project files
+remain available if that step fails. In an active environment, use
+`flaxon new project_manager --no-venv` to skip creating another one.
+
+`new` and version commands do not import the current project's custom CLI module
+or application. Other commands still discover custom commands once. Keep
+`flaxon_cli.py` limited to command declarations; import expensive services inside
+a command handler.

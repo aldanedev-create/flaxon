@@ -9,9 +9,11 @@ python -m pip install "flaxon[standard]"
 flaxon new my-project
 cd my-project
 python -m pip install -e .
+python management.py check
+python management.py makemigrations
 python management.py migrate
 python management.py setup-admin
-flaxon run
+python management.py runserver
 ```
 
 The default starter welcomes you at `/`, demonstrates a module-owned Python API from TypeScript, and includes a protected `/admin`. Try `/server-page` for the complete Jinax example, and run `flaxon welcome` or `flaxon welcome-status` for module-owned custom commands. Choose Flaxon + Jinax for server-rendered applications, Flaxon + Teloce for interactive interfaces, or combine them. There is no default administrator password. Read [getting started](getting-started.md) for virtual environments, project files, command details, and deployment boundaries.
@@ -23,7 +25,15 @@ The default starter welcomes you at `/`, demonstrates a module-owned Python API 
 3. **Organize features:** [modules](guides/Modules.md), [navigation](fullstack/06-routing.md), and [admin/CMS](guides/admin-cms.md).
 4. **Ship responsibly:** [testing](guides/testing.md), [security](security.md), [production](fullstack/10-production.md), and [deployment](deployment.md).
 
-## Ten full-stack lessons
+## Build a complete project manager
+
+Follow the [copy-and-paste ebook course](fullstack/project-manager/index.md).
+Start with `flaxon new project_manager`, then build working authentication,
+owned projects, tasks, a Teloce HTML SPA with scoped CSS and signals, staff Admin,
+CMS help content, tests and Render deployment. Every chapter names the files to
+create or replace and includes the complete code and verification commands.
+
+## Ten full-stack concept lessons
 
 Work through [the course overview](fullstack/index.md), then follow these lessons:
 
@@ -166,3 +176,33 @@ Use the guides for explanations, the API pages for reference, and the examples f
 - [Flaxon VS Code Extension - Quick Cheat Sheet](vs%20Code%20%28Extension%29/Quick%20Cheat%20Sheet.md)
 
 - [ORM, settings, and management commands](guides/orm.md)
+
+- [01 | Preview and CLI setup](fullstack/project-manager/01.md)
+
+- [02 | Settings, management and application composition](fullstack/project-manager/02.md)
+
+- [03 | Models and Python migrations](fullstack/project-manager/03.md)
+
+- [04 | Customer authentication and sessions](fullstack/project-manager/04.md)
+
+- [05 | Owned project APIs](fullstack/project-manager/05.md)
+
+- [06 | Task workflow](fullstack/project-manager/06.md)
+
+- [07 | Backend tests](fullstack/project-manager/07.md)
+
+- [08 | Teloce HTML shell and scoped CSS](fullstack/project-manager/08.md)
+
+- [09 | Login and project screens](fullstack/project-manager/09.md)
+
+- [10 | Task components, signals and progress](fullstack/project-manager/10.md)
+
+- [11 | SPA routing and direct refresh](fullstack/project-manager/11.md)
+
+- [12 | Staff Admin](fullstack/project-manager/12.md)
+
+- [13 | CMS help and sample data](fullstack/project-manager/13.md)
+
+- [14 | Full-stack verification](fullstack/project-manager/14.md)
+
+- [15 | Production build and Render](fullstack/project-manager/15.md)

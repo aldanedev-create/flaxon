@@ -1,5 +1,10 @@
 # Deployment
 
+For generated projects, use the shared `settings.py`, `Flaxon.from_settings()`,
+explicit mounts in `app.py`, and `management.py` workflow. See [ORM and project management](guides/orm.md)
+for Python migrations, model registration, permission hooks, relationship editing,
+and Admin/CMS metadata storage. Backend-only and legacy adapter examples remain supported.
+
 ## Overview
 
 Flaxon applications can be deployed in a variety of environments, from a simple development server to scalable production deployments using multiple workers, Docker, reverse proxies, and cloud platforms.

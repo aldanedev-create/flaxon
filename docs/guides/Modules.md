@@ -1,5 +1,10 @@
 # Modules Guide
 
+For generated projects, use the shared `settings.py`, `Flaxon.from_settings()`,
+explicit mounts in `app.py`, and `management.py` workflow. See [ORM and project management](orm.md)
+for Python migrations, model registration, permission hooks, relationship editing,
+and Admin/CMS metadata storage. Backend-only and legacy adapter examples remain supported.
+
 `flaxon/modules.py` adds a Flask-blueprint-style composition unit to
 Flaxon: `FlaxonModule`. It's one file, drops into an existing Flaxon
 install with no other changes, and is built entirely on Flaxon's own

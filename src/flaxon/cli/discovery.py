@@ -6,6 +6,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Any
+
 from .base import Command
 from .commands import (
     BuildCommand,
@@ -44,8 +45,11 @@ class CommandDiscovery:
             WorkerCommand(),
         ]
 
-    def discover(self) -> list[Command]:
+    def discover(self, *, include_project: bool = True) -> list[Command]:
         commands = list(self._builtin_commands)
+
+        if not include_project:
+            return commands
 
         cwd = os.getcwd()
         if cwd not in sys.path:

@@ -388,7 +388,12 @@ class CMS:
         self.allow_unauthenticated = allow_unauthenticated
         self.csrf = csrf
         self.store = getattr(app, "_flaxon_admin_store", None)
-        self.database = database or getattr(app, "database", None) or getattr(app, "db", None)
+        # The ORM lifecycle object is not the legacy SQL adapter. Metadata uses
+        # the dashboard's AdminStore unless a compatible SQL adapter is supplied.
+        candidate = database or getattr(app, "database", None) or getattr(app, "db", None)
+        self.database = candidate if all(callable(getattr(candidate, method, None)) for method in ("execute", "fetch_all")) else None
+        if database is not None and self.database is None:
+            raise TypeError("database must implement execute() and fetch_all(); use AdminStore for ORM metadata")
         self.publish_interval = max(1.0, publish_interval)
         self.redis_url = redis_url
         self.redis_protocol = redis_protocol
