@@ -164,3 +164,5 @@ Use the guides for explanations, the API pages for reference, and the examples f
 - [Flaxon VS Code Extension - Features Guide](vs%20Code%20%28Extension%29/features.md)
 - [Flaxon VS Code Extension - Getting Started](vs%20Code%20%28Extension%29/getting-started.md)
 - [Flaxon VS Code Extension - Quick Cheat Sheet](vs%20Code%20%28Extension%29/Quick%20Cheat%20Sheet.md)
+
+- [ORM, settings, and management commands](guides/orm.md)

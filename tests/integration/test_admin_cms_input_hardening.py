@@ -14,7 +14,7 @@ from flaxon.testing import TestClient
 
 def _client():
     app = Flaxon("cms-input-hardening")
-    CMS(app, auth=None)
+    CMS(app, auth=None, allow_unauthenticated=True)
     return TestClient(app)
 
 

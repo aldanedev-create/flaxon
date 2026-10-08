@@ -40,6 +40,8 @@ class Generator:
         starter = Path(__file__).with_name("starter")
         for source in sorted(starter.rglob("*.tmpl")):
             relative = source.relative_to(starter).with_suffix("")
+            if relative.name == "env.example":
+                relative = relative.with_name(".env.example")
             if relative.name == "gitignore":
                 relative = relative.with_name(".gitignore")
             target = directory / relative

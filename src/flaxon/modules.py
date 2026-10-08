@@ -92,7 +92,13 @@ class FlaxonModule:
         static_dir: str | None = None,
         ui_dir: str | Path | None = None,
         ui_routes: dict[str, str] | None = None,
+        models_module: str | None = None,
+        admin_module: str | None = None,
+        migrations_module: str | None = None,
     ) -> None:
+        self.models_module = models_module
+        self.admin_module = admin_module
+        self.migrations_module = migrations_module
         self.name = name
         self.router = Router()  # unprefixed -- prefix decided at mount time
         self.template_dir = template_dir
@@ -324,6 +330,12 @@ def _merge_module(app: Any, module: FlaxonModule, prefix: str, mount_name: str, 
             f"Module '{module.name}' requires {missing!r} in app.container, "
             f"but they aren't registered. Register them before mounting."
         )
+
+    orm_modules = getattr(app, "_orm_modules", None)
+    if orm_modules is None:
+        app._orm_modules = orm_modules = []
+    if module not in orm_modules:
+        orm_modules.append(module)
 
     wrapped_router = Router(prefix=module.router.prefix)
     for source in module.router.routes:

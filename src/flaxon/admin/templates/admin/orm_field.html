@@ -1,0 +1,16 @@
+{# Typed ORM fields; legacy custom models retain their existing templates. #}
+{% if is_readonly %}
+<input name="{{ field_name }}" value="{{ current_value }}" readonly>
+{% elif schema.kind == 'checkbox' %}
+<input type="hidden" name="{{ field_name }}" value="false">
+<input type="checkbox" name="{{ field_name }}" value="true"{% if current_value|string|lower in ['true', '1'] %} checked{% endif %}>
+{% elif schema.kind == 'textarea' %}
+<textarea name="{{ field_name }}" rows="6"{% if schema.required %} required{% endif %}>{{ current_value }}</textarea>
+{% elif schema.kind == 'select' %}
+<select name="{{ field_name }}"{% if schema.required %} required{% endif %}>
+<option value="">Select a related record</option>
+{% for value, label in schema.choices %}<option value="{{ value }}"{% if current_value|string == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+</select>
+{% else %}
+<input name="{{ field_name }}" type="{{ schema.kind }}" value="{{ current_value }}"{% if schema.required %} required{% endif %}{% if schema.max_length %} maxlength="{{ schema.max_length }}"{% endif %}{% if schema.kind == 'number' %} step="any"{% endif %}>
+{% endif %}

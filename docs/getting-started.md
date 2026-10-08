@@ -15,9 +15,11 @@ python -m pip install "flaxon[standard]"
 flaxon new my-project
 cd my-project
 python -m pip install -e .
+python management.py check
+python management.py makemigrations
 python management.py migrate
 python management.py setup-admin
-flaxon run
+python management.py runserver
 ```
 
 Open **http://127.0.0.1:8000/**. The welcome page's **Try your Python API** button calls `/api/welcome/status` through a TypeScript helper. Open `/admin/login` to sign in with the account you created.
@@ -39,14 +41,15 @@ For a Jinax-only application, keep `app.use_templates(...)`, remove `app.use_tel
 | `app.py` | Compose the application, mount the module, configure Teloce, and serve `/`. |
 | `templates/welcome.html` | Complete Jinax HTML page at `/server-page`. |
 | `flaxon_cli.py` | Register custom commands owned by your feature modules. |
-| `settings.py` | Project paths, SQLite location, and development mode. |
+| `settings.py` | Shared database URL, security, paths, and enabled features. |
 | `modules/welcome/module.py` | Your first module-owned Python API. |
 | `modules/welcome/ui/Welcome.html` | Welcome component with `lang="ts"` and scoped CSS. |
 | `modules/welcome/ui/api.ts` | Typed browser helper for the module API. |
 | `ui/app.html` | Root component importing the welcome interface. |
 | `public/` | Global CSS and favicon served at `/assets`. |
 | `management.py` | Project-local migrations and administrator creation. |
-| `migrations/0001_project_notes.json` | Example migration creating a project notes table. |
+| `models.py` / `admin.py` | ORM schema and explicit Admin registration. |
+| `migrations/` | Generated Python migrations from model changes. |
 | `data/` | Local database and uploads; excluded from Git. |
 
 Teloce compiles the browser code; Flaxon handles requests, Python modules, persistence, and administration. The welcome example does not need a separate Node development server.
@@ -70,7 +73,7 @@ The welcome page links to the [documentation website](https://flaxon-website.ver
 2. Update `api.ts` to call that endpoint and describe its response with a TypeScript interface.
 3. Update `Welcome.html` to show the result. Its scoped styles belong to the component.
 4. Add a module for each feature and mount it in `app.py`. Keep its UI beside its Python routes.
-5. Add migrations for database schema changes, then run `python management.py migrate`.
+5. Edit models, run `python management.py makemigrations`, review the generated Python migration, then run `python management.py migrate`.
 
 Check migration status with `python management.py migrate --status`. `python management.py createsuperuser` is an alias for `setup-admin`; existing usernames are never overwritten. Run `python management.py --help` for command help.
 
@@ -91,3 +94,5 @@ Follow the [ten full-stack lessons](fullstack/index.md) in order, from your firs
 | Complete reference and examples | [All documentation](index.md#complete-documentation-directory) |
 
 Before deployment, set `FLAXON_DEBUG=0`, use HTTPS, review permissions, back up `data/`, and follow the deployment and production-admin guides. The starter uses local SQLite and local uploads for a single application instance. Deploy the project sources or an editable installation; packaging your own application as a wheel requires including its UI and public files.
+
+See [ORM and settings](guides/orm.md) for the complete management workflow and legacy migration transition.

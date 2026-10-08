@@ -38,7 +38,11 @@
         <span>{{ field_name|replace('_', ' ')|title }}{% if field_key in ['name', 'title', 'slug', 'email'] %}<b>*</b>
           {% endif %}
         </span>
-        {% if is_long or is_json %}
+        {% if field_name in form_schema %}
+        {% set schema = form_schema[field_name] %}
+        {% set current_value = schema.default if schema.default is not none else "" %}
+        {% include "admin/orm_field.html" %}
+        {% elif is_long or is_json %}
         <textarea name="{{ field_name }}" rows="6" {% if is_readonly %}readonly{% endif %} placeholder="{% if is_json %}{&quot;key&quot;: &quot;value&quot;}
         {% else %}Enter {{ field_name|replace('_', ' ') }}...{% endif %}"{% if is_json %} data-json-field{% endif %}>
 

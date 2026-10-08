@@ -53,7 +53,10 @@
           <div class="corporate-field record-field {% if is_long or is_json %}record-field-wide{% endif %}{% if is_readonly %} is-readonly{% endif %}">
             <div class="edit-field-label"><label for="edit-{{ field_key }}">{{ field_name|replace('_', ' ')|title }}</label>{% if is_readonly %}<span class="corporate-badge corporate-badge-neutral">Read-only</span>{% endif %}</div>
 
-            {% if is_readonly %}
+            {% if field_name in form_schema %}
+            {% set schema = form_schema[field_name] %}
+            {% include "admin/orm_field.html" %}
+            {% elif is_readonly %}
             <div class="edit-readonly-value" id="edit-{{ field_key }}">{{ current_value or 'Not set' }}</div>
             {% elif is_boolean %}
             <input type="hidden" name="{{ field_name }}" value="false" data-boolean-fallback="{{ field_name }}">

@@ -5,6 +5,7 @@ from typing import Any
 
 from flaxon.http import HTMLResponse, RedirectResponse, Request
 from flaxon.exceptions import Conflict
+from .registry import evaluate_permission_hook
 
 class AdminView:
     def __init__(self, admin_model: Any, request: Request, dashboard: Any) -> None:
@@ -30,11 +31,18 @@ class ChangeListView(AdminView):
     async def render(self) -> HTMLResponse:
         model_class = self.admin_model.model
         objects: list[Any] = []
-        page = max(1, int(self.request.query.get("page", "1") or 1))
-        per_page = min(200, max(1, int(self.request.query.get("per_page", "25") or 25)))
+        try:
+            page = max(1, int(self.request.query.get("page", "1") or 1))
+            per_page = min(200, max(1, int(self.request.query.get("per_page", "25") or 25)))
+        except (ValueError, TypeError) as exc:
+            from flaxon.exceptions import BadRequest
+            raise BadRequest("page and per_page must be integers") from exc
         query_result = None
         if hasattr(model_class, "query"):
-            result = model_class.query(q=self.request.query.get("q") or None, page=page, per_page=per_page)
+            query_options = {"q": self.request.query.get("q") or None, "page": page, "per_page": per_page}
+            if hasattr(model_class, "orm_model"):
+                query_options["query_params"] = self.request.query
+            result = model_class.query(**query_options)
             query_result = await result if hasattr(result, "__await__") else result
             objects = list(query_result.get("items", []))
         elif hasattr(model_class, "get_instances"):
@@ -63,13 +71,15 @@ class ChangeListView(AdminView):
         if hook is not None:
             visible = []
             for obj in objects:
-                allowed = hook(getattr(self.request, "user", None), obj)
-                allowed = await allowed if hasattr(allowed, "__await__") else allowed
+                allowed = await evaluate_permission_hook(hook, getattr(self.request, "user", None), obj)
                 if allowed:
                     visible.append(obj)
             objects = visible
+            if query_result is not None:
+                query_result = {**query_result, "total": len(visible), "pages": page + int(len(objects) == per_page)}
 
         context = {
+            "form_schema": await self.admin_model.model.form_schema() if hasattr(self.admin_model.model, "form_schema") else {},
             "model": self.admin_model,
             "models": self.dashboard.registry.get_all(),
             "objects": objects,
@@ -125,6 +135,7 @@ class DetailView(AdminView):
             obj = await result if hasattr(result, "__await__") else result
 
         context = {
+            "form_schema": await self.admin_model.model.form_schema() if hasattr(self.admin_model.model, "form_schema") else {},
             "model": self.admin_model,
             "models": self.dashboard.registry.get_all(),
             "object": obj,
@@ -146,14 +157,18 @@ class CreateView(AdminView):
             form_data = self._form_dict(form_data)
             form_data = self.dashboard.validate_csrf(form_data)
 
+            form_data.pop("_save", None)
+            readonly = set(self.admin_model.readonly_fields) | {"id"}
+            form_data = {key: value for key, value in form_data.items() if key not in readonly}
+
             # Hook for model saving instance if supported by model manager
             model_class = self.admin_model.model
             result = None
             if hasattr(model_class, "create_instance"):
                 result = model_class.create_instance(form_data)
                 if hasattr(result, "__await__"):
-                    await result
-            record_id = str(result.get("id", "")) if isinstance(result, dict) else None
+                    result = await result
+            record_id = str(result.get("id", "")) if isinstance(result, dict) else str(getattr(result, "pk", ""))
             self.dashboard.record_activity("created", self.admin_model.get_name(), self.request, record_id)
 
             return RedirectResponse(
@@ -162,6 +177,7 @@ class CreateView(AdminView):
             )
 
         context = {
+            "form_schema": await self.admin_model.model.form_schema() if hasattr(self.admin_model.model, "form_schema") else {},
             "model": self.admin_model,
             "models": self.dashboard.registry.get_all(),
             "verbose_name": self.admin_model.get_verbose_name(),
@@ -194,6 +210,8 @@ class UpdateView(AdminView):
             return {}
         if isinstance(obj, dict):
             value: Any = dict(obj)
+        elif hasattr(obj, "_meta") and hasattr(obj._meta, "fields_db_projection"):
+            value = {name: getattr(obj, name, None) for name in obj._meta.fields_db_projection}
         elif hasattr(obj, "to_dict"):
             value = obj.to_dict()
         else:
@@ -288,6 +306,7 @@ class UpdateView(AdminView):
         last_modified = field_values.get("updated_at") or field_values.get("created_at") or ""
 
         context = {
+            "form_schema": await self.admin_model.model.form_schema() if hasattr(self.admin_model.model, "form_schema") else {},
             "model": self.admin_model,
             "models": self.dashboard.registry.get_all(),
             "object": obj,
@@ -338,6 +357,7 @@ class DeleteView(AdminView):
             obj = await result if hasattr(result, "__await__") else result
 
         context = {
+            "form_schema": await self.admin_model.model.form_schema() if hasattr(self.admin_model.model, "form_schema") else {},
             "model": self.admin_model,
             "models": self.dashboard.registry.get_all(),
             "verbose_name": self.admin_model.get_verbose_name(),

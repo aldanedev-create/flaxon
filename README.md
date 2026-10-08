@@ -22,6 +22,7 @@ python -m pip install "flaxon[standard]"
 flaxon new my-project --no-venv
 cd my-project
 python -m pip install -e .
+python management.py makemigrations
 python management.py migrate
 python management.py setup-admin
 flaxon run app:app --reload
@@ -29,7 +30,7 @@ flaxon run app:app --reload
 
 Open [localhost:8000](http://127.0.0.1:8000/) to see your application. The starter includes a welcome interface, feature modules, custom CLI commands, migrations, and a protected Admin dashboard.
 
-See the [getting started guide](https://github.com/aldanedev-create/flaxon/blob/main/docs/getting%20Starting.md) for the complete setup.
+See the [getting started guide](https://github.com/aldanedev-create/flaxon/blob/main/docs/getting-started.md) for the complete setup.
 
 ## Documentation
 
@@ -58,3 +59,5 @@ Report vulnerabilities privately following [SECURITY.md](https://github.com/alda
 ## License
 
 [MIT](LICENSE).
+
+Models and Python migrations are integrated through Tortoise ORM. See the [settings and management guide](docs/guides/orm.md).

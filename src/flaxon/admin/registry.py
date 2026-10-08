@@ -81,9 +81,15 @@ class Registry:
         self._model_classes: dict[Any, str] = {}
 
     def register(self, model: Any, **options: Any) -> None:
+        original = model
+        from tortoise.models import Model
+        if isinstance(model, type) and issubclass(model, Model):
+            from flaxon.db.admin import model_adapter
+            model = model_adapter(model, options)
         admin_model = AdminModel(model, **options)
         self._models[admin_model.get_name()] = admin_model
         self._model_classes[model] = admin_model.get_name()
+        self._model_classes[original] = admin_model.get_name()
 
     def unregister(self, model: Any) -> None:
         name = self._model_classes.pop(model, None)
@@ -110,3 +116,24 @@ class Registry:
 
 # Global default registry instance for decorators and automatic registration
 default_registry = Registry()
+
+
+async def evaluate_permission_hook(hook, user, target=None):
+    """Support both model hooks (user) and object hooks (user, object)."""
+    import inspect
+    signature = inspect.signature(hook)
+    if target is None:
+        try:
+            signature.bind(user)
+        except TypeError:
+            # A required object hook is evaluated per record, not against None.
+            return True
+        result = hook(user)
+    else:
+        try:
+            signature.bind(user, target)
+        except TypeError:
+            result = hook(user)
+        else:
+            result = hook(user, target)
+    return bool(await result if inspect.isawaitable(result) else result)
