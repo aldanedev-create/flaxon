@@ -1,4 +1,9 @@
 
+
+For generated projects, use the shared `settings.py`, `Flaxon.from_settings()`,
+explicit mounts in `app.py`, and `management.py` workflow. See [ORM and project management](orm.md)
+for Python migrations, model registration, permission hooks, relationship editing,
+and Admin/CMS metadata storage. Backend-only and legacy adapter examples remain supported.
 # Testing
 
 ## Overview

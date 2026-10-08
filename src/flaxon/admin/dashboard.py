@@ -82,7 +82,12 @@ class AdminDashboard:
         self.jinax = Jinax(template_dir or _PACKAGE_TEMPLATE_DIR, auto_reload=True)
         self.jinax.add_global("dashboard", self)
         self.store = store or (AdminStore(storage_path) if storage_path else None)
-        self.database = database or getattr(app, "database", None) or getattr(app, "db", None)
+        # The ORM lifecycle object is not the legacy SQL adapter. Metadata uses
+        # the dashboard's AdminStore unless a compatible SQL adapter is supplied.
+        candidate = database or getattr(app, "database", None) or getattr(app, "db", None)
+        self.database = candidate if all(callable(getattr(candidate, method, None)) for method in ("execute", "fetch_all")) else None
+        if database is not None and self.database is None:
+            raise TypeError("database must implement execute() and fetch_all(); use AdminStore for ORM metadata")
         self._database_loaded = False
         setattr(self.app, "_flaxon_admin_store", self.store)
         persisted_users = list((self.store.list("users") if self.store else {}).values())

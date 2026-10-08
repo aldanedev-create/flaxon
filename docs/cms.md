@@ -1,5 +1,10 @@
 # Flaxon CMS
 
+For generated projects, use the shared `settings.py`, `Flaxon.from_settings()`,
+explicit mounts in `app.py`, and `management.py` workflow. See [ORM and project management](guides/orm.md)
+for Python migrations, model registration, permission hooks, relationship editing,
+and Admin/CMS metadata storage. Backend-only and legacy adapter examples remain supported.
+
 This page is kept as a stable entry point for existing links. The current CMS
 implementation, production setup, API contract, persistence, security model,
 SPA behavior, editorial workflows, and customization examples are maintained

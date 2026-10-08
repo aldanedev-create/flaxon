@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Project CLI: discover commands once, avoid importing project commands for new/version, flush setup messages, show environment progress and stop after a 120-second timeout with recovery instructions.
+- Admin/CMS: distinguish the ORM lifecycle object from legacy SQL adapters so generated ORM applications use their metadata store without page errors.
+- Documentation: shared settings/management/ORM workflow and a verified 15-chapter, complete-code project-manager ebook covering Teloce HTML, scoped CSS, signals, SPA routing, staff Admin/CMS and Render.
+
+
 ## [0.2.7] — Unreleased
 
 - Bundle Alpine.js for essential Admin/CMS interactions.

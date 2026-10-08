@@ -1,5 +1,9 @@
 # Learn full-stack Flaxon in ten lessons
 
+For a complete application from CLI generation through deployment, start with the
+[Project Manager ebook](project-manager/index.md). The lessons below explain
+individual full-stack concepts and remain useful as reference.
+
 Build a Taskboard, then explore other ways to use the same Python application:
 interactive Teloce pages, server-rendered Jinax pages, feature modules, API clients
 and live interfaces. The lessons use readable Python and TypeScript, explicit

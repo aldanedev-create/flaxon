@@ -1,5 +1,33 @@
 # Full-stack quick start
 
+For generated projects, use the shared `settings.py`, `Flaxon.from_settings()`,
+explicit mounts in `app.py`, and `management.py` workflow. See [ORM and project management](guides/orm.md)
+for Python migrations, model registration, permission hooks, relationship editing,
+and Admin/CMS metadata storage. Backend-only and legacy adapter examples remain supported.
+
+## Start from the project CLI
+
+```bash
+python -m pip install "flaxon[standard,admin]"
+flaxon new project_manager
+cd project_manager
+# Activate the generated .venv, then:
+python -m pip install -e .
+python management.py check
+python management.py makemigrations
+python management.py migrate
+python management.py setup-admin
+python management.py runserver
+```
+
+For unreleased ORM features, install the repository revision or the pinned course
+wheel rather than assuming those features are in the latest PyPI release.
+Follow [getting started](getting-started.md) for activation commands and the
+[complete project-manager ebook](fullstack/project-manager/index.md) to build a
+real app, one complete file at a time.
+
+## A minimal hand-written full-stack example
+
 Build a Python API and a Teloce interface in the same project. Python 3.11+ is
 required. Create a virtual environment and install compatible Flaxon/Teloce releases:
 

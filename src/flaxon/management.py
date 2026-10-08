@@ -93,10 +93,9 @@ def execute(argv=None, *, settings="settings", application="app:app", project_ro
     known = {"check", "makemigrations", "migrate", "sqlmigrate", "shell", "setup-admin", "createsuperuser", "runserver", "migrate-admin-store", "-h", "--help"}
     if args_list and args_list[0] not in known:
         from flaxon.cli.main import create_parser
-        from flaxon.cli.discovery import CommandDiscovery
         from flaxon.cli.console import Console
         custom_args = create_parser().parse_args(args_list)
-        command = next(c for c in CommandDiscovery().discover() if c.name == custom_args.command)
+        command = custom_args._commands[custom_args.command]
         return command.run(custom_args, Console())
     args = parser.parse_args(args_list)
     try:

@@ -117,3 +117,18 @@ def register(admin):
     assert "projects.0001_initial" in output
     command(root, "migrate")
     assert (feature / "migrations/0001_initial.py").exists()
+
+
+def test_admin_cms_do_not_treat_orm_lifecycle_as_sql_adapter(tmp_path):
+    from types import SimpleNamespace
+    from flaxon import Flaxon
+    from flaxon.admin import AdminDashboard
+    from flaxon.admin.cms import CMS
+    settings = SimpleNamespace(__file__=str(tmp_path / "settings.py"), BASE_DIR=tmp_path,
+                               DEBUG=True, DATABASE_URL=f"sqlite://{tmp_path / 'app.sqlite3'}")
+    app = Flaxon.from_settings(settings)
+    admin = AdminDashboard(app, users=[], storage_path=str(tmp_path / "admin.sqlite3"))
+    cms = CMS(app, auth=admin.auth)
+    assert admin.database is None
+    assert cms.database is None
+    assert cms.store is admin.store
