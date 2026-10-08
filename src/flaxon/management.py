@@ -27,6 +27,9 @@ def load_application(application: str):
 
 
 def admin_store(settings):
+    if getattr(settings, "ADMIN_STORE_BACKEND", "sqlite") == "orm":
+        from flaxon.db.admin_store import ORMAdminStore
+        return ORMAdminStore(settings.DATABASE_URL)
     from flaxon.admin.services import AdminStore
     path = Path(settings.ADMIN_STORAGE_PATH)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -63,6 +66,8 @@ def execute(argv=None, *, settings="settings", application="app:app", project_ro
             sys.path.insert(0, str(root))
     parser = argparse.ArgumentParser(description="Manage your Flaxon project")
     commands = parser.add_subparsers(dest="command", required=True)
+    copy_store = commands.add_parser("migrate-admin-store", help="Copy a legacy SQLite Admin store into an empty migrated ORM store")
+    copy_store.add_argument("source")
     commands.add_parser("check", help="Validate settings, model discovery, and Admin registration")
     make = commands.add_parser("makemigrations", help="Generate Python migrations from models")
     make.add_argument("labels", nargs="*")
@@ -85,7 +90,7 @@ def execute(argv=None, *, settings="settings", application="app:app", project_ro
     server.add_argument("--no-reload", action="store_true")
     # Preserve existing module command parsing and argument handling.
     args_list = list(sys.argv[1:] if argv is None else argv)
-    known = {"check", "makemigrations", "migrate", "sqlmigrate", "shell", "setup-admin", "createsuperuser", "runserver", "-h", "--help"}
+    known = {"check", "makemigrations", "migrate", "sqlmigrate", "shell", "setup-admin", "createsuperuser", "runserver", "migrate-admin-store", "-h", "--help"}
     if args_list and args_list[0] not in known:
         from flaxon.cli.main import create_parser
         from flaxon.cli.discovery import CommandDiscovery
@@ -96,6 +101,15 @@ def execute(argv=None, *, settings="settings", application="app:app", project_ro
     args = parser.parse_args(args_list)
     try:
         project_settings = Settings(settings)
+        if args.command == "migrate-admin-store":
+            if getattr(project_settings, "ADMIN_STORE_BACKEND", "sqlite") != "orm":
+                raise ValueError("Set ADMIN_STORE_BACKEND = 'orm' first")
+            store = admin_store(project_settings)
+            try:
+                print(store.import_sqlite(args.source))
+            finally:
+                store.close()
+            return 0
         if args.command in {"setup-admin", "createsuperuser"}:
             setup_admin(project_settings, args.username)
             return 0

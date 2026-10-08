@@ -2,6 +2,14 @@
 
 ## [0.2.7] — Unreleased
 
+- Bundle Alpine.js for essential Admin/CMS interactions.
+- Add permission-filtered relationship selectors, many-to-many forms, optional
+  child inlines, query scoping, field groups and custom widget templates.
+- Make ORM imports transactional, show field validation errors, reject stale ORM
+  edits, preview dependent deletion and enforce cascade delete permissions.
+- Add opt-in ORM Admin/CMS metadata storage with Python migrations and a
+  transactional legacy SQLite store copy command.
+
 - Integrate pinned Tortoise ORM through flaxon.db and shared typed settings.
 - Add model-driven Python migrations and project management commands; preserve legacy adapters/JSON runners.
 - Discover model/Admin metadata from explicitly mounted modules without frontend compilation in management mode.

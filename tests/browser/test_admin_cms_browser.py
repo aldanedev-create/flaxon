@@ -42,6 +42,8 @@ async def test_admin_login_and_cms_create_in_browser(unused_tcp_port):
             browser = await playwright.chromium.launch(headless=True, timeout=15000)
             page = await browser.new_page()
             page.set_default_timeout(15000)
+            # Essential Admin JS is bundled; cosmetic CDNs are unnecessary for this test.
+            await page.route("https://**/*", lambda route: route.abort())
             await page.goto(f"http://127.0.0.1:{unused_tcp_port}/admin/login")
             csrf = await page.locator('input[name="_csrf"]').input_value()
             assert csrf
@@ -53,9 +55,9 @@ async def test_admin_login_and_cms_create_in_browser(unused_tcp_port):
             await page.wait_for_function("() => typeof Alpine !== 'undefined'")
             assert response and response.ok
             assert await page.evaluate("() => window.FLAXON_CMS_API_BASE === '/admin/cms/api'")
-            await page.get_by_text("Posts", exact=True).click()
+            await page.get_by_role("button", name="Posts", exact=True).click()
             await page.get_by_text("Add Post", exact=False).click()
-            await page.locator('input[type="text"]').first.fill("Browser-created post")
+            await page.locator('input[x-model="formData[f.name]"]').first.fill("Browser-created post")
             await page.get_by_text("Save", exact=True).click()
             await page.get_by_text("Browser-created post", exact=True).wait_for()
             await browser.close()

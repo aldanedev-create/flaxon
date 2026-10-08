@@ -275,6 +275,7 @@ class AdminDashboard:
         router.patch(f"{self.url_prefix}/media/<path:filename>")(self.media_api)
         router.delete(f"{self.url_prefix}/media/<path:filename>")(self.media_api)
         router.get(f"{self.url_prefix}/search")(self.search)
+        router.get(f"{self.url_prefix}/<model_name>/relationships/<field_name>")(self.relationship_choices)
         router.get(f"{self.url_prefix}/<model_name>/export")(self.model_export)
         router.post(f"{self.url_prefix}/<model_name>/import")(self.model_import)
         router.get(f"{self.url_prefix}/<model_name>/<object_id>/history")(self.history)
@@ -562,6 +563,8 @@ class AdminDashboard:
         await self._load_database()
         user = await self.auth.current_user(request)
         self._navigation_user.set(user)
+        from flaxon.db.admin import admin_context
+        admin_context.set((self, user))
         if permission:
             await self.auth.authorize_async(user, permission)
         return user
@@ -1497,6 +1500,21 @@ class AdminDashboard:
                         results.append({"model": model.get_name(), "label": model.get_verbose_name(), "id": values.get("id", ""), "values": values})
         return await self.jinax.render_response("admin/search.html", {"query": needle, "results": results, "models": self.registry.get_all()})
 
+    async def relationship_choices(self, request: Request, model_name: str, field_name: str) -> Response:
+        await self._require_model_user(request, model_name, "read")
+        registered = self.registry.get(model_name)
+        adapter = registered.model
+        field = getattr(adapter, "relationship_fields", {}).get(field_name)
+        if field is None:
+            raise BadRequest("Unknown relationship field")
+        try:
+            page = max(1, int(request.query.get("page", "1")))
+        except ValueError as exc:
+            raise BadRequest("page must be an integer") from exc
+        rows = await adapter.related_rows(field, str(request.query.get("q", ""))[:200])
+        start = (page - 1) * 25
+        return JSONResponse({"items": [{"id": str(row.pk), "label": str(row)} for row in rows[start:start + 25]], "more": len(rows) > start + 25})
+
     async def model_export(self, request: Request, model_name: str) -> Response:
         await self._require_model_user(request, model_name, "read")
         admin_model = self.registry.get(model_name)
@@ -1559,6 +1577,26 @@ class AdminDashboard:
         allow_partial = str(request.query.get("allow_partial", "")).lower() in {"1", "true", "yes"}
         if errors and not allow_partial:
             return JSONResponse({"imported": 0, "errors": errors, "rolled_back": True}, status_code=422)
+        if hasattr(admin_model.model, "transaction"):
+            imported = 0
+            try:
+                if allow_partial:
+                    for row, record in valid:
+                        try:
+                            async with admin_model.model.transaction():
+                                await admin_model.model.create_instance(record)
+                            imported += 1
+                        except Exception as exc:
+                            errors.append({"row": row, "error": str(exc)})
+                else:
+                    async with admin_model.model.transaction():
+                        for row, record in valid:
+                            await admin_model.model.create_instance(record)
+                            imported += 1
+            except Exception as exc:
+                return JSONResponse({"imported": 0, "errors": [{"row": row, "error": str(exc)}], "rolled_back": True}, status_code=422)
+            self.record_activity("imported", model_name, request, imported=imported, errors=len(errors))
+            return JSONResponse({"imported": imported, "errors": errors}, status_code=207 if errors else 201)
         created_records: list[dict[str, Any]] = []
         try:
             for row, record in valid:

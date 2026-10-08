@@ -14,6 +14,8 @@ def test_postgres_generated_migrations_and_model_crud(tmp_path, monkeypatch):
         pytest.fail("Use a dedicated empty database whose name ends in _test")
     root = tmp_path / "postgres_project"
     Generator().generate(root)
+    settings = root / "settings.py"
+    settings.write_text(settings.read_text() + '\nADMIN_STORE_BACKEND = "orm"\n')
     monkeypatch.setenv("DATABASE_URL", url)
     def run(*args):
         result = subprocess.run([sys.executable, "management.py", *args], cwd=root, capture_output=True, text=True)
@@ -39,6 +41,16 @@ async def main():
         assert (await ProjectNote.get(pk=note.pk)).completed is True
         await note.delete()
 asyncio.run(main())
+from settings import DATABASE_URL
+from flaxon.db.admin_store import ORMAdminStore
+store = ORMAdminStore(DATABASE_URL)
+try:
+    store.set("ci", "postgres", {"verified": True})
+    assert store.get("ci", "postgres")["verified"] is True
+    store.mutate("ci", "counter", lambda value: value.update(count=value["count"] + 1), default={"count": 0})
+    assert store.get("ci", "counter")["count"] == 1
+finally:
+    store.close()
 '''
     result = subprocess.run([sys.executable, "-c", script], cwd=root, capture_output=True, text=True)
     assert result.returncode == 0, result.stdout + result.stderr

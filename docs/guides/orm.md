@@ -72,8 +72,9 @@ path. UTC and timezone-aware ORM timestamps are the default.
 
 For PostgreSQL, install `flaxon[postgres]` and set a Tortoise-compatible URL:
 `postgres://USER:URL_ENCODED_PASSWORD@HOST:5432/DATABASE`. The starter's staff and
-CMS metadata still use a separate SQLite AdminStore; persist both files, or
-supply the existing PostgreSQLAdminStore / another durable store yourself.
+CMS metadata use SQLite by default. To put them in the same ORM database, set
+`ADMIN_STORE_BACKEND = "orm"` before generating and applying migrations.
+The existing PostgreSQLAdminStore remains available for manually configured apps.
 Changing the domain ORM URL does not automatically migrate Admin metadata.
 
 ## Models and queries
@@ -139,8 +140,10 @@ of your factory. It creates a project-local registry, strict permissions, durabl
 staff accounts, optional CMS, and session-bound CSRF. Only registered models are
 exposed. Primary keys and automatic timestamps are read-only. Forms derive basic
 types, required flags and length limits from ORM fields. Foreign keys use a
-bounded choice list up to 100 related records, otherwise an ID field. Model
-validation remains authoritative. Many-to-many editing needs a custom view.
+permission-filtered choice list up to 100 related records, otherwise a searchable
+paginated selector. Many-to-many fields receive multiple-selection controls.
+Related models must be explicitly registered; both displayed choices and submitted
+IDs obey their model/object permissions. Model validation remains authoritative.
 
 ## Management commands
 
@@ -192,3 +195,96 @@ Python object-permission hooks may still scan records in memory; large or
 multi-tenant datasets need scoped database adapters. Audit/export/search snapshots
 redact credential-like keys. This is targeted hardening, not a complete security
 certification or parity claim with Django Admin.
+
+
+## Simple Admin customization
+
+```python
+from models import Project, Task
+
+def register(admin):
+    admin.register(
+        Project,
+        search_fields=["name"],
+        fieldsets={"Details": ["name", "description"]},
+        queryset=lambda user, query: query.filter(owner_id=user.id),
+        inlines={"tasks": {"model": Task, "fk": "project_id"}},
+    )
+    admin.register(Task, search_fields=["title"])
+```
+
+`queryset(user, query)` scopes the base ORM query for lists, lookups, relationship
+choices, search and export. Return a QuerySet; an async function may return one.
+Use it for tenant/ownership filtering. Optional `can_view`, `can_add`,
+`can_change`, and `can_delete` hooks provide additional business rules. Python
+object hooks filter before pagination, giving correct counts, but may scan
+records; the query hook avoids that cost for large tables.
+
+`fieldsets` inserts named headings before the first configured field. Existing
+`fields` still controls order. `widgets={"body": "admin/widgets/body.html"}`
+selects a trusted Jinax template for a field; templates receive `field_name`,
+`schema`, and `current_value`. Never derive template names from request input.
+
+Inlines edit registered child models within a parent form. `fk` names the child's
+foreign-key ID column. Each operation enforces the child's create/change/delete
+permission and hook, and existing children must belong to that parent. Parent
+and child changes share a transaction. Forms support at most 100 children and
+200 many-to-many selections; larger workflows should use the separate model
+list. Inline fields currently use scalar inputs; complex child editors can use a
+custom Admin view. Custom business side effects must run after a successful
+transaction; database rollback cannot undo email or external service calls.
+
+Validation errors preserve submitted scalar values and display field errors.
+Unique/relationship conflicts remain explicit 409 responses. ORM edit forms
+include a fingerprint of the record; stale or missing versions cannot overwrite
+newer changes. Atomic conditional writes protect against concurrent saves,
+including models without `updated_at`. The fingerprint includes many-to-many selections. Inline existing-child saves
+carry child versions.
+
+Deletion confirmation shows direct dependent counts and database deletion rules.
+Cascade deletion additionally checks registered dependent-model and object delete
+permissions recursively. Protected relationships produce a readable conflict.
+
+ORM imports are atomic by default. `?allow_partial=true` gives each row its own
+transaction and reports the actual successful count; external side effects remain
+the application's responsibility. Import preview runs the configured import
+validator; database constraints are checked when applying the import.
+
+## ORM-backed Admin/CMS metadata
+
+Opt in through `settings.py`:
+
+```python
+ADMIN_STORE_BACKEND = "orm"
+```
+
+```bash
+python management.py makemigrations
+python management.py migrate
+python management.py setup-admin
+```
+
+Flaxon adds the `flaxon_admin` model label and generated `admin_migrations/`
+package. Commit those Python migrations. This stores staff records, sessions,
+CMS metadata, audit metadata and operations through the ORM in `DATABASE_URL`.
+No Admin table is created silently on server startup. The store preserves the
+existing synchronous service contract using a dedicated thread/event loop with
+separate ORM connections; calls are synchronous and are not a nonblocking
+request API. Media file bytes still need persistent filesystem or object storage.
+
+To move an existing SQLite store, stop all writers, back up both databases,
+apply the ORM migrations, and copy into an **empty destination**:
+
+```bash
+python management.py migrate-admin-store /absolute/path/to/admin.sqlite3
+```
+
+The copy is transactional, preserves operation timestamps, refuses a nonempty
+destination, and leaves the source unchanged. Test sign-in, CMS records, sessions
+and audit history before switching production traffic. Retain the source backup
+for rollback. Changing the setting by itself does not copy existing records.
+
+Admin bundles Alpine.js 3.14.3 with its MIT license so the CMS and core Admin
+interactions do not require downloading that runtime from a CDN. Cosmetic fonts,
+icons and Tailwind enhancements still reference external assets. Browser
+regression tests block those external requests and exercise the local controls.

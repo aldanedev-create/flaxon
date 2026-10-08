@@ -18,6 +18,8 @@ TIME_ZONE = "UTC"
 ADMIN_ENABLED = True
 CMS_ENABLED = True
 ADMIN_SERVICES_ENABLED = False
+# Set ADMIN_STORE_BACKEND = "orm" before makemigrations to share DATABASE_URL.
+ADMIN_STORE_BACKEND = "sqlite"
 # Staff accounts and CMS metadata use Flaxon's existing durable AdminStore.
 # Keep this file on persistent storage alongside the application database.
 ADMIN_STORAGE_PATH = DATA_DIR / "admin.sqlite3"

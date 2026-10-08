@@ -1,0 +1,34 @@
+<script>
+for (const picker of document.querySelectorAll('[data-related-picker]')) {
+  const search = picker.querySelector('[data-related-search]');
+  const results = picker.querySelector('[data-related-results]');
+  const more = picker.querySelector('[data-related-more]');
+  const status = picker.querySelector('[data-related-status]');
+  const hidden = picker.previousElementSibling?.matches("[data-related-many]") ? picker.previousElementSibling : null;
+  if (hidden) {results.replaceChildren(); for (const id of JSON.parse(hidden.value || "[]")) results.add(new Option(String(id), String(id), true, true));}
+  results.addEventListener("change", () => {if (hidden) hidden.value = JSON.stringify([...results.selectedOptions].map(option => option.value));});
+  let timer, page = 1, request = 0;
+  async function load(append = false) {
+    const version = ++request;
+    try {
+      const url = new URL(search.dataset.url, location.origin);
+      url.searchParams.set('q', search.value); url.searchParams.set('page', page);
+      const response = await fetch(url, {credentials: 'same-origin'});
+      if (!response.ok) throw new Error('Unable to load related records.');
+      const data = await response.json();
+      if (version !== request) return;
+      if (!append) {if (hidden) {for (const option of [...results.options]) if (!option.selected) option.remove();} else results.replaceChildren(new Option('Select a record', ''));}
+      for (const item of data.items) {const existing = [...results.options].find(option => option.value === item.id); if (existing) existing.textContent = item.label; else results.add(new Option(item.label, item.id));}
+      more.hidden = !data.more; status.textContent = data.items.length ? '' : 'No matching records.';
+    } catch (error) { status.textContent = error.message; }
+  }
+  search.addEventListener('input', () => {clearTimeout(timer); page = 1; timer = setTimeout(() => load(), 250);});
+  more.addEventListener('click', () => {page++; load(true);});
+}
+for (const select of document.querySelectorAll('[data-many-picker]')) {
+  const hidden = select.previousElementSibling;
+  const selected = new Set(JSON.parse(hidden.value || '[]').map(String));
+  for (const option of select.options) option.selected = selected.has(option.value);
+  select.addEventListener('change', () => {hidden.value = JSON.stringify([...select.selectedOptions].map(option => option.value));});
+}
+</script>
