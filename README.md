@@ -25,8 +25,10 @@ python -m pip install -e .
 python management.py makemigrations
 python management.py migrate
 python management.py setup-admin
-flaxon run app:app --reload
+python management.py runserver
 ```
+
+
 
 Open [localhost:8000](http://127.0.0.1:8000/) to see your application. The starter includes a welcome interface, feature modules, custom CLI commands, migrations, and a protected Admin dashboard.
 
