@@ -555,3 +555,7 @@ authorization and privileged operations on the server; components call those
 endpoints and present their results. Follow the [full-stack lessons](../fullstack/index.md)
 and [Teloce integration reference](../api/teloce.md) to connect this capability
 to pages, components and application modules.
+
+## Upgrading authentication
+
+[JWT, password and session migration](request-security-upgrade.md) explains standard tokens, trusted key rotation, legacy password upgrades and secure cookie defaults. Legacy hexadecimal-signature JWTs require sign-in again.

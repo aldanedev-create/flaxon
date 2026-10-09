@@ -1,22 +1,21 @@
 from __future__ import annotations
 
-import secrets
-import time
-import sqlite3
-import json
-import uuid
 import base64
 import hashlib
 import hmac
-from inspect import isawaitable
-from urllib.parse import quote
+import json
+import secrets
+import sqlite3
+import time
+import uuid
 from dataclasses import dataclass, field
+from inspect import isawaitable
 from typing import Any
+from urllib.parse import quote
 
 from flaxon.exceptions import Forbidden, Unauthorized
 from flaxon.http import Request, Response
-from flaxon.security import PasswordHasher, PasswordValidator, SessionBackend, User
-from flaxon.security import RateLimiter
+from flaxon.security import PasswordHasher, PasswordValidator, RateLimiter, SessionBackend, User
 from flaxon.security.rate_limit import DistributedRateLimiter
 
 from .authorization import AuthorizationProvider, DefaultAuthorizationProvider
@@ -133,6 +132,9 @@ class AdminAuth:
         password_matches = self.hasher.verify(password, password_hash)
         if not record or record.get("active", True) is False or not record.get("password_hash"):
             return None
+        if password_matches and self.hasher.needs_rehash(password_hash):
+            record["password_hash"] = self.hasher.hash(password)
+            self.users[username] = record
         return self.user(username) if password_matches else None
 
     def validate_password(self, password: str) -> None:

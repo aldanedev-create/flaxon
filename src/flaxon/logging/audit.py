@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from flaxon.http import Request
+
 from .formatters import AuditFormatter
 
 

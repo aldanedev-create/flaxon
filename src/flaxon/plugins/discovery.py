@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -38,7 +39,8 @@ class PluginDiscovery:
                 if plugin:
                     plugins.append(plugin)
 
-            except Exception:
+            except Exception as exc:
+                logging.getLogger(__name__).warning("Optional plugin could not load (%s)", type(exc).__name__)
                 continue
 
         return plugins
@@ -53,8 +55,8 @@ class PluginDiscovery:
             if plugin:
                 plugins.append(plugin)
 
-        except Exception:
-            pass
+        except Exception as exc:
+            logging.getLogger(__name__).warning("Isolated callback or cleanup failed (%s)", type(exc).__name__)
 
         return plugins
 

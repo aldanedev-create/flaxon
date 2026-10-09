@@ -13,7 +13,7 @@ class CookieSession:
         expires: datetime | None = None,
         path: str | None = "/",
         domain: str | None = None,
-        secure: bool = False,
+        secure: bool = True,
         httponly: bool = True,
         samesite: str = "lax",
     ) -> None:
@@ -60,7 +60,7 @@ class CookieManager:
         cookie_name: str = "session",
         cookie_path: str = "/",
         cookie_domain: str | None = None,
-        cookie_secure: bool = False,
+        cookie_secure: bool = True,
         cookie_httponly: bool = True,
         cookie_samesite: str = "lax",
     ) -> None:

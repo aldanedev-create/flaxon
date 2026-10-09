@@ -24,6 +24,6 @@ def test_malformed_stored_hash_is_not_authentication(hashed):
 
 
 def test_iteration_upgrade_requires_rehash():
-    hashed = PasswordHasher(iterations=1000).hash("Correct123!")
-    assert PasswordHasher(iterations=2000).needs_rehash(hashed)
-    assert not PasswordHasher(iterations=1000).needs_rehash(hashed)
+    hashed = PasswordHasher(algorithm="pbkdf2_sha256", iterations=1000).hash("Correct123!")
+    assert PasswordHasher(algorithm="pbkdf2_sha256", iterations=2000).needs_rehash(hashed)
+    assert not PasswordHasher(algorithm="pbkdf2_sha256", iterations=1000).needs_rehash(hashed)

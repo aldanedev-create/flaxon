@@ -79,10 +79,7 @@ class MemoryBroadcaster(Broadcaster):
             queues = list(self._subscribers.get(channel, []))
 
         for queue in queues:
-            try:
-                await queue.put(message)
-            except Exception:
-                pass
+            await queue.put(message)
 
     async def subscribe(self, channel: str) -> AsyncIterator[Any]:
         """Subscribe to a channel.

@@ -77,86 +77,48 @@ class CompressionMiddleware(Middleware):
             return
 
         body_parts: list[bytes] = []
-        status_code = 200
-        headers: list[tuple[bytes, bytes]] = []
-        compressible = False
+        start_message: dict[str, Any] | None = None
 
         async def send_wrapper(message: dict[str, Any]) -> None:
-            nonlocal status_code, headers, compressible
-
+            nonlocal start_message
             if message["type"] == "http.response.start":
-                status_code = message["status"]
                 headers = message.get("headers", [])
-
                 content_type = self._get_content_type(headers)
-                content_length = self._get_content_length(headers)
-
-                if content_length is not None and content_length < self.minimum_size:
-                    await send(message)
+                length = self._get_content_length(headers)
+                already_encoded = any(key.lower() == b"content-encoding" for key, _ in headers)
+                # Unknown-length streams pass through without buffering.
+                if (length is not None and length >= self.minimum_size
+                        and self._is_compressible(content_type)
+                        and not content_type.startswith("text/event-stream")
+                        and not already_encoded and scope.get("method") != "HEAD"
+                        and message["status"] not in {204, 304}):
+                    start_message = dict(message)
                     return
-
-                compressible = self._is_compressible(content_type)
-
-                if compressible:
-                    message["headers"] = [
-                        (k, v)
-                        for k, v in headers
-                        if k.lower() not in (b"content-length", b"content-encoding")
-                    ]
-
-                await send(message)
+            elif message["type"] == "http.response.body" and start_message is not None:
+                body_parts.append(message.get("body", b""))
+                if message.get("more_body", False):
+                    return
+                body = b"".join(body_parts)
+                original = start_message.get("headers", [])
+                if len(body) >= self.minimum_size:
+                    body = self._compress(body, encoding)
+                    vary = next((v.decode("latin-1") for k, v in original if k.lower() == b"vary"), "")
+                    values = [value.strip() for value in vary.split(",") if value.strip()]
+                    if not any(value.lower() in {"accept-encoding", "*"} for value in values):
+                        values.append("Accept-Encoding")
+                    start_message["headers"] = [
+                        (k, v) for k, v in original
+                        if k.lower() not in {b"content-length", b"content-encoding", b"vary"}
+                    ] + [(b"content-length", str(len(body)).encode()),
+                         (b"content-encoding", encoding.encode()),
+                         (b"vary", ", ".join(values).encode("latin-1"))]
+                await send(start_message)
+                await send({"type": "http.response.body", "body": body, "more_body": False})
+                start_message = None
                 return
-
-            if message["type"] == "http.response.body":
-                body = message.get("body", b"")
-                body_parts.append(body)
-
-                if not message.get("more_body", False):
-                    full_body = b"".join(body_parts)
-
-                    if compressible and len(full_body) >= self.minimum_size:
-                        compressed = self._compress(full_body, encoding)
-                        compressed_headers = [
-                            (b"content-encoding", encoding.encode("latin-1")),
-                            (b"content-length", str(len(compressed)).encode("latin-1")),
-                            (b"vary", b"accept-encoding"),
-                        ]
-
-                        for key, value in headers:
-                            if key.lower() not in (
-                                b"content-length",
-                                b"content-encoding",
-                                b"content-type",
-                            ):
-                                compressed_headers.append((key, value))
-
-                        content_type = self._get_content_type(headers)
-                        if content_type:
-                            compressed_headers.append(
-                                (b"content-type", content_type.encode("latin-1"))
-                            )
-
-                        await send(
-                            {
-                                "type": "http.response.start",
-                                "status": status_code,
-                                "headers": compressed_headers,
-                            }
-                        )
-                        await send(
-                            {
-                                "type": "http.response.body",
-                                "body": compressed,
-                                "more_body": False,
-                            }
-                        )
-                    else:
-                        await send(message)
-                    return
-
             await send(message)
 
-        await self.app(scope, receive_send_wrapper if False else send_wrapper)
+        await self.app(scope, receive, send_wrapper)
 
     def _get_accept_encoding(self, scope: dict[str, Any]) -> str:
         for key, value in scope.get("headers", []):
@@ -203,7 +165,7 @@ class CompressionMiddleware(Middleware):
 
     def _compress(self, data: bytes, encoding: str) -> bytes:
         if encoding == "gzip":
-            return gzip.compress(data, level=self.level)
+            return gzip.compress(data, compresslevel=self.level)
 
         if encoding == "deflate":
             return zlib.compress(data, level=self.level)

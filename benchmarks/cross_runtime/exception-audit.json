@@ -1,0 +1,472 @@
+[
+  {
+    "path": "src/flaxon/modules.py",
+    "line": 300,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/serialization/msgpack.py",
+    "line": 37,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/serialization/msgpack.py",
+    "line": 66,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/debugging/frames.py",
+    "line": 22,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/debugging/frames.py",
+    "line": 32,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/debugging/inspector.py",
+    "line": 26,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/debugging/request_snapshot.py",
+    "line": 72,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/debugging/traceback.py",
+    "line": 56,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/http/body.py",
+    "line": 140,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/http/body.py",
+    "line": 146,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/tasks/task.py",
+    "line": 92,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/tasks/worker.py",
+    "line": 75,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/tasks/worker.py",
+    "line": 63,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/tasks/retry.py",
+    "line": 81,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/routing/dependency.py",
+    "line": 71,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/events/dispatcher.py",
+    "line": 31,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/events/dispatcher.py",
+    "line": 47,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/events/dispatcher.py",
+    "line": 71,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/events/dispatcher.py",
+    "line": 87,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/files/validation.py",
+    "line": 110,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/files/upload.py",
+    "line": 173,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/health/checks.py",
+    "line": 91,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/health/checks.py",
+    "line": 124,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/health/checks.py",
+    "line": 148,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/plugins/discovery.py",
+    "line": 58,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/plugins/discovery.py",
+    "line": 42,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/plugins/manager.py",
+    "line": 34,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/plugins/hooks.py",
+    "line": 24,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/plugins/hooks.py",
+    "line": 33,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/application/lifecycle.py",
+    "line": 82,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/application/app.py",
+    "line": 430,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/application/app.py",
+    "line": 498,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/application/app.py",
+    "line": 556,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/application/app.py",
+    "line": 680,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/application/app.py",
+    "line": 702,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/application/app.py",
+    "line": 713,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/application/bootstrap.py",
+    "line": 103,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/application/bootstrap.py",
+    "line": 83,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/openapi/generator.py",
+    "line": 100,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/middleware/logging.py",
+    "line": 62,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/middleware/recovery.py",
+    "line": 70,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/admin/cms.py",
+    "line": 475,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/admin/dashboard.py",
+    "line": 1254,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/admin/dashboard.py",
+    "line": 1297,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/admin/dashboard.py",
+    "line": 1612,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/admin/dashboard.py",
+    "line": 1577,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/admin/dashboard.py",
+    "line": 1601,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/admin/dashboard.py",
+    "line": 1594,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/admin/production.py",
+    "line": 322,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/admin/production.py",
+    "line": 196,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/admin/production.py",
+    "line": 342,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/dependency_injection/resolver.py",
+    "line": 17,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/websocket/heartbeat.py",
+    "line": 106,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/websocket/heartbeat.py",
+    "line": 99,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/websocket/authentication.py",
+    "line": 139,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/websocket/broadcaster.py",
+    "line": 218,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/websocket/events.py",
+    "line": 272,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/websocket/events.py",
+    "line": 170,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/websocket/events.py",
+    "line": 266,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/graphql/validation.py",
+    "line": 41,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/graphql/schema.py",
+    "line": 78,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/graphql/executor.py",
+    "line": 62,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/graphql/scalars.py",
+    "line": 50,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/cli/base.py",
+    "line": 106,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/cli/base.py",
+    "line": 146,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/cli/base.py",
+    "line": 217,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/cli/base.py",
+    "line": 244,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/cli/main.py",
+    "line": 47,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/cli/discovery.py",
+    "line": 101,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/jinax/hot_reload.py",
+    "line": 62,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/db/admin_store.py",
+    "line": 42,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/database/transactions.py",
+    "line": 70,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/database/health.py",
+    "line": 28,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/files/adapters/s3.py",
+    "line": 95,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/graphql/extensions/persisted_queries.py",
+    "line": 61,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/cli/commands/generate.py",
+    "line": 38,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/cli/commands/shell.py",
+    "line": 33,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/cli/commands/doctor.py",
+    "line": 27,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/cli/commands/worker.py",
+    "line": 54,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/cli/commands/schedule.py",
+    "line": 64,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/cli/commands/new.py",
+    "line": 70,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/cli/commands/inspect.py",
+    "line": 30,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/cli/commands/docs.py",
+    "line": 52,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/cli/commands/docs.py",
+    "line": 61,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/cli/commands/run.py",
+    "line": 61,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/cli/commands/migrate.py",
+    "line": 156,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/cli/commands/routes.py",
+    "line": 28,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/database/adapters/mysql.py",
+    "line": 82,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/database/adapters/custom.py",
+    "line": 75,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/database/adapters/mongodb.py",
+    "line": 118,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/database/adapters/redis.py",
+    "line": 126,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/database/adapters/postgresql.py",
+    "line": 72,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/database/adapters/sqlalchemy.py",
+    "line": 99,
+    "direct_pass": false
+  },
+  {
+    "path": "src/flaxon/database/adapters/sqlite.py",
+    "line": 81,
+    "direct_pass": false
+  }
+]

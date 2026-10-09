@@ -1,0 +1,58 @@
+{
+  "orjson_version": "3.13.0",
+  "timings": [
+    {
+      "sample": "small",
+      "iterations": 10000,
+      "stdlib_seconds": 0.01673971900027027,
+      "orjson_seconds": 0.0010206250003648165,
+      "serializer_speed_ratio": 16.401439308547953
+    },
+    {
+      "sample": "list",
+      "iterations": 10000,
+      "stdlib_seconds": 0.16940430600016043,
+      "orjson_seconds": 0.02020816599997488,
+      "serializer_speed_ratio": 8.382962907191628
+    }
+  ],
+  "compatibility": [
+    {
+      "sample": "datetime",
+      "stdlib": "{\"value\": \"2026-10-09 12:00:00\"}",
+      "orjson": "{\"value\":\"2026-10-09T12:00:00\"}",
+      "same_output": false
+    },
+    {
+      "sample": "date",
+      "stdlib": "{\"value\": \"2026-10-09\"}",
+      "orjson": "{\"value\":\"2026-10-09\"}",
+      "same_output": false
+    },
+    {
+      "sample": "decimal",
+      "stdlib": "{\"value\": \"1.25\"}",
+      "orjson": "{\"value\":\"1.25\"}",
+      "same_output": false
+    },
+    {
+      "sample": "large_integer",
+      "stdlib": "{\"value\": 1208925819614629174706176}",
+      "orjson": "TypeError",
+      "same_output": false
+    },
+    {
+      "sample": "nonfinite_float",
+      "stdlib": "{\"value\": NaN}",
+      "orjson": "{\"value\":null}",
+      "same_output": false
+    },
+    {
+      "sample": "integer_key",
+      "stdlib": "{\"value\": {\"1\": \"value\"}}",
+      "orjson": "TypeError",
+      "same_output": false
+    }
+  ],
+  "decision": "Retain stdlib JSONResponse. Direct orjson substitution changes datetime, integer key, large integer and nonfinite float behavior. Serializer speed is not HTTP or developer productivity speed."
+}

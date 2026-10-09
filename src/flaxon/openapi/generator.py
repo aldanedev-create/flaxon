@@ -2,20 +2,20 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
-from decimal import Decimal
 import inspect
 import re
 import types
 import typing
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
 from flaxon.routing import MISSING, Query
+from flaxon.routing.execution import is_scalar_query
 
 from .operation import OperationBuilder
 from .schema import SchemaBuilder
-
 
 _PARAMETER = re.compile(r"<(?:(?P<converter>[a-zA-Z_][a-zA-Z0-9_]*):)?(?P<name>[a-zA-Z_][a-zA-Z0-9_]*)>")
 
@@ -138,8 +138,13 @@ class OpenAPIGenerator:
 
             for name, parameter in signature.parameters.items():
                 declaration = parameter.default
+                annotation = hints.get(name, parameter.annotation)
                 if not isinstance(declaration, Query):
-                    continue
+                    path_names = {item[0] for item in getattr(route, "parameters", [])}
+                    if name in path_names or name in {"request", "socket", "websocket"} or not is_scalar_query(annotation):
+                        continue
+                    default = MISSING if parameter.default is inspect.Parameter.empty else parameter.default
+                    declaration = Query(default=default)
                 query_schema = self._schema_for_annotation(hints.get(name, parameter.annotation))
                 if query_schema == {}:
                     query_schema = {"type": "string"}

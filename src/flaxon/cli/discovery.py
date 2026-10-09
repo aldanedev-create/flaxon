@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import logging
 import os
 import sys
 from pathlib import Path
@@ -98,6 +99,7 @@ class CommandDiscovery:
                 commands.extend(self._discover_from_module(module))
 
             except Exception:
+                logging.getLogger(__name__).warning("Could not load custom command module %s", file_path)
                 continue
 
         return commands

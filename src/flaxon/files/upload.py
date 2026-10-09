@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import tempfile
 from dataclasses import dataclass
@@ -169,5 +170,5 @@ class FileUpload:
                     file.close()
                     if os.path.exists(path):
                         os.unlink(path)
-            except Exception:
-                pass
+            except Exception as exc:
+                logging.getLogger(__name__).warning("Isolated callback or cleanup failed (%s)", type(exc).__name__)

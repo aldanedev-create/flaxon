@@ -3,9 +3,11 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from flaxon.exceptions import BadRequest, Conflict, Forbidden
 from flaxon.http import HTMLResponse, RedirectResponse, Request
-from flaxon.exceptions import Conflict, BadRequest
+
 from .registry import evaluate_permission_hook
+
 
 class AdminView:
     def __init__(self, admin_model: Any, request: Request, dashboard: Any) -> None:
@@ -139,11 +141,11 @@ class ChangeListView(AdminView):
                 self.dashboard.permission_for_action(self.admin_model.get_name(), action_name),
             )
             return True
-        except Exception:
+        except Forbidden:
             try:
                 self.dashboard.auth.authorize(user, "admin:superuser")
                 return True
-            except Exception:
+            except Forbidden:
                 return False
 
 

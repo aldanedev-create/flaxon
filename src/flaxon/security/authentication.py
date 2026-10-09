@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import hmac
-import json
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
@@ -11,6 +9,8 @@ from typing import Any
 
 from flaxon.exceptions import Unauthorized
 from flaxon.http import Request
+
+from .jwt import JWT
 
 
 class User:
@@ -79,22 +79,12 @@ class AuthenticationBackend(ABC):
 class JWTBackend(AuthenticationBackend):
     _instances: list[JWTBackend] = []
 
-    def __init__(self, secret_key: str, algorithm: str = "HS256") -> None:
+    def __init__(self, secret_key: str, algorithm: str = "HS256", **options: Any) -> None:
+        self.jwt = JWT(secret_key, algorithm, **options)
         self.secret_key = secret_key.encode()
         self.algorithm = algorithm
+        self._revoked: dict[str, float] = {}
         self._instances.append(self)
-
-    def _sign(self, data: str) -> str:
-        return hmac.new(self.secret_key, data.encode(), hashlib.sha256).hexdigest()
-
-    def _base64_encode(self, data: str) -> str:
-        import base64
-        return base64.urlsafe_b64encode(data.encode()).decode().rstrip("=")
-
-    def _base64_decode(self, data: str) -> str:
-        import base64
-        padding = "=" * (4 - len(data) % 4)
-        return base64.urlsafe_b64decode(data + padding).decode()
 
     async def authenticate(self, request: Request) -> User | None:
         auth_header = request.headers.get("authorization")
@@ -108,37 +98,25 @@ class JWTBackend(AuthenticationBackend):
         return await self.validate_token(token)
 
     async def create_token(self, user: User, expires_in: int | None = None) -> str:
-        expires_in = expires_in or 3600
-        header = self._base64_encode(json.dumps({"alg": self.algorithm, "typ": "JWT"}))
-        payload = self._base64_encode(json.dumps({
-            **user.to_dict(),
-            "iat": int(time.time()),
-            "exp": int(time.time()) + expires_in,
-        }))
-        signature = self._sign(f"{header}.{payload}")
-        return f"{header}.{payload}.{signature}"
+        return self.jwt.encode(user.to_dict(), expires_in=3600 if expires_in is None else expires_in)
 
     async def validate_token(self, token: str) -> User | None:
+        now = time.time()
+        self._revoked = {key: expiry for key, expiry in self._revoked.items() if expiry > now}
+        if hashlib.sha256(token.encode()).hexdigest() in self._revoked:
+            return None
         try:
-            parts = token.split(".")
-            if len(parts) != 3:
-                return None
-
-            header, payload, signature = parts
-            expected = self._sign(f"{header}.{payload}")
-            if not hmac.compare_digest(expected, signature):
-                return None
-
-            payload_data = json.loads(self._base64_decode(payload))
-            if payload_data.get("exp", 0) < time.time():
-                return None
-
-            return User.from_dict(payload_data)
-        except Exception:
+            return User.from_dict(self.jwt.decode(token))
+        except (Unauthorized, KeyError, TypeError, ValueError):
             return None
 
     async def revoke_token(self, token: str) -> None:
-        pass
+        """Revoke locally until expiry; distributed deployments need a shared store."""
+        try:
+            payload = self.jwt.decode(token)
+        except Unauthorized:
+            return
+        self._revoked[hashlib.sha256(token.encode()).hexdigest()] = float(payload["exp"]) + self.jwt.leeway
 
 
 class SessionBackend(AuthenticationBackend):
@@ -217,8 +195,8 @@ class AuthenticationMiddleware:
             if user:
                 scope["user"] = user
                 request.user = user
-        except Exception:
-            pass
+        except Unauthorized:
+            scope["user"] = None
 
         await self.app(scope, receive, send)
 

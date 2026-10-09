@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import logging
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -79,8 +80,8 @@ class Bootstrapper:
                             "name": module_name,
                             "module": module,
                         })
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logging.getLogger(__name__).warning("Isolated callback or cleanup failed (%s)", type(exc).__name__)
         except ImportError:
             pass
 
@@ -99,8 +100,8 @@ class Bootstrapper:
                             "name": path.stem,
                             "module": module,
                         })
-            except Exception:
-                pass
+            except Exception as exc:
+                logging.getLogger(__name__).warning("Isolated callback or cleanup failed (%s)", type(exc).__name__)
 
     def add_hook(self, hook: Callable[[Flaxon], None]) -> None:
         """
