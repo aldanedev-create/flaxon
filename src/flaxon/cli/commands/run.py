@@ -5,7 +5,7 @@ import os
 import sys
 from typing import Any
 
-from ..base import Command
+from flaxon.cli.base import Command
 
 
 class RunCommand(Command):

@@ -5,7 +5,7 @@ from .memory import MemorySubscriptionBackend
 from .redis import RedisSubscriptionBackend
 
 __all__ = [
-    "SubscriptionManager",
     "MemorySubscriptionBackend",
     "RedisSubscriptionBackend",
+    "SubscriptionManager",
 ]

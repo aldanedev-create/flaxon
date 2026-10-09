@@ -15,8 +15,8 @@ from .trusted_hosts import TrustedHostsMiddleware
 
 __all__ = [
     "BodyLimitMiddleware",
-    "CompressionMiddleware",
     "CORSMiddleware",
+    "CompressionMiddleware",
     "LoggingMiddleware",
     "Middleware",
     "ProxyHeadersMiddleware",

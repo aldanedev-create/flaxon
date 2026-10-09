@@ -14,6 +14,7 @@ from .task import Task
 
 
 class Scheduler:
+    """Enqueue tasks when their configured time or interval becomes due."""
 
     def __init__(self, queue: TaskQueue) -> None:
         self.queue = queue
@@ -28,29 +29,26 @@ class Scheduler:
         at: datetime.datetime | None = None,
         interval: int | None = None,
     ) -> None:
-        schedule_time = (
-            datetime.datetime.now() + datetime.timedelta(seconds=delay)
-            if delay
-            else at
-        )
+        """Record a task's next run time and optional repeating interval."""
+        schedule_time = datetime.datetime.now() + datetime.timedelta(seconds=delay) if delay else at
 
         if schedule_time is None:
             schedule_time = datetime.datetime.now()
 
-        self._scheduled_tasks.append(
-            {
-                "task": task,
-                "schedule_time": schedule_time,
-                "interval": interval,
-                "next_run": schedule_time,
-            }
-        )
+        self._scheduled_tasks.append({
+            "task": task,
+            "schedule_time": schedule_time,
+            "interval": interval,
+            "next_run": schedule_time,
+        })
 
     async def start(self) -> None:
+        """Start the background loop that enqueues due tasks."""
         self._running = True
         self._scheduler_task = asyncio.create_task(self._run())
 
     async def stop(self) -> None:
+        """Cancel and await the background scheduling loop."""
         self._running = False
         if self._scheduler_task:
             self._scheduler_task.cancel()
@@ -73,9 +71,7 @@ class Scheduler:
             if item["next_run"] <= now:
                 to_run.append(item)
                 if item["interval"]:
-                    item["next_run"] += datetime.timedelta(
-                        seconds=item["interval"]
-                    )
+                    item["next_run"] += datetime.timedelta(seconds=item["interval"])
                 else:
                     self._scheduled_tasks.remove(item)
 
@@ -91,6 +87,8 @@ def scheduled_task(
     at: datetime.datetime | None = None,
     queue: str = "default",
 ) -> Callable:
+    """Wrap an async callable; actual scheduling uses Scheduler.schedule."""
+
     def decorator(func: Callable) -> Callable:
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             return await func(*args, **kwargs)

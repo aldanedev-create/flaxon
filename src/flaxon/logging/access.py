@@ -10,6 +10,8 @@ from .formatters import AccessFormatter
 
 
 class AccessLogger:
+    """Write HTTP response status, duration, and request metadata to a logger."""
+
     def __init__(self, logger: logging.Logger | None = None) -> None:
         self.logger = logger or logging.getLogger("flaxon.access")
         self._configure()
@@ -30,6 +32,7 @@ class AccessLogger:
         duration: float,
         extra: dict[str, Any] | None = None,
     ) -> None:
+        """Write request metadata, response status, and duration in milliseconds."""
         extra_data = {
             "method": request.method,
             "path": request.path,
@@ -55,6 +58,8 @@ class AccessLogger:
 
 
 class AccessMiddleware:
+    """Record the status and duration of HTTP requests, including failed calls."""
+
     def __init__(self, app: Any, logger: AccessLogger | None = None) -> None:
         self.app = app
         self.logger = logger or AccessLogger()

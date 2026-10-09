@@ -6,6 +6,8 @@ from datetime import datetime
 
 
 class ConsoleFormatter(logging.Formatter):
+    """Format readable console records, prefixing any available request ID."""
+
     def __init__(self) -> None:
         super().__init__(
             fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -13,16 +15,20 @@ class ConsoleFormatter(logging.Formatter):
         )
 
     def format(self, record: logging.LogRecord) -> str:
+        """Render a log record using this formatter's output format."""
         if hasattr(record, "request_id"):
             record.msg = f"[{record.request_id}] {record.msg}"
         return super().format(record)
 
 
 class JSONFormatter(logging.Formatter):
+    """Format log records as JSON with their structured metadata."""
+
     def __init__(self) -> None:
         super().__init__()
 
     def format(self, record: logging.LogRecord) -> str:
+        """Render a log record using this formatter's output format."""
         log_data = {
             "timestamp": datetime.fromtimestamp(record.created).isoformat(),
             "level": record.levelname,
@@ -44,6 +50,7 @@ class JSONFormatter(logging.Formatter):
 
         if record.exc_info:
             import traceback
+
             log_data["exception"] = {
                 "type": record.exc_info[0].__name__ if record.exc_info[0] else None,
                 "message": str(record.exc_info[1]) if record.exc_info[1] else None,
@@ -58,10 +65,13 @@ class JSONFormatter(logging.Formatter):
 
 
 class AccessFormatter(logging.Formatter):
+    """Format HTTP access records with request and response metadata."""
+
     def __init__(self) -> None:
         super().__init__()
 
     def format(self, record: logging.LogRecord) -> str:
+        """Render a log record using this formatter's output format."""
         log_data = {
             "timestamp": datetime.fromtimestamp(record.created).isoformat(),
             "type": "access",
@@ -79,10 +89,13 @@ class AccessFormatter(logging.Formatter):
 
 
 class AuditFormatter(logging.Formatter):
+    """Format audit records describing users and resource actions."""
+
     def __init__(self) -> None:
         super().__init__()
 
     def format(self, record: logging.LogRecord) -> str:
+        """Render a log record using this formatter's output format."""
         log_data = {
             "timestamp": datetime.fromtimestamp(record.created).isoformat(),
             "type": "audit",

@@ -4,7 +4,7 @@ import asyncio
 import time
 from typing import Any
 
-from ..session import Session
+from flaxon.sessions.session import Session
 
 
 class MemoryBackend:

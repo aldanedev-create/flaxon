@@ -14,6 +14,8 @@ from .retry import RetryPolicy
 
 # FIX (UP042): Use StrEnum instead of subclassing (str, Enum)
 class TaskStatus(StrEnum):
+    """The lifecycle states recorded by a background task."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -24,6 +26,8 @@ class TaskStatus(StrEnum):
 
 
 class Task:
+    """Execute a callable while recording status, retries, results, and errors."""
+
     def __init__(
         self,
         name: str,
@@ -55,6 +59,7 @@ class Task:
         self._context: TaskContext | None = None
 
     async def run(self, *args: Any, **kwargs: Any) -> Any:
+        """Execute the task callable and record its outcome, applying retries if allowed."""
         self.status = TaskStatus.RUNNING
         self.started_at = datetime.now()
         self._context = TaskContext(self.id, self.name)
@@ -101,6 +106,7 @@ class Task:
             raise
 
     def cancel(self) -> None:
+        """Mark a registered task as cancelled when cancellation is permitted."""
         if self.status in {TaskStatus.PENDING, TaskStatus.RUNNING}:
             self.status = TaskStatus.CANCELLED
             self.completed_at = datetime.now()
@@ -134,6 +140,8 @@ def task(
     queue: str = "default",
     priority: int = 0,
 ) -> Callable:
+    """Decorate a callable to construct a configured Task object."""
+
     def decorator(func: Callable) -> Task:
         task_name = name or func.__name__
         return Task(

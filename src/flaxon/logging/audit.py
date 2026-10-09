@@ -9,6 +9,8 @@ from .formatters import AuditFormatter
 
 
 class AuditLogger:
+    """Record authentication and resource-management actions as audit events."""
+
     def __init__(self, logger: logging.Logger | None = None) -> None:
         self.logger = logger or logging.getLogger("flaxon.audit")
         self._configure()
@@ -34,6 +36,7 @@ class AuditLogger:
         error: str | None = None,
         extra: dict[str, Any] | None = None,
     ) -> None:
+        """Write an audit action with its actor, resource, changes, and outcome."""
         log_data = {
             "action": action,
             "user_id": str(user_id) if user_id else None,
@@ -55,6 +58,7 @@ class AuditLogger:
     def log_login(
         self, user_id: str | int, ip: str | None = None, user_agent: str | None = None, success: bool = True
     ) -> None:
+        """Record the success or failure of a sign-in attempt."""
         self.log(
             action="login",
             user_id=user_id,
@@ -64,6 +68,7 @@ class AuditLogger:
         )
 
     def log_logout(self, user_id: str | int, ip: str | None = None, user_agent: str | None = None) -> None:
+        """Record a sign-out event."""
         self.log(
             action="logout",
             user_id=user_id,
@@ -74,6 +79,7 @@ class AuditLogger:
     def log_create(
         self, user_id: str | int, resource: str, data: dict[str, Any], ip: str | None = None
     ) -> None:
+        """Record a resource creation with its supplied data."""
         self.log(
             action="create",
             user_id=user_id,
@@ -85,6 +91,7 @@ class AuditLogger:
     def log_update(
         self, user_id: str | int, resource: str, changes: dict[str, Any], ip: str | None = None
     ) -> None:
+        """Record a resource update with its supplied changes."""
         self.log(
             action="update",
             user_id=user_id,
@@ -94,6 +101,7 @@ class AuditLogger:
         )
 
     def log_delete(self, user_id: str | int, resource: str, ip: str | None = None) -> None:
+        """Record a resource deletion."""
         self.log(
             action="delete",
             user_id=user_id,
@@ -102,6 +110,7 @@ class AuditLogger:
         )
 
     def log_access_denied(self, user_id: str | int | None, resource: str, ip: str | None = None) -> None:
+        """Record a denied resource access as a failed audit action."""
         self.log(
             action="access_denied",
             user_id=user_id,
@@ -112,6 +121,8 @@ class AuditLogger:
 
 
 class AuditMiddleware:
+    """Record an audit event before dispatching an HTTP request."""
+
     def __init__(self, app: Any, logger: AuditLogger | None = None) -> None:
         self.app = app
         self.logger = logger or AuditLogger()

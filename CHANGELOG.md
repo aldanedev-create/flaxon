@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Reduce Ruff findings from 3,442 to 2,973 without disabling rules; document cache, dependency, task, and logging APIs and tighten the per-file/rule CI budget.
+- Isolate request, logging, task, and dependency context values across concurrent tasks; copy logging configuration handlers and repair rotating file handler options. Add regression tests and expand strict typing checks to 15 core modules.
+
 - Index dynamic HTTP candidates by their full literal prefix and cache route specificity, preserving typed converters, method fallback, mounted routes, and registration-order ties.
 - Log task signal and worker failures; use bounded worker retry delays; propagate S3 access/backend errors instead of reporting missing objects.
 - Narrow request decoding, annotation resolution, persisted-query, and WebSocket token error boundaries.

@@ -57,8 +57,9 @@ from __future__ import annotations
 import asyncio
 import functools
 import inspect
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from flaxon.routing.route import WebSocketRoute
 from flaxon.routing.router import Router
@@ -239,7 +240,7 @@ class FlaxonModule:
 
     # -- nesting ------------------------------------------------------------
 
-    def register_module(self, child: "FlaxonModule", prefix: str = "") -> None:
+    def register_module(self, child: FlaxonModule, prefix: str = "") -> None:
         """Nest another module's routes/static/templates/hooks/commands
         into this one, merged at mount time under `prefix` (relative to
         wherever this parent module itself ends up mounted).

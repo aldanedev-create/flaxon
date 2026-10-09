@@ -15,9 +15,9 @@ from typing import Any
 from flaxon.http import Request
 from flaxon.websocket import WebSocket
 
-_request_context: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
+_request_context: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar(
     "flaxon_request_context",
-    default={},
+    default=None,
 )
 
 _request: contextvars.ContextVar[Request | None] = contextvars.ContextVar(
@@ -34,9 +34,9 @@ _websocket: contextvars.ContextVar[WebSocket | None] = contextvars.ContextVar(
 class RequestContext:
     """Request context manager for request-local data."""
 
-    def __init__(self) -> None:
-        """Initialize the request context."""
-        self._data = _request_context.get()
+    @property
+    def _data(self) -> dict[str, Any]:
+        return _request_context.get() or {}
 
     def get(self, key: str, default: Any = None) -> Any:
         """Get a value from the context."""
@@ -44,15 +44,19 @@ class RequestContext:
 
     def set(self, key: str, value: Any) -> None:
         """Set a value in the context."""
-        self._data[key] = value
+        data = dict(self._data)
+        data[key] = value
+        _request_context.set(data)
 
     def delete(self, key: str) -> None:
         """Delete a value from the context."""
-        self._data.pop(key, None)
+        data = dict(self._data)
+        data.pop(key, None)
+        _request_context.set(data)
 
     def clear(self) -> None:
         """Clear all values from the context."""
-        self._data.clear()
+        _request_context.set({})
 
     def keys(self) -> list[str]:
         """Get all keys in the context."""
@@ -72,7 +76,7 @@ class RequestContext:
 
     def __setitem__(self, key: str, value: Any) -> None:
         """Set a value in the context."""
-        self._data[key] = value
+        self.set(key, value)
 
     def __delitem__(self, key: str) -> None:
         """Delete a value from the context."""
@@ -128,7 +132,6 @@ class ContextMiddleware:
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
         """Handle the request with context."""
         if scope.get("type") == "http":
-            from flaxon.http import Request
             request = Request(scope, receive, None)
             with request_context(request):
                 await self.app(scope, receive, send)

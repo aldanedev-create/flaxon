@@ -6,6 +6,7 @@ import hashlib
 import importlib
 import json
 from contextvars import ContextVar
+from datetime import UTC
 from typing import Any
 
 from tortoise import fields
@@ -443,11 +444,11 @@ def model_adapter(model: type[Model], options: dict[str, Any]):
                     obj = await model.select_for_update().get(pk=object_id)
                     if expected_version and await cls.version(obj) != expected_version:
                         raise Conflict("This record changed. Reload before saving.")
-                    from datetime import datetime, timezone
+                    from datetime import datetime
 
                     for name, field in columns.items():
                         if getattr(field, "auto_now", False):
-                            values[name] = datetime.now(timezone.utc)
+                            values[name] = datetime.now(UTC)
                     original = {name: getattr(obj, name) for name in model._meta.fields_db_projection}
                     obj.update_from_dict(values)
                     changed = (

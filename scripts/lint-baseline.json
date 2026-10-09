@@ -12,18 +12,8 @@
       "count": 1
     },
     {
-      "file": "src/flaxon/__init__.py",
-      "rule": "RUF022",
-      "count": 1
-    },
-    {
       "file": "src/flaxon/admin/__init__.py",
       "rule": "PLC0415",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/admin/__init__.py",
-      "rule": "RUF022",
       "count": 1
     },
     {
@@ -83,11 +73,6 @@
     },
     {
       "file": "src/flaxon/admin/cms.py",
-      "rule": "F402",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/admin/cms.py",
       "rule": "PLC0206",
       "count": 1
     },
@@ -110,21 +95,6 @@
       "file": "src/flaxon/admin/cms.py",
       "rule": "PLR0917",
       "count": 1
-    },
-    {
-      "file": "src/flaxon/admin/cms.py",
-      "rule": "UP017",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/admin/cms.py",
-      "rule": "UP035",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/admin/cms.py",
-      "rule": "UP037",
-      "count": 2
     },
     {
       "file": "src/flaxon/admin/config.py",
@@ -232,16 +202,6 @@
       "count": 2
     },
     {
-      "file": "src/flaxon/admin/dashboard.py",
-      "rule": "UP034",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/admin/decorators.py",
-      "rule": "UP035",
-      "count": 1
-    },
-    {
       "file": "src/flaxon/admin/exceptions.py",
       "rule": "D101",
       "count": 4
@@ -319,11 +279,6 @@
     {
       "file": "src/flaxon/admin/production.py",
       "rule": "RUF006",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/admin/production.py",
-      "rule": "UP035",
       "count": 1
     },
     {
@@ -407,11 +362,6 @@
       "count": 1
     },
     {
-      "file": "src/flaxon/admin/views.py",
-      "rule": "UP034",
-      "count": 2
-    },
-    {
       "file": "src/flaxon/application/app.py",
       "rule": "C901",
       "count": 2
@@ -452,16 +402,6 @@
       "count": 1
     },
     {
-      "file": "src/flaxon/application/context.py",
-      "rule": "B039",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/application/context.py",
-      "rule": "PLC0415",
-      "count": 1
-    },
-    {
       "file": "src/flaxon/application/environment.py",
       "rule": "PLW2901",
       "count": 1
@@ -478,28 +418,8 @@
     },
     {
       "file": "src/flaxon/caching/backends/custom.py",
-      "rule": "D101",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/caching/backends/custom.py",
-      "rule": "D102",
-      "count": 11
-    },
-    {
-      "file": "src/flaxon/caching/backends/custom.py",
       "rule": "SIM108",
       "count": 1
-    },
-    {
-      "file": "src/flaxon/caching/backends/filesystem.py",
-      "rule": "D101",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/caching/backends/filesystem.py",
-      "rule": "D102",
-      "count": 12
     },
     {
       "file": "src/flaxon/caching/backends/filesystem.py",
@@ -518,16 +438,6 @@
     },
     {
       "file": "src/flaxon/caching/backends/memory.py",
-      "rule": "D101",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/caching/backends/memory.py",
-      "rule": "D102",
-      "count": 14
-    },
-    {
-      "file": "src/flaxon/caching/backends/memory.py",
       "rule": "RUF059",
       "count": 2
     },
@@ -543,33 +453,8 @@
     },
     {
       "file": "src/flaxon/caching/backends/redis.py",
-      "rule": "B905",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/caching/backends/redis.py",
-      "rule": "D101",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/caching/backends/redis.py",
-      "rule": "D102",
-      "count": 15
-    },
-    {
-      "file": "src/flaxon/caching/backends/redis.py",
       "rule": "PLC0415",
       "count": 1
-    },
-    {
-      "file": "src/flaxon/caching/cache.py",
-      "rule": "D101",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/caching/cache.py",
-      "rule": "D102",
-      "count": 14
     },
     {
       "file": "src/flaxon/caching/cache.py",
@@ -595,21 +480,6 @@
       "file": "src/flaxon/caching/decorators.py",
       "rule": "RUF006",
       "count": 2
-    },
-    {
-      "file": "src/flaxon/caching/exceptions.py",
-      "rule": "D101",
-      "count": 5
-    },
-    {
-      "file": "src/flaxon/caching/key_builder.py",
-      "rule": "D101",
-      "count": 2
-    },
-    {
-      "file": "src/flaxon/caching/key_builder.py",
-      "rule": "D102",
-      "count": 10
     },
     {
       "file": "src/flaxon/caching/key_builder.py",
@@ -647,11 +517,6 @@
       "count": 1
     },
     {
-      "file": "src/flaxon/cli/commands/build.py",
-      "rule": "TID252",
-      "count": 1
-    },
-    {
       "file": "src/flaxon/cli/commands/docs.py",
       "rule": "D101",
       "count": 1
@@ -677,11 +542,6 @@
       "count": 2
     },
     {
-      "file": "src/flaxon/cli/commands/docs.py",
-      "rule": "TID252",
-      "count": 1
-    },
-    {
       "file": "src/flaxon/cli/commands/doctor.py",
       "rule": "C901",
       "count": 1
@@ -697,19 +557,9 @@
       "count": 3
     },
     {
-      "file": "src/flaxon/cli/commands/doctor.py",
-      "rule": "TID252",
-      "count": 1
-    },
-    {
       "file": "src/flaxon/cli/commands/generate.py",
       "rule": "D101",
       "count": 1
-    },
-    {
-      "file": "src/flaxon/cli/commands/generate.py",
-      "rule": "TID252",
-      "count": 2
     },
     {
       "file": "src/flaxon/cli/commands/inspect.py",
@@ -725,11 +575,6 @@
       "file": "src/flaxon/cli/commands/inspect.py",
       "rule": "PLC0415",
       "count": 2
-    },
-    {
-      "file": "src/flaxon/cli/commands/inspect.py",
-      "rule": "TID252",
-      "count": 1
     },
     {
       "file": "src/flaxon/cli/commands/migrate.py",
@@ -762,11 +607,6 @@
       "count": 1
     },
     {
-      "file": "src/flaxon/cli/commands/migrate.py",
-      "rule": "TID252",
-      "count": 1
-    },
-    {
       "file": "src/flaxon/cli/commands/new.py",
       "rule": "D101",
       "count": 1
@@ -775,11 +615,6 @@
       "file": "src/flaxon/cli/commands/new.py",
       "rule": "S603",
       "count": 1
-    },
-    {
-      "file": "src/flaxon/cli/commands/new.py",
-      "rule": "TID252",
-      "count": 2
     },
     {
       "file": "src/flaxon/cli/commands/routes.py",
@@ -794,11 +629,6 @@
     {
       "file": "src/flaxon/cli/commands/routes.py",
       "rule": "PTH123",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/cli/commands/routes.py",
-      "rule": "TID252",
       "count": 1
     },
     {
@@ -817,11 +647,6 @@
       "count": 1
     },
     {
-      "file": "src/flaxon/cli/commands/run.py",
-      "rule": "TID252",
-      "count": 1
-    },
-    {
       "file": "src/flaxon/cli/commands/schedule.py",
       "rule": "D101",
       "count": 1
@@ -832,11 +657,6 @@
       "count": 4
     },
     {
-      "file": "src/flaxon/cli/commands/schedule.py",
-      "rule": "TID252",
-      "count": 1
-    },
-    {
       "file": "src/flaxon/cli/commands/shell.py",
       "rule": "D101",
       "count": 1
@@ -844,11 +664,6 @@
     {
       "file": "src/flaxon/cli/commands/shell.py",
       "rule": "PLC0415",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/cli/commands/shell.py",
-      "rule": "TID252",
       "count": 1
     },
     {
@@ -872,11 +687,6 @@
       "count": 1
     },
     {
-      "file": "src/flaxon/cli/commands/test.py",
-      "rule": "TID252",
-      "count": 1
-    },
-    {
       "file": "src/flaxon/cli/commands/version.py",
       "rule": "D101",
       "count": 1
@@ -887,11 +697,6 @@
       "count": 3
     },
     {
-      "file": "src/flaxon/cli/commands/version.py",
-      "rule": "TID252",
-      "count": 1
-    },
-    {
       "file": "src/flaxon/cli/commands/worker.py",
       "rule": "D101",
       "count": 1
@@ -900,11 +705,6 @@
       "file": "src/flaxon/cli/commands/worker.py",
       "rule": "PLC0415",
       "count": 4
-    },
-    {
-      "file": "src/flaxon/cli/commands/worker.py",
-      "rule": "TID252",
-      "count": 1
     },
     {
       "file": "src/flaxon/cli/console.py",
@@ -1078,11 +878,6 @@
     },
     {
       "file": "src/flaxon/database/adapters/sqlite.py",
-      "rule": "B905",
-      "count": 2
-    },
-    {
-      "file": "src/flaxon/database/adapters/sqlite.py",
       "rule": "D101",
       "count": 1
     },
@@ -1095,11 +890,6 @@
       "file": "src/flaxon/database/adapters/sqlite.py",
       "rule": "PLC0415",
       "count": 1
-    },
-    {
-      "file": "src/flaxon/database/connections.py",
-      "rule": "B905",
-      "count": 2
     },
     {
       "file": "src/flaxon/database/connections.py",
@@ -1203,28 +993,18 @@
     },
     {
       "file": "src/flaxon/database/repositories.py",
-      "rule": "F841",
-      "count": 2
-    },
-    {
-      "file": "src/flaxon/database/repositories.py",
       "rule": "S608",
       "count": 11
     },
     {
       "file": "src/flaxon/database/repositories.py",
       "rule": "SIM118",
-      "count": 2
+      "count": 1
     },
     {
       "file": "src/flaxon/database/transactions.py",
       "rule": "D102",
       "count": 5
-    },
-    {
-      "file": "src/flaxon/db/__init__.py",
-      "rule": "RUF022",
-      "count": 1
     },
     {
       "file": "src/flaxon/db/admin.py",
@@ -1269,11 +1049,6 @@
     {
       "file": "src/flaxon/db/admin.py",
       "rule": "SIM114",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/db/admin.py",
-      "rule": "UP017",
       "count": 1
     },
     {
@@ -1330,11 +1105,6 @@
       "file": "src/flaxon/debugging/dashboard.py",
       "rule": "E501",
       "count": 8
-    },
-    {
-      "file": "src/flaxon/debugging/dashboard.py",
-      "rule": "F841",
-      "count": 1
     },
     {
       "file": "src/flaxon/debugging/dashboard.py",
@@ -1558,23 +1328,8 @@
     },
     {
       "file": "src/flaxon/dependency_injection/container.py",
-      "rule": "D101",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/dependency_injection/container.py",
-      "rule": "D102",
-      "count": 15
-    },
-    {
-      "file": "src/flaxon/dependency_injection/container.py",
       "rule": "PLW0108",
       "count": 1
-    },
-    {
-      "file": "src/flaxon/dependency_injection/decorators.py",
-      "rule": "D103",
-      "count": 5
     },
     {
       "file": "src/flaxon/dependency_injection/decorators.py",
@@ -1582,39 +1337,9 @@
       "count": 2
     },
     {
-      "file": "src/flaxon/dependency_injection/exceptions.py",
-      "rule": "D101",
-      "count": 6
-    },
-    {
-      "file": "src/flaxon/dependency_injection/provider.py",
-      "rule": "D101",
-      "count": 8
-    },
-    {
-      "file": "src/flaxon/dependency_injection/provider.py",
-      "rule": "D102",
-      "count": 8
-    },
-    {
       "file": "src/flaxon/dependency_injection/provider.py",
       "rule": "PLC0415",
       "count": 1
-    },
-    {
-      "file": "src/flaxon/dependency_injection/scope.py",
-      "rule": "B039",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/dependency_injection/scope.py",
-      "rule": "D101",
-      "count": 3
-    },
-    {
-      "file": "src/flaxon/dependency_injection/scope.py",
-      "rule": "D102",
-      "count": 14
     },
     {
       "file": "src/flaxon/events/dispatcher.py",
@@ -1867,11 +1592,6 @@
       "count": 2
     },
     {
-      "file": "src/flaxon/graphql/__init__.py",
-      "rule": "RUF022",
-      "count": 1
-    },
-    {
       "file": "src/flaxon/graphql/ast.py",
       "rule": "D101",
       "count": 23
@@ -1967,11 +1687,6 @@
       "count": 1
     },
     {
-      "file": "src/flaxon/graphql/extensions/__init__.py",
-      "rule": "RUF022",
-      "count": 1
-    },
-    {
       "file": "src/flaxon/graphql/extensions/complexity.py",
       "rule": "D101",
       "count": 1
@@ -2039,11 +1754,6 @@
     {
       "file": "src/flaxon/graphql/extensions/persisted_queries.py",
       "rule": "S324",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/graphql/extensions/persisted_queries.py",
-      "rule": "UP015",
       "count": 1
     },
     {
@@ -2189,11 +1899,6 @@
     {
       "file": "src/flaxon/graphql/schema.py",
       "rule": "RET504",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/graphql/subscriptions/__init__.py",
-      "rule": "RUF022",
       "count": 1
     },
     {
@@ -2399,11 +2104,6 @@
     {
       "file": "src/flaxon/http/serialization.py",
       "rule": "PLR0912",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/http/serialization.py",
-      "rule": "UP017",
       "count": 1
     },
     {
@@ -2733,23 +2433,13 @@
     },
     {
       "file": "src/flaxon/logging/access.py",
-      "rule": "D101",
-      "count": 2
-    },
-    {
-      "file": "src/flaxon/logging/access.py",
       "rule": "D102",
-      "count": 2
-    },
-    {
-      "file": "src/flaxon/logging/audit.py",
-      "rule": "D101",
-      "count": 2
+      "count": 1
     },
     {
       "file": "src/flaxon/logging/audit.py",
       "rule": "D102",
-      "count": 8
+      "count": 1
     },
     {
       "file": "src/flaxon/logging/audit.py",
@@ -2760,56 +2450,6 @@
       "file": "src/flaxon/logging/audit.py",
       "rule": "PLR0917",
       "count": 1
-    },
-    {
-      "file": "src/flaxon/logging/configuration.py",
-      "rule": "D101",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/logging/configuration.py",
-      "rule": "D102",
-      "count": 10
-    },
-    {
-      "file": "src/flaxon/logging/configuration.py",
-      "rule": "RUF012",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/logging/context.py",
-      "rule": "B039",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/logging/context.py",
-      "rule": "D101",
-      "count": 2
-    },
-    {
-      "file": "src/flaxon/logging/context.py",
-      "rule": "D102",
-      "count": 8
-    },
-    {
-      "file": "src/flaxon/logging/context.py",
-      "rule": "D103",
-      "count": 4
-    },
-    {
-      "file": "src/flaxon/logging/filters.py",
-      "rule": "D101",
-      "count": 8
-    },
-    {
-      "file": "src/flaxon/logging/filters.py",
-      "rule": "D102",
-      "count": 8
-    },
-    {
-      "file": "src/flaxon/logging/filters.py",
-      "rule": "D103",
-      "count": 2
     },
     {
       "file": "src/flaxon/logging/filters.py",
@@ -2823,16 +2463,6 @@
     },
     {
       "file": "src/flaxon/logging/formatters.py",
-      "rule": "D101",
-      "count": 4
-    },
-    {
-      "file": "src/flaxon/logging/formatters.py",
-      "rule": "D102",
-      "count": 4
-    },
-    {
-      "file": "src/flaxon/logging/formatters.py",
       "rule": "PLC0415",
       "count": 1
     },
@@ -2842,54 +2472,9 @@
       "count": 1
     },
     {
-      "file": "src/flaxon/logging/handlers.py",
-      "rule": "D101",
-      "count": 7
-    },
-    {
-      "file": "src/flaxon/logging/handlers.py",
-      "rule": "D102",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/logging/handlers.py",
-      "rule": "D103",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/logging/json_logger.py",
-      "rule": "D101",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/logging/json_logger.py",
-      "rule": "D102",
-      "count": 12
-    },
-    {
-      "file": "src/flaxon/logging/json_logger.py",
-      "rule": "D103",
-      "count": 1
-    },
-    {
       "file": "src/flaxon/logging/json_logger.py",
       "rule": "PLC0415",
       "count": 1
-    },
-    {
-      "file": "src/flaxon/logging/logger.py",
-      "rule": "D101",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/logging/logger.py",
-      "rule": "D102",
-      "count": 10
-    },
-    {
-      "file": "src/flaxon/logging/logger.py",
-      "rule": "D103",
-      "count": 7
     },
     {
       "file": "src/flaxon/logging/logger.py",
@@ -2907,11 +2492,6 @@
       "count": 1
     },
     {
-      "file": "src/flaxon/mail/adapters/console.py",
-      "rule": "TID252",
-      "count": 1
-    },
-    {
       "file": "src/flaxon/mail/adapters/custom.py",
       "rule": "D101",
       "count": 1
@@ -2934,11 +2514,6 @@
     {
       "file": "src/flaxon/mail/adapters/smtp.py",
       "rule": "PLR0917",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/mail/adapters/smtp.py",
-      "rule": "TID252",
       "count": 1
     },
     {
@@ -3087,11 +2662,6 @@
       "count": 9
     },
     {
-      "file": "src/flaxon/middleware/__init__.py",
-      "rule": "RUF022",
-      "count": 1
-    },
-    {
       "file": "src/flaxon/middleware/base.py",
       "rule": "D102",
       "count": 1
@@ -3219,16 +2789,6 @@
     {
       "file": "src/flaxon/modules.py",
       "rule": "PLR0917",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/modules.py",
-      "rule": "UP035",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/modules.py",
-      "rule": "UP037",
       "count": 1
     },
     {
@@ -3435,11 +2995,6 @@
       "file": "src/flaxon/protocols.py",
       "rule": "D102",
       "count": 46
-    },
-    {
-      "file": "src/flaxon/routing/__init__.py",
-      "rule": "RUF022",
-      "count": 1
     },
     {
       "file": "src/flaxon/routing/dependency.py",
@@ -3942,11 +3497,6 @@
       "count": 6
     },
     {
-      "file": "src/flaxon/sessions/backends/database.py",
-      "rule": "TID252",
-      "count": 1
-    },
-    {
       "file": "src/flaxon/sessions/backends/memory.py",
       "rule": "D101",
       "count": 1
@@ -3959,11 +3509,6 @@
     {
       "file": "src/flaxon/sessions/backends/memory.py",
       "rule": "SIM105",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/sessions/backends/memory.py",
-      "rule": "TID252",
       "count": 1
     },
     {
@@ -3982,11 +3527,6 @@
       "count": 1
     },
     {
-      "file": "src/flaxon/sessions/backends/redis.py",
-      "rule": "TID252",
-      "count": 1
-    },
-    {
       "file": "src/flaxon/sessions/backends/signed_cookie.py",
       "rule": "D101",
       "count": 1
@@ -3995,11 +3535,6 @@
       "file": "src/flaxon/sessions/backends/signed_cookie.py",
       "rule": "D102",
       "count": 7
-    },
-    {
-      "file": "src/flaxon/sessions/backends/signed_cookie.py",
-      "rule": "TID252",
-      "count": 1
     },
     {
       "file": "src/flaxon/sessions/cookie.py",
@@ -4067,49 +3602,9 @@
       "count": 1
     },
     {
-      "file": "src/flaxon/tasks/backends/custom.py",
-      "rule": "D101",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/tasks/backends/custom.py",
-      "rule": "D102",
-      "count": 11
-    },
-    {
-      "file": "src/flaxon/tasks/backends/custom.py",
-      "rule": "TID252",
-      "count": 3
-    },
-    {
-      "file": "src/flaxon/tasks/backends/database.py",
-      "rule": "D101",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/tasks/backends/database.py",
-      "rule": "D102",
-      "count": 11
-    },
-    {
       "file": "src/flaxon/tasks/backends/database.py",
       "rule": "S608",
       "count": 10
-    },
-    {
-      "file": "src/flaxon/tasks/backends/database.py",
-      "rule": "TID252",
-      "count": 4
-    },
-    {
-      "file": "src/flaxon/tasks/backends/memory.py",
-      "rule": "D101",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/tasks/backends/memory.py",
-      "rule": "D102",
-      "count": 13
     },
     {
       "file": "src/flaxon/tasks/backends/memory.py",
@@ -4117,103 +3612,8 @@
       "count": 1
     },
     {
-      "file": "src/flaxon/tasks/backends/memory.py",
-      "rule": "TID252",
-      "count": 4
-    },
-    {
-      "file": "src/flaxon/tasks/backends/redis.py",
-      "rule": "D101",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/tasks/backends/redis.py",
-      "rule": "D102",
-      "count": 16
-    },
-    {
       "file": "src/flaxon/tasks/backends/redis.py",
       "rule": "PLC0415",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/tasks/backends/redis.py",
-      "rule": "TID252",
-      "count": 4
-    },
-    {
-      "file": "src/flaxon/tasks/context.py",
-      "rule": "B039",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/tasks/context.py",
-      "rule": "D101",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/tasks/context.py",
-      "rule": "D102",
-      "count": 5
-    },
-    {
-      "file": "src/flaxon/tasks/context.py",
-      "rule": "D103",
-      "count": 5
-    },
-    {
-      "file": "src/flaxon/tasks/exceptions.py",
-      "rule": "D101",
-      "count": 7
-    },
-    {
-      "file": "src/flaxon/tasks/queue.py",
-      "rule": "D101",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/tasks/queue.py",
-      "rule": "D102",
-      "count": 12
-    },
-    {
-      "file": "src/flaxon/tasks/registry.py",
-      "rule": "D101",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/tasks/registry.py",
-      "rule": "D102",
-      "count": 7
-    },
-    {
-      "file": "src/flaxon/tasks/registry.py",
-      "rule": "D103",
-      "count": 2
-    },
-    {
-      "file": "src/flaxon/tasks/result.py",
-      "rule": "D101",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/tasks/result.py",
-      "rule": "D102",
-      "count": 10
-    },
-    {
-      "file": "src/flaxon/tasks/retry.py",
-      "rule": "D101",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/tasks/retry.py",
-      "rule": "D102",
-      "count": 3
-    },
-    {
-      "file": "src/flaxon/tasks/retry.py",
-      "rule": "D103",
       "count": 1
     },
     {
@@ -4227,39 +3627,9 @@
       "count": 1
     },
     {
-      "file": "src/flaxon/tasks/scheduler.py",
-      "rule": "D101",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/tasks/scheduler.py",
-      "rule": "D102",
-      "count": 3
-    },
-    {
-      "file": "src/flaxon/tasks/scheduler.py",
-      "rule": "D103",
-      "count": 1
-    },
-    {
       "file": "src/flaxon/tasks/serializer.py",
       "rule": "B007",
       "count": 1
-    },
-    {
-      "file": "src/flaxon/tasks/serializer.py",
-      "rule": "D101",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/tasks/serializer.py",
-      "rule": "D102",
-      "count": 7
-    },
-    {
-      "file": "src/flaxon/tasks/serializer.py",
-      "rule": "D103",
-      "count": 6
     },
     {
       "file": "src/flaxon/tasks/serializer.py",
@@ -4269,21 +3639,6 @@
     {
       "file": "src/flaxon/tasks/serializer.py",
       "rule": "S301",
-      "count": 1
-    },
-    {
-      "file": "src/flaxon/tasks/task.py",
-      "rule": "D101",
-      "count": 2
-    },
-    {
-      "file": "src/flaxon/tasks/task.py",
-      "rule": "D102",
-      "count": 2
-    },
-    {
-      "file": "src/flaxon/tasks/task.py",
-      "rule": "D103",
       "count": 1
     },
     {
@@ -4434,7 +3789,7 @@
     {
       "file": "src/flaxon/typing.py",
       "rule": "UP007",
-      "count": 10
+      "count": 6
     },
     {
       "file": "src/flaxon/utils/deprecation.py",
@@ -4640,11 +3995,6 @@
       "file": "src/flaxon/websocket/redis_backend.py",
       "rule": "PLC0415",
       "count": 3
-    },
-    {
-      "file": "src/flaxon/websocket/rooms.py",
-      "rule": "B905",
-      "count": 2
     }
   ]
 }

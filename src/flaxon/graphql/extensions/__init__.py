@@ -5,7 +5,7 @@ from .depth_limit import DepthLimitExtension
 from .persisted_queries import PersistedQueriesExtension
 
 __all__ = [
-    "PersistedQueriesExtension",
     "ComplexityExtension",
     "DepthLimitExtension",
+    "PersistedQueriesExtension",
 ]

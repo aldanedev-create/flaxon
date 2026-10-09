@@ -152,3 +152,30 @@ fixture tests also passed with benchmark measurements enabled.
 pytest tests --benchmark-disable
 # Runs all assertions and reports the existing coverage-threshold failure.
 ```
+
+## Follow-up lint cleanup
+
+A second pass reduced Ruff 0.16.10 findings from **3,442 to 2,973** (469
+removed). It adds 388 public API docstrings across caching, dependency injection,
+tasks, and logging, plus reviewed import and formatting cleanup. Parent-relative
+imports now use equivalent absolute Flaxon paths. Optional integrations retain
+their lazy imports. No lint rules were disabled, and every file/rule allowance
+was reduced or kept unchanged.
+
+The pass also fixes shared mutable context defaults and cached context
+dictionaries. Request and logging helpers read the active context dynamically;
+context mutations copy their dictionaries so child tasks cannot overwrite their
+parent's values. Task and dependency contexts use immutable defaults. Logging
+configurations copy handler definitions, and rotating file handlers now pass
+size, backup count, and encoding by name to the standard library handler.
+
+Thirteen regression tests cover independent contexts, concurrent tasks and
+logging middleware, nested context restoration, configuration isolation, and
+actual log rollover. These tests are included in the request/security CI job.
+The strict typing gate now checks **15 modules**, adding the four context
+modules. This remains targeted coverage rather than a whole-package typing
+claim.
+
+The full suite completed with **946 passed and 32 skipped**, with default
+coverage options and benchmark timing disabled. This verifies test assertions;
+the existing coverage gap described above remains.

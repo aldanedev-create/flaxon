@@ -33,7 +33,7 @@ class Repository(Generic[T]):
         self.table_name = _safe_identifier(table_name, "table name")
 
     async def create(self, data: dict[str, Any]) -> dict[str, Any]:
-        safe_keys = [_safe_identifier(k, "column name") for k in data.keys()]
+        safe_keys = [_safe_identifier(k, "column name") for k in data]
         columns = ", ".join(safe_keys)
         placeholders = ", ".join(f"${i+1}" for i in range(len(data)))
         query = f"INSERT INTO {self.table_name} ({columns}) VALUES ({placeholders}) RETURNING *"
@@ -59,7 +59,7 @@ class Repository(Generic[T]):
     async def delete(self, id: Any, id_column: str = "id") -> bool:
         id_column = _safe_identifier(id_column, "column name")
         query = f"DELETE FROM {self.table_name} WHERE {id_column} = $1"
-        result = await self.db.execute(query, id)
+        await self.db.execute(query, id)
         return True
 
     async def count(self) -> int:
@@ -112,7 +112,7 @@ class Repository(Generic[T]):
 
     async def delete_all(self) -> int:
         query = f"DELETE FROM {self.table_name}"
-        result = await self.db.execute(query)
+        await self.db.execute(query)
         return 0
 
     async def paginate(self, page: int = 1, per_page: int = 20) -> dict[str, Any]:

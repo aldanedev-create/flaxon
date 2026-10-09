@@ -9,6 +9,8 @@ from typing import Any
 
 
 class Serializer:
+    """Convert task values and encode JSON or trusted pickle payloads."""
+
     def __init__(self) -> None:
         self._serializers: dict[type, Callable[[Any], Any]] = {}
         self._deserializers: dict[type, Callable[[Any], Any]] = {}
@@ -36,10 +38,12 @@ class Serializer:
     def register(
         self, type_: type, serializer: Callable[[Any], Any], deserializer: Callable[[Any], Any]
     ) -> None:
+        """Register an encoder and decoder for a Python value type."""
         self._serializers[type_] = serializer
         self._deserializers[type_] = deserializer
 
     def serialize(self, value: Any) -> Any:
+        """Recursively convert registered types and container values for storage."""
         if value is None:
             return None
 
@@ -57,6 +61,7 @@ class Serializer:
         return value
 
     def deserialize(self, value: Any) -> Any:
+        """Recursively decode container values using the registered conversions."""
         if value is None:
             return None
 
@@ -75,15 +80,19 @@ class Serializer:
         return value
 
     def to_json(self, value: Any) -> str:
+        """Serialize a value as a JSON string."""
         return json.dumps(self.serialize(value), default=str, ensure_ascii=False)
 
     def from_json(self, data: str) -> Any:
+        """Parse JSON and recursively deserialize its values."""
         return self.deserialize(json.loads(data))
 
     def to_pickle(self, value: Any) -> bytes:
+        """Encode a Python value using pickle for trusted internal storage."""
         return pickle.dumps(value)
 
     def from_pickle(self, data: bytes) -> Any:
+        """Load a pickle payload; the input must come from a trusted source."""
         return pickle.loads(data)
 
 
@@ -91,24 +100,30 @@ _default_serializer = Serializer()
 
 
 def serialize(value: Any) -> Any:
+    """Recursively convert registered types and container values for storage."""
     return _default_serializer.serialize(value)
 
 
 def deserialize(value: Any) -> Any:
+    """Recursively decode container values using the registered conversions."""
     return _default_serializer.deserialize(value)
 
 
 def to_json(value: Any) -> str:
+    """Serialize a value as a JSON string."""
     return _default_serializer.to_json(value)
 
 
 def from_json(data: str) -> Any:
+    """Parse JSON and recursively deserialize its values."""
     return _default_serializer.from_json(data)
 
 
 def to_pickle(value: Any) -> bytes:
+    """Encode a Python value using pickle for trusted internal storage."""
     return _default_serializer.to_pickle(value)
 
 
 def from_pickle(data: bytes) -> Any:
+    """Load a pickle payload; the input must come from a trusted source."""
     return _default_serializer.from_pickle(data)

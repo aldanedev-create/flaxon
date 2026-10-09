@@ -7,6 +7,8 @@ from typing import Any
 
 
 class RetryPolicy:
+    """Select retryable errors and calculate backoff delays with optional jitter."""
+
     def __init__(
         self,
         max_retries: int = 3,
@@ -24,6 +26,7 @@ class RetryPolicy:
         self.retry_on = retry_on or [Exception]
 
     def should_retry(self, retry_count: int, error: Exception) -> bool:
+        """Check the retry limit and whether the error matches an allowed type."""
         if retry_count >= self.max_retries:
             return False
 
@@ -34,6 +37,7 @@ class RetryPolicy:
         return False
 
     def get_delay(self, retry_count: int) -> float:
+        """Calculate a backoff delay with the configured cap and optional jitter."""
         if retry_count == 0:
             return self.delay
 
@@ -47,6 +51,7 @@ class RetryPolicy:
         return max(0, delay)
 
     def get_next_retry_count(self, retry_count: int) -> int:
+        """Return the retry count incremented by one."""
         return retry_count + 1
 
 
@@ -58,6 +63,8 @@ def retry(
     random_jitter: float = 0.1,
     retry_on: list[type[Exception]] | None = None,
 ) -> Callable:
+    """Decorate a callable with asynchronous retry handling."""
+
     def decorator(func: Callable) -> Callable:
         policy = RetryPolicy(
             max_retries=max_retries,
@@ -87,4 +94,5 @@ def retry(
                     await asyncio.sleep(delay_seconds)
 
         return wrapper
+
     return decorator

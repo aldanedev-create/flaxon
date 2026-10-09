@@ -11,6 +11,8 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 
 def inject(container: Container | None = None) -> Callable[[F], F]:
+    """Decorate a callable to inject registered annotated dependencies."""
+
     def decorator(func: F) -> F:
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -29,11 +31,15 @@ def inject(container: Container | None = None) -> Callable[[F], F]:
                             kwargs[name] = container.get(dep_name)
 
             return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
 def provide(container: Container | None = None) -> Callable[[F], F]:
+    """Decorate a callable to register its result as a named instance."""
+
     def decorator(func: F) -> F:
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -42,11 +48,15 @@ def provide(container: Container | None = None) -> Callable[[F], F]:
                 container.register_instance(func.__name__, result)
                 return result
             return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
 def autowire(container: Container) -> Callable[[F], F]:
+    """Fill missing arguments using providers named for their annotated types."""
+
     def decorator(func: F) -> F:
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -65,11 +75,15 @@ def autowire(container: Container) -> Callable[[F], F]:
                                 kwargs[name] = container.get(dep_name)
 
             return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
 def service(name: str | None = None, singleton: bool = True) -> Callable:
+    """Wrap class construction; registration is still managed by the container."""
+
     def decorator(cls: type) -> type:
         original_init = cls.__init__
 
@@ -80,10 +94,14 @@ def service(name: str | None = None, singleton: bool = True) -> Callable:
         cls.__init__ = new_init
 
         return cls
+
     return decorator
 
 
 def dependency(name: str | None = None) -> Callable:
+    """Return a class marker decorator without registering the class."""
+
     def decorator(cls: type) -> type:
         return cls
+
     return decorator

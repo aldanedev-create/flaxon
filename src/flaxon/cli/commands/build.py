@@ -5,7 +5,7 @@ import subprocess
 import sys
 from typing import Any
 
-from ..base import Command
+from flaxon.cli.base import Command
 
 
 class BuildCommand(Command):

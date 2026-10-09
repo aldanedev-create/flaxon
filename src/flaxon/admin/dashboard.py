@@ -154,7 +154,7 @@ class AdminDashboard:
         self._csrf_token = self.csrf.generate_token()
         setattr(self.app, "_flaxon_admin_auth", self.auth)
         setattr(self.app, "_flaxon_admin_dashboard", self)
-        self.activities: list[AdminActivity] = [AdminActivity(**item) for item in ((self.store.get("meta", "activities", []) if self.store else []))]
+        self.activities: list[AdminActivity] = [AdminActivity(**item) for item in (self.store.get("meta", "activities", []) if self.store else [])]
         self.notifications: list[dict[str, Any]] = (self.store.get("meta", "notifications", []) if self.store else []) or []
         self.operations: list[dict[str, Any]] = (self.store.get("operations", "records", []) if self.store else []) or []
         if self.store and hasattr(self.store, "list_operations"):

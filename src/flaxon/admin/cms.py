@@ -34,10 +34,11 @@ import re
 import secrets
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from flaxon.exceptions import BadRequest, Forbidden, NotFound
 from flaxon.http import HTMLResponse, JSONResponse, Request, Response
@@ -63,7 +64,7 @@ def slugify(value: str) -> str:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 # ---------------------------------------------------------------------------
@@ -122,7 +123,7 @@ class CMSField:
 class BulkAction:
     name: str
     label: str
-    handler: Callable[["ContentType", list[str]], Any]
+    handler: Callable[[ContentType, list[str]], Any]
 
 
 @dataclass
@@ -164,7 +165,7 @@ class ContentType:
             self.register_action("publish", "Publish selected", lambda ct, ids: ct._set_status(ids, "published"))
             self.register_action("unpublish", "Unpublish selected", lambda ct, ids: ct._set_status(ids, "draft"))
 
-    def register_action(self, name: str, label: str, handler: Callable[["ContentType", list[str]], Any]) -> None:
+    def register_action(self, name: str, label: str, handler: Callable[[ContentType, list[str]], Any]) -> None:
         self._actions[name] = BulkAction(name, label, handler)
 
     def field_map(self) -> dict[str, CMSField]:
@@ -800,12 +801,12 @@ class CMS:
         return url
 
     async def _prepare_uploads(self, request: Request, data: dict[str, Any], content_type: ContentType) -> dict[str, Any]:
-        for field in content_type.fields:
-            if field.type not in {"file", "image"}:
+        for content_field in content_type.fields:
+            if content_field.type not in {"file", "image"}:
                 continue
-            upload = data.get(field.name)
+            upload = data.get(content_field.name)
             if hasattr(upload, "filename"):
-                data[field.name] = await self._save_admin_upload(upload, request)
+                data[content_field.name] = await self._save_admin_upload(upload, request)
         return data
 
     async def api_list(self, request: Request, type_name: str) -> Response:

@@ -20,6 +20,10 @@ CHECKED_MODULES = (
     "http/body.py",
     "http/serialization.py",
     "security/jwt.py",
+    "application/context.py",
+    "logging/context.py",
+    "tasks/context.py",
+    "dependency_injection/scope.py",
 )
 
 
