@@ -45,9 +45,7 @@ class Teloce:
         self.app = app
         self.project_root = Path(project_root or Path.cwd()).resolve()
         output = Path(build_dir)
-        self.build_dir = (
-            output.resolve() if output.is_absolute() else (self.project_root / output).resolve()
-        )
+        self.build_dir = output.resolve() if output.is_absolute() else (self.project_root / output).resolve()
         self.static_url = "/" + static_url.strip("/")
         self.entry = entry.replace("\\", "/").lstrip("/")
         self.title = title or app.name
@@ -76,9 +74,7 @@ class Teloce:
         for source in getattr(app, "_teloce_ui_sources", []):
             self.register_source(source.name, source.directory, routes=source.routes)
 
-        cache_control = (
-            "no-cache"
-        )
+        cache_control = "no-cache"
         app.mount_static(self.static_url, str(self.build_dir), cache_control=cache_control)
         app.on_startup(self.build)
 
@@ -116,8 +112,7 @@ class Teloce:
                 from teloce.router import generate_spa_router
             except ImportError as exc:
                 raise RuntimeError(
-                    "Teloce support requires the optional dependency: "
-                    "pip install --upgrade flaxon teloce-py"
+                    "Teloce support requires the optional dependency: pip install --upgrade flaxon teloce-py"
                 ) from exc
 
             missing = [str(source.directory) for source in self.sources if not source.directory.is_dir()]
@@ -125,8 +120,7 @@ class Teloce:
                 raise RuntimeError(f"Teloce UI directory does not exist: {missing[0]}")
 
             source_roots = [
-                source.directory.relative_to(self.project_root).as_posix()
-                for source in self.sources
+                source.directory.relative_to(self.project_root).as_posix() for source in self.sources
             ]
             build_options = {
                 "mode": "development" if self.app.debug else "production",
@@ -144,8 +138,7 @@ class Teloce:
             result = Builder(build_options).build(self.project_root, self.build_dir)
             if result.get("failed"):
                 details = "; ".join(
-                    f"{item.get('file')}: {item.get('error')}"
-                    for item in result.get("errors", [])
+                    f"{item.get('file')}: {item.get('error')}" for item in result.get("errors", [])
                 )
                 raise RuntimeError(f"Teloce build failed: {details}")
 
@@ -158,9 +151,7 @@ class Teloce:
                     page_dirs.append(pages)
                     for filename, route in source.routes.items():
                         normalized_filename = filename.replace("\\", "/")
-                        route_overrides[
-                            f"{pages.as_posix()}::{normalized_filename}"
-                        ] = route
+                        route_overrides[f"{pages.as_posix()}::{normalized_filename}"] = route
 
             self.router_output = None
             if page_dirs:
@@ -175,10 +166,15 @@ class Teloce:
                 )
                 if not self.app.debug and self.options.get("minify", True):
                     from minifyjs import minify
-                    optimized = minify(router_path.read_text(encoding="utf-8"),
-                                       compress=True, mangle=True, format="esm",
-                                       target=self.options.get("target") or "es2020",
-                                       source_name="router.js")
+
+                    optimized = minify(
+                        router_path.read_text(encoding="utf-8"),
+                        compress=True,
+                        mangle=True,
+                        format="esm",
+                        target=self.options.get("target") or "es2020",
+                        source_name="router.js",
+                    )
                     router_path.write_text(optimized.code, encoding="utf-8")
                 self.router_output = router_path.relative_to(self.build_dir).as_posix()
 
@@ -208,7 +204,7 @@ class Teloce:
         router_mount = ""
         if self.router_output:
             router_url = f"{self.static_url}/{self.router_output}"
-            router_import = f'import router from {json.dumps(router_url)};'
+            router_import = f"import router from {json.dumps(router_url)};"
             router_mount = (
                 'const view = document.querySelector("[data-teloce-router-view], #router-view");'
                 "if (view) router.mount(view, context);"
@@ -297,7 +293,11 @@ def install_teloce(
 
 def _resource_tag(tag: str, attributes: dict[str, Any]) -> str:
     """Render explicitly supported resource attributes without accepting raw HTML."""
-    allowed = {"src", "type", "defer", "async", "integrity", "crossorigin", "referrerpolicy"} if tag == "script" else {"href", "rel", "type", "media", "integrity", "crossorigin", "referrerpolicy", "sizes"}
+    allowed = (
+        {"src", "type", "defer", "async", "integrity", "crossorigin", "referrerpolicy"}
+        if tag == "script"
+        else {"href", "rel", "type", "media", "integrity", "crossorigin", "referrerpolicy", "sizes"}
+    )
     unknown = attributes.keys() - allowed
     if unknown:
         raise ValueError(f"Unsupported {tag} attributes: {', '.join(sorted(unknown))}")

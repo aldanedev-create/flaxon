@@ -26,9 +26,11 @@ class Mount:
 
         admin_app = Flaxon("admin")
 
+
         @admin_app.get("/")
         async def admin_home():
             return {"admin": True}
+
 
         app = Flaxon("main")
         mount = Mount("/admin", admin_app)

@@ -4,6 +4,8 @@ import hashlib
 import json
 from typing import Any
 
+from flaxon.exceptions import BadRequest
+
 
 class PersistedQueriesExtension:
     def __init__(self, storage: dict[str, str] | None = None, enabled: bool = True) -> None:
@@ -58,11 +60,21 @@ class PersistedQueriesExtension:
 
         try:
             data = await request.json()
-        except Exception:
+        except (json.JSONDecodeError, UnicodeDecodeError, BadRequest):
+            return
+        if not isinstance(data, dict):
             return
 
         query = data.get("query")
-        query_hash = data.get("extensions", {}).get("persistedQuery", {}).get("sha256Hash")
+        extensions = data.get("extensions")
+        if not isinstance(extensions, dict):
+            return
+        persisted = extensions.get("persistedQuery")
+        if not isinstance(persisted, dict):
+            return
+        query_hash = persisted.get("sha256Hash")
+        if not isinstance(query_hash, str):
+            return
 
         if query_hash and not query:
             persisted_query = self.get(query_hash)

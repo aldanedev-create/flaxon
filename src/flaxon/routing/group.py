@@ -24,13 +24,16 @@ class RouteGroup:
         ```python
         group = RouteGroup(prefix="/api/v1")
 
+
         @group.get("/users")
         async def list_users():
             return [{"id": 1}]
 
+
         @group.post("/users")
         async def create_user(data: CreateUser):
             return {"success": True}
+
 
         app.include_router(group)
         ```

@@ -95,7 +95,15 @@ class ConnectionPool:
 
 
 class PostgresConnection(DatabaseConnection):
-    def __init__(self, host: str = "localhost", port: int = 5432, database: str = "postgres", user: str = "postgres", password: str = "", **kwargs: Any) -> None:
+    def __init__(
+        self,
+        host: str = "localhost",
+        port: int = 5432,
+        database: str = "postgres",
+        user: str = "postgres",
+        password: str = "",
+        **kwargs: Any,
+    ) -> None:
         self.host = host
         self.port = port
         self.database = database
@@ -107,6 +115,7 @@ class PostgresConnection(DatabaseConnection):
     async def connect(self) -> None:
         try:
             import asyncpg
+
             self._conn = await asyncpg.connect(
                 host=self.host,
                 port=self.port,
@@ -116,7 +125,9 @@ class PostgresConnection(DatabaseConnection):
                 **self.kwargs,
             )
         except ImportError as exc:
-            raise RuntimeError("asyncpg is required for PostgreSQL. Install with: pip install asyncpg") from exc
+            raise RuntimeError(
+                "asyncpg is required for PostgreSQL. Install with: pip install asyncpg"
+            ) from exc
 
     async def disconnect(self) -> None:
         if self._conn:
@@ -147,9 +158,12 @@ class SQLiteConnection(DatabaseConnection):
     async def connect(self) -> None:
         try:
             import aiosqlite
+
             self._conn = await aiosqlite.connect(self.database, **self.kwargs)
         except ImportError as exc:
-            raise RuntimeError("aiosqlite is required for SQLite. Install with: pip install aiosqlite") from exc
+            raise RuntimeError(
+                "aiosqlite is required for SQLite. Install with: pip install aiosqlite"
+            ) from exc
 
     async def disconnect(self) -> None:
         if self._conn:

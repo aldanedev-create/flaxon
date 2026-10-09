@@ -81,7 +81,9 @@ class Bootstrapper:
                             "module": module,
                         })
                 except Exception as exc:
-                    logging.getLogger(__name__).warning("Isolated callback or cleanup failed (%s)", type(exc).__name__)
+                    logging.getLogger(__name__).warning(
+                        "Isolated callback or cleanup failed (%s)", type(exc).__name__
+                    )
         except ImportError:
             pass
 
@@ -101,7 +103,9 @@ class Bootstrapper:
                             "module": module,
                         })
             except Exception as exc:
-                logging.getLogger(__name__).warning("Isolated callback or cleanup failed (%s)", type(exc).__name__)
+                logging.getLogger(__name__).warning(
+                    "Isolated callback or cleanup failed (%s)", type(exc).__name__
+                )
 
     def add_hook(self, hook: Callable[[Flaxon], None]) -> None:
         """

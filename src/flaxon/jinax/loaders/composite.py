@@ -7,6 +7,7 @@ try:
     from jinja2 import BaseLoader, TemplateNotFound
 except ImportError:  # pragma: no cover - Jinax raises a clearer error when used.
     TemplateNotFound = FileNotFoundError
+
     class BaseLoader:  # type: ignore[no-redef]
         """Fallback base so importing optional loader helpers stays lightweight."""
 
@@ -24,7 +25,9 @@ class CompositeLoader(BaseLoader):
         if loader in self.loaders:
             self.loaders.remove(loader)
 
-    def get_source(self, environment: Any, template: str) -> tuple[str, str | None, Callable[[], bool] | None]:
+    def get_source(
+        self, environment: Any, template: str
+    ) -> tuple[str, str | None, Callable[[], bool] | None]:
         for loader in self.loaders:
             try:
                 return loader.get_source(environment, template)

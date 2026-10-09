@@ -20,7 +20,9 @@ class SecurityHeadersMiddleware(Middleware):
         async def send_wrapper(message: dict[str, Any]) -> None:
             if message.get("type") == "http.response.start":
                 response_headers = list(message.get("headers", []))
-                response_headers.extend((key.encode("latin-1"), value.encode("latin-1")) for key, value in self.headers.items())
+                response_headers.extend(
+                    (key.encode("latin-1"), value.encode("latin-1")) for key, value in self.headers.items()
+                )
                 message["headers"] = response_headers
             await send(message)
 

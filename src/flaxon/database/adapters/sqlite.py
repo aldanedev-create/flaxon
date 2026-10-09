@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import Any
 import re
+from typing import Any
 
 from .base import BaseAdapter
 
@@ -24,9 +24,12 @@ class SQLiteAdapter(BaseAdapter):
     async def connect(self) -> None:
         try:
             import aiosqlite
+
             self._conn = await aiosqlite.connect(self.database, **self.kwargs)
         except ImportError as exc:
-            raise RuntimeError("aiosqlite is required for SQLite. Install with: pip install aiosqlite") from exc
+            raise RuntimeError(
+                "aiosqlite is required for SQLite. Install with: pip install aiosqlite"
+            ) from exc
 
     async def disconnect(self) -> None:
         if self._conn:

@@ -97,7 +97,9 @@ class Heartbeat:
                     try:
                         await socket.close(1000, "Heartbeat timeout")
                     except Exception as exc:
-                        logging.getLogger(__name__).warning("Isolated callback or cleanup failed (%s)", type(exc).__name__)
+                        logging.getLogger(__name__).warning(
+                            "Isolated callback or cleanup failed (%s)", type(exc).__name__
+                        )
                     await self.stop(socket)
                     return
 
@@ -136,9 +138,7 @@ class HeartbeatMiddleware:
         ```
     """
 
-    def __init__(
-        self, app: Any, interval: int = 30, timeout: int = 60
-    ) -> None:
+    def __init__(self, app: Any, interval: int = 30, timeout: int = 60) -> None:
         """
         Initialize the heartbeat middleware.
 
@@ -150,9 +150,7 @@ class HeartbeatMiddleware:
         self.app = app
         self.heartbeat = Heartbeat(interval, timeout)
 
-    async def __call__(
-        self, scope: dict[str, Any], receive: Any, send: Any
-    ) -> None:
+    async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
         """Process the request with heartbeat support."""
         if scope.get("type") != "websocket":
             await self.app(scope, receive, send)

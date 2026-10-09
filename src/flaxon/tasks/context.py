@@ -5,8 +5,12 @@ from typing import Any
 
 
 class TaskContext:
-    _current_task_id: contextvars.ContextVar[str | None] = contextvars.ContextVar("current_task_id", default=None)
-    _current_task_name: contextvars.ContextVar[str | None] = contextvars.ContextVar("current_task_name", default=None)
+    _current_task_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+        "current_task_id", default=None
+    )
+    _current_task_name: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+        "current_task_name", default=None
+    )
     _task_data: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar("task_data", default={})
 
     def __init__(self, task_id: str | None = None, task_name: str | None = None) -> None:

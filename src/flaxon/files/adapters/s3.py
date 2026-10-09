@@ -24,6 +24,7 @@ class S3StorageAdapter:
     async def connect(self) -> None:
         try:
             import aioboto3
+
             self._client = aioboto3.Session()
         except ImportError as exc:
             raise RuntimeError("aioboto3 is required. Install with: pip install aioboto3") from exc
@@ -81,6 +82,9 @@ class S3StorageAdapter:
             return True
 
     async def exists(self, path: str) -> bool:
+        """Check existence, propagating permission and backend failures."""
+        from botocore.exceptions import ClientError
+
         session = await self._get_client()
         async with session.client(
             "s3",
@@ -92,8 +96,11 @@ class S3StorageAdapter:
             try:
                 await s3.head_object(Bucket=self.bucket, Key=path)
                 return True
-            except Exception:
-                return False
+            except ClientError as exc:
+                code = str(exc.response.get("Error", {}).get("Code", ""))
+                if code in {"404", "NoSuchKey", "NotFound"}:
+                    return False
+                raise
 
     async def size(self, path: str) -> int:
         session = await self._get_client()
@@ -143,4 +150,6 @@ class S3StorageAdapter:
             region_name=self.region,
             endpoint_url=self.endpoint_url,
         ) as s3:
-            return await s3.generate_presigned_url("get_object", Params={"Bucket": self.bucket, "Key": path}, ExpiresIn=max(1, expires_in))
+            return await s3.generate_presigned_url(
+                "get_object", Params={"Bucket": self.bucket, "Key": path}, ExpiresIn=max(1, expires_in)
+            )

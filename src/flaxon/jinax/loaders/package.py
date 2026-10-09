@@ -13,7 +13,9 @@ class PackageLoader:
         self.encoding = encoding
         self._cache: dict[str, tuple[str, float]] = {}
 
-    def get_source(self, environment: Any, template: str) -> tuple[str, str | None, Callable[[], bool] | None]:
+    def get_source(
+        self, environment: Any, template: str
+    ) -> tuple[str, str | None, Callable[[], bool] | None]:
         try:
             full_path = f"{self.package_path}/{template}"
             resource = importlib.resources.files(self.package_name).joinpath(full_path)
@@ -36,7 +38,9 @@ class PackageLoader:
             return source, str(path), uptodate
 
         except (FileNotFoundError, TypeError) as exc:
-            raise FileNotFoundError(f"Template '{template}' not found in package {self.package_name}") from exc
+            raise FileNotFoundError(
+                f"Template '{template}' not found in package {self.package_name}"
+            ) from exc
 
     def list_templates(self) -> list[str]:
         try:
@@ -55,7 +59,9 @@ class PackageLoader:
 
     def exists(self, template: str) -> bool:
         try:
-            resource = importlib.resources.files(self.package_name).joinpath(f"{self.package_path}/{template}")
+            resource = importlib.resources.files(self.package_name).joinpath(
+                f"{self.package_path}/{template}"
+            )
             return resource.exists()
         except (FileNotFoundError, TypeError):
             return False

@@ -6,7 +6,15 @@ from .decorators import admin_action, admin_display, admin_model
 from .exceptions import AdminError, ModelNotFoundError, PermissionDeniedError
 from .registry import Registry
 from .views import AdminView, ChangeListView, CreateView, DeleteView, DetailView, UpdateView
-from .services import AdminActivity, AdminAuth, AdminRateLimit, AdminStore, PostgreSQLAdminStore, AdminStoreSessionBackend, RedisAdminSessionBackend
+from .services import (
+    AdminActivity,
+    AdminAuth,
+    AdminRateLimit,
+    AdminStore,
+    PostgreSQLAdminStore,
+    AdminStoreSessionBackend,
+    RedisAdminSessionBackend,
+)
 from .authorization import (
     AsyncAuthorizationProvider,
     AuthorizationProvider,
@@ -18,7 +26,15 @@ from .authorization import (
     canonical_model_permission,
     default_group_definitions,
 )
-from .production import DurableJob, DurableJobStore, DurableJobWorker, ImmutableAuditLog, NotificationService, ResumableUploadStore, WebAuthnService
+from .production import (
+    DurableJob,
+    DurableJobStore,
+    DurableJobWorker,
+    ImmutableAuditLog,
+    NotificationService,
+    ResumableUploadStore,
+    WebAuthnService,
+)
 from .migrations import ADMIN_SCHEMA_DOWN, ADMIN_SCHEMA_UP, write_admin_migration
 
 __all__ = [
@@ -75,8 +91,15 @@ __all__ = [
 ]
 
 _MICROSERVICE_EXPORTS = {
-    "AdminControlPlane", "AdminControlPlaneModule", "EventBus", "RemoteModelAdapter",
-    "RemoteServiceClient", "RemoteServiceError", "ServiceRecord", "ServiceRegistry", "ServiceTokenManager",
+    "AdminControlPlane",
+    "AdminControlPlaneModule",
+    "EventBus",
+    "RemoteModelAdapter",
+    "RemoteServiceClient",
+    "RemoteServiceError",
+    "ServiceRecord",
+    "ServiceRegistry",
+    "ServiceTokenManager",
 }
 
 

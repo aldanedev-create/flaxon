@@ -4,6 +4,7 @@ import json
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
+
 from .decoder import Decoder
 from .encoder import Encoder
 from .types import SerializationError
@@ -15,7 +16,9 @@ class JSONEncoder(Encoder):
 
     def encode(self, data: Any) -> str:
         try:
-            return json.dumps(data, default=self._default, ensure_ascii=False, separators=(",", ":"), **self.kwargs)
+            return json.dumps(
+                data, default=self._default, ensure_ascii=False, separators=(",", ":"), **self.kwargs
+            )
         except TypeError as exc:
             raise SerializationError(f"Failed to encode JSON: {exc}") from exc
 

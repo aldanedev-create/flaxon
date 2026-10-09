@@ -39,7 +39,7 @@ test-watch: ## Run tests in watch mode (requires pytest-watch)
 
 lint: ## Run linting
 	@echo "$(YELLOW)Running linter...$(NC)"
-	ruff check .
+	python scripts/check_lint_budget.py
 	@echo "$(GREEN)✓ Linting complete$(NC)"
 
 lint-fix: ## Run linter and fix issues
@@ -49,7 +49,7 @@ lint-fix: ## Run linter and fix issues
 
 type-check: ## Run type checking
 	@echo "$(YELLOW)Running type checker...$(NC)"
-	mypy .
+	python scripts/typecheck.py
 	@echo "$(GREEN)✓ Type checking complete$(NC)"
 
 format: ## Format code with ruff

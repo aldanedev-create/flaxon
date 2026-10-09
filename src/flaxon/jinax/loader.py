@@ -10,7 +10,9 @@ class Loader:
         self.search_path = Path(search_path)
         self.encoding = encoding
 
-    def get_source(self, environment: Any, template: str) -> tuple[str, str | None, Callable[[], bool] | None]:
+    def get_source(
+        self, environment: Any, template: str
+    ) -> tuple[str, str | None, Callable[[], bool] | None]:
         path = self.search_path / template
         if not path.exists():
             raise TemplateNotFound(template)

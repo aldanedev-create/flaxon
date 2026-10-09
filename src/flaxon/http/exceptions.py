@@ -65,7 +65,9 @@ class Forbidden(HTTPException):
 class NotFound(HTTPException):
     """Raised when a resource is not found."""
 
-    def __init__(self, detail: str = "The requested resource was not found.", code: str | None = None) -> None:
+    def __init__(
+        self, detail: str = "The requested resource was not found.", code: str | None = None
+    ) -> None:
         """
         Initialize the exception.
 

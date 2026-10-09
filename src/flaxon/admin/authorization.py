@@ -46,7 +46,6 @@ def canonical_model_permission(model_name: str, action: str) -> str:
     The shape follows the familiar ``app.action_model`` convention while
     avoiding a dependency on a particular ORM or application registry.
     """
-
     actions = {"read": "view", "create": "add", "update": "change", "delete": "delete"}
     verb = actions.get(action, action)
     return f"{model_name}.{verb}_{model_name}"
@@ -54,7 +53,6 @@ def canonical_model_permission(model_name: str, action: str) -> str:
 
 def legacy_model_permission(model_name: str, action: str) -> str:
     """Return the pre-catalog permission key used by older applications."""
-
     return f"{model_name}:{action}"
 
 
@@ -173,7 +171,6 @@ class PermissionCatalog:
         aliases: Iterable[str] = (),
     ) -> PermissionDefinition:
         """Register a capability and optional migration aliases."""
-
         definition = PermissionDefinition(key, label, category, description, dangerous)
         self._definitions[key] = definition
         for alias in aliases:
@@ -182,7 +179,6 @@ class PermissionCatalog:
 
     def register_model(self, model_name: str, label: str | None = None) -> list[PermissionDefinition]:
         """Register the four standard permissions for an Admin model."""
-
         title = label or model_name.replace("_", " ").title()
         definitions = []
         for action, verb, dangerous in (
@@ -239,7 +235,6 @@ def default_group_definitions(strict: bool = True) -> tuple[dict[str, list[str]]
     records do not break. New deployments can use the descriptive names in
     the Admin UI instead of typing permission keys.
     """
-
     if strict:
         staff = ["admin.view_dashboard", "admin.manage_profile"]
         editor = ["admin.view_dashboard", "admin.manage_profile", "media.manage_library"]
@@ -250,8 +245,18 @@ def default_group_definitions(strict: bool = True) -> tuple[dict[str, list[str]]
         "staff": staff,
         "editor": editor,
         "administrator": ["admin.superuser"],
-        "content_editor": ["admin.view_dashboard", "admin.manage_profile", "cms.manage_taxonomies", "cms.import_content"],
-        "publisher": ["admin.view_dashboard", "admin.manage_profile", "cms.publish_content", "cms.restore_revision"],
+        "content_editor": [
+            "admin.view_dashboard",
+            "admin.manage_profile",
+            "cms.manage_taxonomies",
+            "cms.import_content",
+        ],
+        "publisher": [
+            "admin.view_dashboard",
+            "admin.manage_profile",
+            "cms.publish_content",
+            "cms.restore_revision",
+        ],
         "media_manager": ["admin.view_dashboard", "admin.manage_profile", "media.manage_library"],
         "warehouse_staff": ["admin.view_dashboard", "admin.manage_profile"],
         "support_agent": ["admin.view_dashboard", "admin.manage_profile"],
@@ -319,7 +324,10 @@ class DefaultAuthorizationProvider:
             return "admin:write" in values
         if ".view_" in permission or permission.endswith(":read"):
             return "admin:read" in values
-        if any(token in permission for token in (".add_", ".change_", ".delete_", ":create", ":update", ":delete")):
+        if any(
+            token in permission
+            for token in (".add_", ".change_", ".delete_", ":create", ":update", ":delete")
+        ):
             return "admin:write" in values
         return False
 

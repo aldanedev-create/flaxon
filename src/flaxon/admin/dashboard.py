@@ -1,34 +1,53 @@
 from __future__ import annotations
 
-import os
 import asyncio
-import time
-import secrets
+import base64
 import csv
+import hashlib
 import io
 import json
-import base64
-import hashlib
 import mimetypes
+import os
+import secrets
+import time
+from contextvars import ContextVar
 from io import BytesIO
 from pathlib import Path
-from contextvars import ContextVar
 from typing import Any
 
 from flaxon.exceptions import BadRequest, Forbidden, NotFound
-from flaxon.http import JSONResponse, RedirectResponse, Request, Response
 from flaxon.files import FileStorage
-from flaxon.security import CSRF, Sanitizer
-from flaxon.security.rate_limit import DistributedRateLimiter
-from flaxon.security.password import PasswordHasher
+from flaxon.http import JSONResponse, RedirectResponse, Request, Response
 from flaxon.jinax import Jinax
+from flaxon.security import CSRF, Sanitizer
+from flaxon.security.password import PasswordHasher
+from flaxon.security.rate_limit import DistributedRateLimiter
 
+from .authorization import (
+    AuthorizationProvider,
+    PermissionCatalog,
+    canonical_model_permission,
+    default_group_definitions,
+)
 from .config import AdminConfig
-from .authorization import AuthorizationProvider, PermissionCatalog, canonical_model_permission, default_group_definitions
+from .production import (
+    DurableJobStore,
+    DurableJobWorker,
+    ImmutableAuditLog,
+    NotificationService,
+    ResumableUploadStore,
+    WebAuthnService,
+)
 from .registry import Registry, default_registry, evaluate_permission_hook
+from .services import (
+    AdminActivity,
+    AdminAuth,
+    AdminRateLimit,
+    AdminStore,
+    AdminStoreSessionBackend,
+    RedisAdminSessionBackend,
+)
 from .views import ChangeListView, CreateView, DeleteView, DetailView, UpdateView
-from .services import AdminActivity, AdminAuth, AdminRateLimit, AdminStore, AdminStoreSessionBackend, RedisAdminSessionBackend
-from .production import DurableJobStore, DurableJobWorker, ImmutableAuditLog, NotificationService, ResumableUploadStore, WebAuthnService
 
 _PACKAGE_TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
 
@@ -325,7 +344,6 @@ class AdminDashboard:
 
     async def _widget_context(self, user: Any) -> list[Any]:
         """Evaluate extension widgets once per dashboard request."""
-
         rendered = []
         for widget in self.widgets:
             value = widget
@@ -348,12 +366,10 @@ class AdminDashboard:
         dangerous: bool = False,
     ) -> Any:
         """Register an application capability for the role editor."""
-
         return self.permission_catalog.register(key, label, category, description, dangerous=dangerous)
 
     def permission_for_action(self, model_name: str, action: str) -> str:
         """Return and lazily register a model action capability."""
-
         key = canonical_model_permission(model_name, action)
         if self.permission_catalog.get(key) is None:
             model = self.registry.get(model_name)
@@ -383,7 +399,6 @@ class AdminDashboard:
         The page is protected by ``permission`` before the callback runs. The
         callback may still perform additional object-level authorization.
         """
-
         route_name = url or name.lower().replace(" ", "-")
         route_path = f"{self.url_prefix}/{route_name.strip('/')}"
         async def protected_view(request: Request) -> Response:
@@ -412,7 +427,6 @@ class AdminDashboard:
         navigation metadata, so extension code does not need to reach into
         Admin internals or query another service's database.
         """
-
         import flaxon.modules  # noqa: F401 - installs Flaxon.mount_module
 
         mount_prefix = prefix or f"{self.url_prefix}/extensions/{getattr(module, 'name', 'module')}"
@@ -456,7 +470,6 @@ class AdminDashboard:
 
     def can_access_model(self, user: Any, model_name: str, action: str = "read") -> bool:
         """Return whether a template or extension may show a model action."""
-
         return self.auth.has_permission(user, canonical_model_permission(model_name, action))
 
     async def index(self, request: Request) -> Response:
@@ -749,7 +762,6 @@ class AdminDashboard:
     @staticmethod
     def _form_dict(form: Any) -> dict[str, Any]:
         """Accept FormData as well as plain dictionaries from adapters/tests."""
-
         if hasattr(form, "to_dict"):
             return form.to_dict()
         if isinstance(form, dict):
@@ -1294,7 +1306,7 @@ class AdminDashboard:
         try:
             import magic
             detected_type = str(magic.from_buffer(data, mime=True) or "").lower()
-        except Exception:  # noqa: BLE001 - libmagic failures are optional-platform failures.
+        except Exception:
             detected_type = ""
         declared_type = content_type.lower().split(";", 1)[0].strip()
         if declared_type == "application/pdf" and not data.startswith(b"%PDF-"):
@@ -1405,7 +1417,6 @@ class AdminDashboard:
 
     async def media_bulk_api(self, request: Request) -> Response:
         """Apply an explicit action to selected media records."""
-
         await self._require_user(request, "media.manage_library")
         if not self.csrf.verify_token(request.headers.get("x-csrf-token", "")):
             raise Forbidden("CSRF token missing or invalid")
@@ -1574,7 +1585,7 @@ class AdminDashboard:
                     if checked is False:
                         raise ValueError("Record failed import validation.")
                 valid.append((row, record))
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 errors.append({"row": row, "error": str(exc)})
         preview = str(request.query.get("preview", "")).lower() in {"1", "true", "yes"}
         if preview:
@@ -1609,7 +1620,7 @@ class AdminDashboard:
                 result = await result if hasattr(result, "__await__") else result
                 created_records.append(result or record)
             created = created_records
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if not allow_partial:
                 for item in created_records:
                     identifier = item.get("id") if isinstance(item, dict) else getattr(item, "id", None)

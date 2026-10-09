@@ -3,6 +3,7 @@
 The services deliberately depend on the small AdminStore contract so projects
 can replace it with their own database-backed repository.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -59,7 +60,6 @@ class DurableJobStore:
         same method; the locked read/write fallback remains useful for simple
         single-process stores.
         """
-
         if hasattr(self.store, "mutate"):
             return self.store.mutate(self.namespace, "jobs", callback, {})
         with self._fallback_lock:
@@ -89,7 +89,16 @@ class DurableJobStore:
         job_id: str | None = None,
     ) -> DurableJob:
         now = time.time()
-        job = DurableJob(job_id or secrets.token_urlsafe(16), name, payload, max_attempts=max(1, max_attempts), run_after=run_after, created_at=now, updated_at=now)
+        job = DurableJob(
+            job_id or secrets.token_urlsafe(16),
+            name,
+            payload,
+            max_attempts=max(1, max_attempts),
+            run_after=run_after,
+            created_at=now,
+            updated_at=now,
+        )
+
         def add(jobs: dict[str, Any]) -> dict[str, Any]:
             existing = jobs.get(job.id)
             if existing is not None:
@@ -103,6 +112,7 @@ class DurableJobStore:
 
     def claim_due(self, limit: int = 10) -> list[DurableJob]:
         now = time.time()
+
         def claim(jobs: dict[str, Any]) -> list[dict[str, Any]]:
             claimed: list[dict[str, Any]] = []
             for raw in sorted(jobs.values(), key=lambda value: value.get("created_at", 0)):
@@ -161,7 +171,13 @@ class DurableJobStore:
             raw = jobs.get(job_id)
             if raw is None:
                 raise KeyError(job_id)
-            raw.update(status="queued", run_after=time.time() + max(0.0, delay), error=None, lease_until=0.0, updated_at=time.time())
+            raw.update(
+                status="queued",
+                run_after=time.time() + max(0.0, delay),
+                error=None,
+                lease_until=0.0,
+                updated_at=time.time(),
+            )
             self._event(raw, "manual_retry")
             return raw
 
@@ -169,7 +185,9 @@ class DurableJobStore:
 
     def history(self, job_id: str | None = None) -> list[dict[str, Any]]:
         jobs = self.list()
-        events = [event | {"job_id": job.id, "name": job.name} for job in jobs for event in (job.history or [])]
+        events = [
+            event | {"job_id": job.id, "name": job.name} for job in jobs for event in (job.history or [])
+        ]
         if job_id is not None:
             events = [event for event in events if event["job_id"] == job_id]
         return sorted(events, key=lambda event: event.get("at", 0), reverse=True)
@@ -193,13 +211,12 @@ class DurableJobWorker:
                     await result
                 self.jobs.complete(job.id)
                 completed.append(job)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 self.jobs.fail(job.id, str(exc))
         return completed
 
     async def run_forever(self, poll_interval: float = 0.5, stop_event: Any | None = None) -> None:
         """Run registered handlers until an optional async stop event is set."""
-
         while stop_event is None or not stop_event.is_set():
             await self.run_once()
             await asyncio.sleep(max(0.05, poll_interval))
@@ -212,15 +229,36 @@ class ImmutableAuditLog:
         self.store = store
         self.namespace = namespace
 
-    def append(self, action: str, actor: str, details: dict[str, Any], *, ip: str | None = None, user_agent: str | None = None) -> dict[str, Any]:
+    def append(
+        self,
+        action: str,
+        actor: str,
+        details: dict[str, Any],
+        *,
+        ip: str | None = None,
+        user_agent: str | None = None,
+    ) -> dict[str, Any]:
         created: dict[str, Any] = {}
 
         def append_entry(current: list[dict[str, Any]]) -> list[dict[str, Any]]:
             entries = current if isinstance(current, list) else []
             anchors = self.store.get(self.namespace, "anchors", []) or []
-            previous_hash = entries[-1]["hash"] if entries else (anchors[-1].get("hash") if anchors else "0" * 64)
-            entry = {"id": secrets.token_hex(12), "action": action, "actor": actor, "details": details, "ip": ip, "user_agent": user_agent, "created_at": time.time(), "previous_hash": previous_hash}
-            entry["hash"] = hashlib.sha256(json.dumps(entry, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()
+            previous_hash = (
+                entries[-1]["hash"] if entries else (anchors[-1].get("hash") if anchors else "0" * 64)
+            )
+            entry = {
+                "id": secrets.token_hex(12),
+                "action": action,
+                "actor": actor,
+                "details": details,
+                "ip": ip,
+                "user_agent": user_agent,
+                "created_at": time.time(),
+                "previous_hash": previous_hash,
+            }
+            entry["hash"] = hashlib.sha256(
+                json.dumps(entry, sort_keys=True, separators=(",", ":"), default=str).encode()
+            ).hexdigest()
             created.update(entry)
             entries.append(entry)
             return entries
@@ -238,7 +276,12 @@ class ImmutableAuditLog:
         for entry in self.store.get(self.namespace, "entries", []) or []:
             candidate = dict(entry)
             digest = candidate.pop("hash", "")
-            if candidate.get("previous_hash") != previous or not hmac.compare_digest(hashlib.sha256(json.dumps(candidate, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest(), digest):
+            if candidate.get("previous_hash") != previous or not hmac.compare_digest(
+                hashlib.sha256(
+                    json.dumps(candidate, sort_keys=True, separators=(",", ":"), default=str).encode()
+                ).hexdigest(),
+                digest,
+            ):
                 return False
             previous = digest
         return True
@@ -277,7 +320,11 @@ class NotificationService:
         return (self.store.get(self.namespace, "preferences", {}) or {}).get(username, {})
 
     def list(self, username: str, *, unread_only: bool = False, limit: int = 20) -> list[dict[str, Any]]:
-        messages = [item for item in self.store.get(self.namespace, "messages", []) or [] if item.get("username") == username]
+        messages = [
+            item
+            for item in self.store.get(self.namespace, "messages", []) or []
+            if item.get("username") == username
+        ]
         if unread_only:
             messages = [item for item in messages if not item.get("read")]
         return list(reversed(messages[-max(1, min(limit, self.max_messages)) :]))
@@ -287,7 +334,9 @@ class NotificationService:
         messages = self.store.get(self.namespace, "messages", []) or []
         changed = 0
         for message in messages:
-            if message.get("username") != username or (not all_messages and message.get("id") not in selected):
+            if message.get("username") != username or (
+                not all_messages and message.get("id") not in selected
+            ):
                 continue
             if not message.get("read"):
                 message["read"] = True
@@ -297,7 +346,15 @@ class NotificationService:
         return changed
 
     def _store_message(self, username: str, channel: str, payload: dict[str, Any]) -> dict[str, Any]:
-        message = {"id": secrets.token_urlsafe(12), "username": username, "channel": channel, "payload": payload, "created_at": time.time(), "read": False, "delivery_status": "stored"}
+        message = {
+            "id": secrets.token_urlsafe(12),
+            "username": username,
+            "channel": channel,
+            "payload": payload,
+            "created_at": time.time(),
+            "read": False,
+            "delivery_status": "stored",
+        }
         messages = self.store.get(self.namespace, "messages", []) or []
         messages.append(message)
         self.store.set(self.namespace, "messages", messages[-self.max_messages :])
@@ -312,19 +369,27 @@ class NotificationService:
                     message["delivery_error"] = error
         self.store.set(self.namespace, "messages", messages[-self.max_messages :])
 
-    async def _deliver(self, channel: str, message: dict[str, Any], sender: Callable[[str, dict[str, Any]], Any]) -> None:
+    async def _deliver(
+        self, channel: str, message: dict[str, Any], sender: Callable[[str, dict[str, Any]], Any]
+    ) -> None:
         try:
             result = sender(channel, message)
             if isawaitable(result):
                 await result
             message["delivery_status"] = "delivered"
             self._set_delivery(message["id"], "delivered")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             message["delivery_status"] = "failed"
             message["delivery_error"] = str(exc)
             self._set_delivery(message["id"], "failed", str(exc))
 
-    def publish(self, username: str, channel: str, payload: dict[str, Any], sender: Callable[[str, dict[str, Any]], Any] | None = None) -> dict[str, Any]:
+    def publish(
+        self,
+        username: str,
+        channel: str,
+        payload: dict[str, Any],
+        sender: Callable[[str, dict[str, Any]], Any] | None = None,
+    ) -> dict[str, Any]:
         preferences = self.preferences(username)
         if preferences.get(channel) is False:
             return {"delivered": False, "reason": "disabled"}
@@ -334,12 +399,13 @@ class NotificationService:
             return {"delivered": True, "message": message}
         result = callback(channel, message)
         if isawaitable(result):
+
             async def finish() -> None:
                 try:
                     await result
                     message["delivery_status"] = "delivered"
                     self._set_delivery(message["id"], "delivered")
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     message["delivery_status"] = "failed"
                     message["delivery_error"] = str(exc)
                     self._set_delivery(message["id"], "failed", str(exc))
@@ -355,7 +421,13 @@ class NotificationService:
         self._set_delivery(message["id"], "delivered")
         return {"delivered": True, "message": message}
 
-    async def publish_async(self, username: str, channel: str, payload: dict[str, Any], sender: Callable[[str, dict[str, Any]], Any] | None = None) -> dict[str, Any]:
+    async def publish_async(
+        self,
+        username: str,
+        channel: str,
+        payload: dict[str, Any],
+        sender: Callable[[str, dict[str, Any]], Any] | None = None,
+    ) -> dict[str, Any]:
         preferences = self.preferences(username)
         if preferences.get(channel) is False:
             return {"delivered": False, "reason": "disabled"}
@@ -388,7 +460,16 @@ class ResumableUploadStore:
         upload_id = secrets.token_urlsafe(16)
         uploads = self.store.get(self.namespace, "sessions", {}) or {}
         now = time.time()
-        uploads[upload_id] = {"filename": filename, "total_size": total_size, "sha256": sha256, "content_type": content_type, "chunks": {}, "next_offset": 0, "created_at": now, "expires_at": now + max(60, expires_in)}
+        uploads[upload_id] = {
+            "filename": filename,
+            "total_size": total_size,
+            "sha256": sha256,
+            "content_type": content_type,
+            "chunks": {},
+            "next_offset": 0,
+            "created_at": now,
+            "expires_at": now + max(60, expires_in),
+        }
         self.store.set(self.namespace, "sessions", uploads)
         return upload_id
 
@@ -397,12 +478,25 @@ class ResumableUploadStore:
         session = uploads.get(upload_id)
         if session is None or session.get("expires_at", 0) < time.time():
             raise ValueError("Upload session not found")
-        return {"upload_id": upload_id, "filename": session["filename"], "content_type": session.get("content_type", "application/octet-stream"), "total_size": int(session["total_size"]), "offset": int(session.get("next_offset", 0)), "complete": int(session.get("next_offset", 0)) == int(session["total_size"]), "expires_at": session.get("expires_at")}
+        return {
+            "upload_id": upload_id,
+            "filename": session["filename"],
+            "content_type": session.get("content_type", "application/octet-stream"),
+            "total_size": int(session["total_size"]),
+            "offset": int(session.get("next_offset", 0)),
+            "complete": int(session.get("next_offset", 0)) == int(session["total_size"]),
+            "expires_at": session.get("expires_at"),
+        }
 
     def put_chunk(self, upload_id: str, offset: int, data: bytes) -> None:
         uploads = self.store.get(self.namespace, "sessions", {}) or {}
         session = uploads.get(upload_id)
-        if session is None or session.get("expires_at", 0) < time.time() or offset < 0 or offset + len(data) > int(session["total_size"]):
+        if (
+            session is None
+            or session.get("expires_at", 0) < time.time()
+            or offset < 0
+            or offset + len(data) > int(session["total_size"])
+        ):
             raise ValueError("Invalid upload chunk")
         expected = int(session.get("next_offset", 0))
         if offset != expected:
@@ -416,7 +510,10 @@ class ResumableUploadStore:
         session = uploads.get(upload_id)
         if session is None or session.get("expires_at", 0) < time.time():
             raise ValueError("Upload session not found")
-        parts = [base64.b64decode(value) for _, value in sorted(session["chunks"].items(), key=lambda item: int(item[0]))]
+        parts = [
+            base64.b64decode(value)
+            for _, value in sorted(session["chunks"].items(), key=lambda item: int(item[0]))
+        ]
         data = b"".join(parts)
         if len(data) != int(session["total_size"]):
             raise ValueError("Upload is incomplete")
@@ -467,9 +564,15 @@ class WebAuthnService:
     def begin_authentication(self, username: str) -> Any:
         if self.provider is None:
             raise RuntimeError("A WebAuthn provider is required")
-        return self.provider.begin_authentication(username, self.store.get(self.namespace, username, []) or [])
+        return self.provider.begin_authentication(
+            username, self.store.get(self.namespace, username, []) or []
+        )
 
     def finish_authentication(self, username: str, response: Any) -> bool:
         if self.provider is None:
             raise RuntimeError("A WebAuthn provider is required")
-        return bool(self.provider.finish_authentication(username, response, self.store.get(self.namespace, username, []) or []))
+        return bool(
+            self.provider.finish_authentication(
+                username, response, self.store.get(self.namespace, username, []) or []
+            )
+        )

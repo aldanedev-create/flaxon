@@ -56,7 +56,9 @@ class PluginDiscovery:
                 plugins.append(plugin)
 
         except Exception as exc:
-            logging.getLogger(__name__).warning("Isolated callback or cleanup failed (%s)", type(exc).__name__)
+            logging.getLogger(__name__).warning(
+                "Isolated callback or cleanup failed (%s)", type(exc).__name__
+            )
 
         return plugins
 

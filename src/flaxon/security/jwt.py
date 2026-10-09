@@ -13,11 +13,17 @@ from flaxon.http import Request
 class JWT:
     """Standard JWTs with a fixed algorithm and optional trusted key rotation."""
 
-    def __init__(self, secret_key: str, algorithm: str = "HS256", *,
-                 issuer: str | None = None, audience: str | None = None,
-                 key_id: str | None = None,
-                 verification_keys: dict[str, str] | None = None,
-                 leeway: int = 0) -> None:
+    def __init__(
+        self,
+        secret_key: str,
+        algorithm: str = "HS256",
+        *,
+        issuer: str | None = None,
+        audience: str | None = None,
+        key_id: str | None = None,
+        verification_keys: dict[str, str] | None = None,
+        leeway: int = 0,
+    ) -> None:
         if not secret_key:
             raise ValueError("JWT requires a nonempty secret key")
         if algorithm not in {"HS256", "HS384", "HS512"}:
@@ -66,9 +72,18 @@ class JWT:
                 required.append("iss")
             if self.audience is not None:
                 required.append("aud")
-            return cast(dict[str, Any], pyjwt.decode(token, key, algorithms=[self.algorithm],
-                                issuer=self.issuer, audience=self.audience,
-                                leeway=self.leeway, options={"require": required}))
+            return cast(
+                dict[str, Any],
+                pyjwt.decode(
+                    token,
+                    key,
+                    algorithms=[self.algorithm],
+                    issuer=self.issuer,
+                    audience=self.audience,
+                    leeway=self.leeway,
+                    options={"require": required},
+                ),
+            )
         except pyjwt.ExpiredSignatureError as exc:
             raise Unauthorized("Token has expired") from exc
         except (pyjwt.InvalidTokenError, ValueError, TypeError, OverflowError) as exc:
@@ -108,10 +123,13 @@ def jwt_required(func: Any) -> Any:
         if hasattr(result, "__await__"):
             return await result
         return result
+
     return wrapper
 
 
-def create_jwt_token(user_id: str | int, secret_key: str, data: dict[str, Any] | None = None, expires_in: int = 3600) -> str:
+def create_jwt_token(
+    user_id: str | int, secret_key: str, data: dict[str, Any] | None = None, expires_in: int = 3600
+) -> str:
     """
     Create a signed JWT for a user.
 

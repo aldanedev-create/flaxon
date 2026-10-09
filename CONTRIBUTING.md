@@ -32,8 +32,8 @@ By participating in this project, you agree to abide by our [Code of Conduct](CO
 3. Make your changes with tests
 4. **Run the full test suite** (see below) and confirm it passes -- a partial
    or single-file test run is not sufficient before opening a PR
-5. Run linting: `ruff check .`
-6. Run type checking: `mypy .`
+5. Run linting: `python scripts/check_lint_budget.py`
+6. Run type checking: `python scripts/typecheck.py`
 7. Commit with clear messages
 8. Push and open a Pull Request
 
@@ -102,11 +102,19 @@ submitting a PR -- CI (and reviewers) will run the complete suite regardless.
 
 ## Linting Configuration
 
-Flaxon uses `ruff` for linting and formatting. Configuration is in `ruff.toml`.
+Flaxon uses Ruff for linting and formatting. Configuration is in `ruff.toml`;
+use the pinned development version so the legacy budget is reproducible.
+`python scripts/check_lint_budget.py` rejects increases for every file/rule pair.
+`ruff check src/flaxon` reports the full remaining debt. Reduce the checked-in
+baseline when fixing old findings; do not increase it to accept new warnings.
 
 ## Type Checking
 
-Flaxon uses `mypy` for static type checking. Configuration is in `mypy.ini`.
+Flaxon uses mypy for static type checking. Configuration is in `mypy.ini`.
+`python scripts/typecheck.py` checks 11 core modules with the strict configuration.
+Imports from unchecked modules are not followed by this gate. Run
+`python scripts/typecheck.py --full` to audit the whole package; that command
+currently fails on existing typing debt. See [the audit](docs/quality-audit.md).
 
 ## Test Organization
 

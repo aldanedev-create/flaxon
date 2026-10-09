@@ -9,9 +9,21 @@ from __future__ import annotations
 import gzip
 import json
 import zlib
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, Protocol
 
 from flaxon.exceptions import BadRequest
+
+
+class _ReadableRequest(Protocol):
+    @property
+    def headers(self) -> Mapping[str, str]: ...
+
+    async def body(self) -> bytes: ...
+
+    async def text(self) -> str: ...
+
+    async def json(self) -> Any: ...
 
 
 class BodyParser:
@@ -23,7 +35,7 @@ class BodyParser:
     """
 
     @staticmethod
-    async def parse_json(request: Any) -> Any:
+    async def parse_json(request: _ReadableRequest) -> Any:
         """
         Parse JSON body.
 
@@ -42,7 +54,7 @@ class BodyParser:
             raise BadRequest("Invalid JSON body") from exc
 
     @staticmethod
-    async def parse_text(request: Any) -> str:
+    async def parse_text(request: _ReadableRequest) -> str:
         """
         Parse text body.
 
@@ -55,7 +67,7 @@ class BodyParser:
         return await request.text()
 
     @staticmethod
-    async def parse_bytes(request: Any) -> bytes:
+    async def parse_bytes(request: _ReadableRequest) -> bytes:
         """
         Parse bytes body.
 
@@ -68,7 +80,7 @@ class BodyParser:
         return await request.body()
 
     @staticmethod
-    async def parse_form(request: Any) -> dict[str, Any]:
+    async def parse_form(request: _ReadableRequest) -> dict[str, Any]:
         """
         Parse form data.
 
@@ -84,10 +96,11 @@ class BodyParser:
         from .form import FormData
 
         form = await FormData.from_request(request)
-        return form.to_dict()
+        data: dict[str, Any] = form.to_dict()
+        return data
 
     @staticmethod
-    async def parse_multipart(request: Any) -> dict[str, Any]:
+    async def parse_multipart(request: _ReadableRequest) -> dict[str, Any]:
         """
         Parse multipart data.
 
@@ -103,7 +116,8 @@ class BodyParser:
         from .form import FormData
 
         form = await FormData.from_request(request)
-        return form.to_dict()
+        data: dict[str, Any] = form.to_dict()
+        return data
 
 
 class BodyDecoder:
@@ -115,7 +129,7 @@ class BodyDecoder:
     """
 
     @staticmethod
-    async def decode(request: Any, body: bytes | None = None) -> bytes:
+    async def decode(request: _ReadableRequest, body: bytes | None = None) -> bytes:
         """
         Decode a request body.
 
@@ -137,13 +151,13 @@ class BodyDecoder:
         if content_encoding == "gzip":
             try:
                 return gzip.decompress(body)
-            except Exception as exc:
+            except (OSError, EOFError, zlib.error) as exc:
                 raise BadRequest("Invalid gzip body") from exc
 
         if content_encoding == "deflate":
             try:
                 return zlib.decompress(body)
-            except Exception as exc:
+            except zlib.error as exc:
                 raise BadRequest("Invalid deflate body") from exc
 
         if content_encoding and content_encoding not in {"identity", ""}:
@@ -152,7 +166,7 @@ class BodyDecoder:
         return body
 
     @staticmethod
-    async def decode_json(request: Any) -> Any:
+    async def decode_json(request: _ReadableRequest) -> Any:
         """
         Decode and parse JSON body.
 
@@ -172,7 +186,7 @@ class BodyDecoder:
             raise BadRequest("Invalid JSON body") from exc
 
     @staticmethod
-    async def decode_text(request: Any) -> str:
+    async def decode_text(request: _ReadableRequest) -> str:
         """
         Decode and parse text body.
 
@@ -208,7 +222,7 @@ class BodyLimiter:
         """
         self.max_size = max_size
 
-    async def check(self, request: Any) -> None:
+    async def check(self, request: _ReadableRequest) -> None:
         """
         Check if the request body exceeds the maximum size.
 
@@ -224,13 +238,11 @@ class BodyLimiter:
             try:
                 size = int(content_length)
                 if size > self.max_size:
-                    raise BadRequest(
-                        f"Request body too large: {size} bytes (max: {self.max_size})"
-                    )
+                    raise BadRequest(f"Request body too large: {size} bytes (max: {self.max_size})")
             except ValueError:
                 pass
 
-    async def read_limited(self, request: Any) -> bytes:
+    async def read_limited(self, request: _ReadableRequest) -> bytes:
         """
         Read the request body with size limiting.
 
@@ -248,8 +260,6 @@ class BodyLimiter:
         body = await request.body()
 
         if len(body) > self.max_size:
-            raise BadRequest(
-                f"Request body too large: {len(body)} bytes (max: {self.max_size})"
-            )
+            raise BadRequest(f"Request body too large: {len(body)} bytes (max: {self.max_size})")
 
         return body

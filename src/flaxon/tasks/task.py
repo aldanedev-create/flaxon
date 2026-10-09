@@ -24,7 +24,6 @@ class TaskStatus(StrEnum):
 
 
 class Task:
-
     def __init__(
         self,
         name: str,
@@ -91,14 +90,10 @@ class Task:
 
         except Exception as exc:
             self.error = str(exc)
-            if self.retry_policy and self.retry_policy.should_retry(
-                self.retry_count, exc
-            ):
+            if self.retry_policy and self.retry_policy.should_retry(self.retry_count, exc):
                 self.status = TaskStatus.RETRY
                 self.retry_count += 1
-                await asyncio.sleep(
-                    self.retry_policy.get_delay(self.retry_count)
-                )
+                await asyncio.sleep(self.retry_policy.get_delay(self.retry_count))
                 return await self.run(*args, **kwargs)
 
             self.status = TaskStatus.FAILED
@@ -128,9 +123,7 @@ class Task:
         )
 
     def __repr__(self) -> str:
-        return (
-            f"Task(id={self.id}, name={self.name}, status={self.status.value})"
-        )
+        return f"Task(id={self.id}, name={self.name}, status={self.status.value})"
 
 
 def task(

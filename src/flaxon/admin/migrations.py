@@ -25,9 +25,15 @@ DROP TABLE IF EXISTS flaxon_cms_menus; DROP TABLE IF EXISTS flaxon_cms_comments;
 def write_admin_migration(directory: str | Path = "migrations", name: str = "flaxon_admin") -> Path:
     """Generate a migration JSON file consumed by ``flaxon migrate``."""
     import json
+
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     version = str(int(time.time() * 1000))
     path = directory / f"{version}_{name}.json"
-    path.write_text(json.dumps({"version": version, "name": name, "up": ADMIN_SCHEMA_UP, "down": ADMIN_SCHEMA_DOWN}, indent=2), encoding="utf-8")
+    path.write_text(
+        json.dumps(
+            {"version": version, "name": name, "up": ADMIN_SCHEMA_UP, "down": ADMIN_SCHEMA_DOWN}, indent=2
+        ),
+        encoding="utf-8",
+    )
     return path

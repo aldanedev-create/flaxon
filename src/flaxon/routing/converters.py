@@ -22,6 +22,7 @@ class Converter:
         regex: The regex pattern to match the parameter.
         cast: Function to convert the string to the target type.
     """
+
     regex: str
     cast: Callable[[str], Any]
 

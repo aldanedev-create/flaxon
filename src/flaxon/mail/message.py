@@ -68,7 +68,9 @@ class Email:
         msg = MIMEMultipart("alternative")
 
         msg["Subject"] = self.subject
-        msg["From"] = str(self.from_address) if isinstance(self.from_address, EmailAddress) else self.from_address
+        msg["From"] = (
+            str(self.from_address) if isinstance(self.from_address, EmailAddress) else self.from_address
+        )
         msg["To"] = ", ".join(str(addr) for addr in self.to)
         msg["Date"] = formatdate()
 
@@ -92,10 +94,7 @@ class Email:
         for attachment in self.attachments:
             part = MIMEBase("application", "octet-stream")
             part.set_payload(attachment.content)
-            part.add_header(
-                "Content-Disposition",
-                f'attachment; filename="{attachment.filename}"'
-            )
+            part.add_header("Content-Disposition", f'attachment; filename="{attachment.filename}"')
             part.add_header("Content-Transfer-Encoding", "base64")
             msg.attach(part)
 
@@ -158,7 +157,9 @@ class Message:
         self.email.html_body = html
         return self
 
-    def attach(self, filename: str, content: bytes | str | None = None, content_type: str | None = None) -> Message:
+    def attach(
+        self, filename: str, content: bytes | str | None = None, content_type: str | None = None
+    ) -> Message:
         if content is None:
             with open(filename, "rb") as f:
                 content = f.read()

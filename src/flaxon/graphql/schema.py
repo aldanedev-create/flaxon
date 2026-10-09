@@ -12,7 +12,12 @@ from .validation import validate_query
 
 
 class GraphQLSchema:
-    def __init__(self, query: ObjectType | None = None, mutation: ObjectType | None = None, subscription: ObjectType | None = None) -> None:
+    def __init__(
+        self,
+        query: ObjectType | None = None,
+        mutation: ObjectType | None = None,
+        subscription: ObjectType | None = None,
+    ) -> None:
         self.query = query
         self.mutation = mutation
         self.subscription = subscription

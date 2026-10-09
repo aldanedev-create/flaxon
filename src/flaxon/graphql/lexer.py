@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from enum import Enum
 
 from .exceptions import GraphQLSyntaxError
@@ -169,13 +168,15 @@ class Lexer:
                 elif char == "u":
                     self.position += 1
                     self.column += 1
-                    unicode_hex = self.source[self.position:self.position + 4]
+                    unicode_hex = self.source[self.position : self.position + 4]
                     try:
                         value += chr(int(unicode_hex, 16))
                         self.position += 3
                         self.column += 3
                     except ValueError:
-                        raise GraphQLSyntaxError(f"Invalid unicode escape: \\u{unicode_hex}", self.line, self.column)
+                        raise GraphQLSyntaxError(
+                            f"Invalid unicode escape: \\u{unicode_hex}", self.line, self.column
+                        )
                 else:
                     value += char
             else:

@@ -86,6 +86,8 @@ class DocsCommand(Command):
 
         path_count = len(spec.get("paths", {}))
         console.success(f"Wrote OpenAPI spec for {path_count} path(s) to {args.output}")
-        console.info("Hand-edit this file for anything auto-detection can't infer, or re-run this command to regenerate the basics.")
+        console.info(
+            "Hand-edit this file for anything auto-detection can't infer, or re-run this command to regenerate the basics."
+        )
 
         return 0

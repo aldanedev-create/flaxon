@@ -41,7 +41,12 @@ class AdminModel:
         self._name = name or model.__name__.lower()
         self.icon = icon
         self.actions = {}
-        self.permission_hooks = {"read": can_view, "create": can_add, "update": can_change, "delete": can_delete}
+        self.permission_hooks = {
+            "read": can_view,
+            "create": can_add,
+            "update": can_change,
+            "delete": can_delete,
+        }
         self.validate_import = validate_import
         if isinstance(actions, dict):
             self.actions.update(actions)
@@ -71,7 +76,6 @@ class AdminModel:
     @staticmethod
     def display_value(obj: Any, field: Any) -> Any:
         """Resolve a list column like Flask-Admin's ``column_formatters``."""
-
         if callable(field):
             return field(obj)
         if field == "__str__":
@@ -91,8 +95,10 @@ class Registry:
     def register(self, model: Any, **options: Any) -> None:
         original = model
         from tortoise.models import Model
+
         if isinstance(model, type) and issubclass(model, Model):
             from flaxon.db.admin import model_adapter
+
             model = model_adapter(model, options)
         if hasattr(model, "orm_model"):
             model.registry = self
@@ -133,6 +139,7 @@ async def evaluate_permission_hook(hook, user, target=None):
     if hook is None:
         return True
     import inspect
+
     signature = inspect.signature(hook)
     if target is None:
         try:

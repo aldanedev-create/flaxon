@@ -139,9 +139,7 @@ class EventHandler:
             func: The listener function to remove.
         """
         if event_type in self._listeners:
-            self._listeners[event_type] = [
-                f for f in self._listeners[event_type] if f != func
-            ]
+            self._listeners[event_type] = [f for f in self._listeners[event_type] if f != func]
 
     def clear_listeners(self) -> None:
         """Clear all event listeners."""
@@ -168,7 +166,9 @@ class EventHandler:
                 if asyncio.iscoroutine(result):
                     await result
             except Exception as exc:
-                logging.getLogger(__name__).warning("Isolated callback or cleanup failed (%s)", type(exc).__name__)
+                logging.getLogger(__name__).warning(
+                    "Isolated callback or cleanup failed (%s)", type(exc).__name__
+                )
 
 
 class WebSocketEvents:
@@ -252,11 +252,7 @@ class WebSocketEvents:
                     await result
 
             async for raw in self.socket:
-                data = (
-                    raw.get("text")
-                    if isinstance(raw, dict)
-                    else getattr(raw, "text", raw)
-                )
+                data = raw.get("text") if isinstance(raw, dict) else getattr(raw, "text", raw)
                 if data is not None:
                     for handler in self._message_handlers:
                         try:

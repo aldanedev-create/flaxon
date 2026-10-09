@@ -8,7 +8,6 @@ from decimal import Decimal
 from typing import Any
 
 
-
 class Serializer:
     def __init__(self) -> None:
         self._serializers: dict[type, Callable[[Any], Any]] = {}
@@ -20,13 +19,23 @@ class Serializer:
         self.register(int, lambda v: v, lambda v: v)
         self.register(float, lambda v: v, lambda v: v)
         self.register(bool, lambda v: v, lambda v: v)
-        self.register(list, lambda v: [self.serialize(item) for item in v], lambda v: [self.deserialize(item) for item in v])
-        self.register(dict, lambda v: {k: self.serialize(v) for k, v in v.items()}, lambda v: {k: self.deserialize(v) for k, v in v.items()})
+        self.register(
+            list,
+            lambda v: [self.serialize(item) for item in v],
+            lambda v: [self.deserialize(item) for item in v],
+        )
+        self.register(
+            dict,
+            lambda v: {k: self.serialize(v) for k, v in v.items()},
+            lambda v: {k: self.deserialize(v) for k, v in v.items()},
+        )
         self.register(datetime, lambda v: v.isoformat(), lambda v: datetime.fromisoformat(v))
         self.register(date, lambda v: v.isoformat(), lambda v: date.fromisoformat(v))
         self.register(Decimal, lambda v: float(v), lambda v: Decimal(str(v)))
 
-    def register(self, type_: type, serializer: Callable[[Any], Any], deserializer: Callable[[Any], Any]) -> None:
+    def register(
+        self, type_: type, serializer: Callable[[Any], Any], deserializer: Callable[[Any], Any]
+    ) -> None:
         self._serializers[type_] = serializer
         self._deserializers[type_] = deserializer
 

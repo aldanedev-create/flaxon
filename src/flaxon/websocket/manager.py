@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
-from typing import Any, AsyncIterator
 import asyncio
+from collections import defaultdict
+from typing import Any
 
 
 class WebSocketManager:

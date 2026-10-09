@@ -69,9 +69,7 @@ class Dependency:
         try:
             result = self.provider()
         except Exception as exc:
-            raise DependencyError(
-                f"Failed to resolve dependency '{self.name}': {exc}"
-            ) from exc
+            raise DependencyError(f"Failed to resolve dependency '{self.name}': {exc}") from exc
 
         if self.singleton:
             self._instance = result
@@ -89,8 +87,10 @@ class DependencyContainer:
         ```python
         container = DependencyContainer()
 
+
         def get_db():
             return create_db_pool()
+
 
         container.register("db", provider=get_db, singleton=True)
 
@@ -127,9 +127,7 @@ class DependencyContainer:
         """
         self._dependencies[name] = Dependency(name, type, provider, singleton)
 
-    def register_instance(
-        self, name: str, instance: Any, *, type: type | None = None
-    ) -> None:
+    def register_instance(self, name: str, instance: Any, *, type: type | None = None) -> None:
         """
         Register a pre-created instance.
 
@@ -188,9 +186,7 @@ class DependencyContainer:
             if dep.type and issubclass(dep.type, type_):
                 return self.resolve(name)
 
-        raise DependencyError(
-            f"Dependency of type '{getattr(type_, '__name__', str(type_))}' not found"
-        )
+        raise DependencyError(f"Dependency of type '{getattr(type_, '__name__', str(type_))}' not found")
 
     def has(self, name: str) -> bool:
         """
@@ -256,6 +252,7 @@ def inject_dependencies(
         ```python
         def handler(db, request):
             return db.query(request.path)
+
 
         params = inject_dependencies(handler, container, {"request": request})
         result = handler(**params)

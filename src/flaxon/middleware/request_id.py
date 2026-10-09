@@ -16,7 +16,14 @@ class RequestIDMiddleware(Middleware):
         self.header_name = header_name.lower().encode("latin-1")
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
-        request_id = next((value.decode("latin-1") for key, value in scope.get("headers", []) if key.lower() == self.header_name), secrets.token_hex(8))
+        request_id = next(
+            (
+                value.decode("latin-1")
+                for key, value in scope.get("headers", [])
+                if key.lower() == self.header_name
+            ),
+            secrets.token_hex(8),
+        )
         scope["request_id"] = request_id
 
         async def send_wrapper(message: dict[str, Any]) -> None:

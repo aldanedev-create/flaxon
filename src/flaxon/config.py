@@ -1,4 +1,5 @@
 """Typed project settings shared by the server and management commands."""
+
 from __future__ import annotations
 
 import importlib
@@ -17,6 +18,7 @@ class Environment:
 
     def load(self, path: str | Path) -> None:
         from dotenv import load_dotenv
+
         load_dotenv(path, override=False)
 
     def str(self, name: str, default: Any = None) -> Any:
@@ -35,7 +37,11 @@ class Environment:
 
     def list(self, name: str, default: list[str] | None = None) -> list[str]:
         value = os.environ.get(name)
-        return list(default or []) if value is None else [part.strip() for part in value.split(",") if part.strip()]
+        return (
+            list(default or [])
+            if value is None
+            else [part.strip() for part in value.split(",") if part.strip()]
+        )
 
 
 env = Environment()
@@ -46,7 +52,9 @@ class Settings:
 
     def __init__(self, source: str | Any = "settings") -> None:
         module = importlib.import_module(source) if isinstance(source, str) else source
-        self.root = Path(getattr(module, "BASE_DIR", getattr(module, "ROOT", Path(module.__file__).parent))).resolve()
+        self.root = Path(
+            getattr(module, "BASE_DIR", getattr(module, "ROOT", Path(module.__file__).parent))
+        ).resolve()
         self.values = {key: getattr(module, key) for key in dir(module) if key.isupper()}
         self.values.setdefault("DEBUG", False)
         self.values.setdefault("JSON_SERIALIZER", "modern")
@@ -81,13 +89,21 @@ class Settings:
             raise ValueError("CSRF_TRUSTED_ORIGINS must be a list")
         for origin in self.CSRF_TRUSTED_ORIGINS:
             parsed = urlsplit(origin)
-            if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.path or parsed.query or parsed.fragment:
+            if (
+                parsed.scheme not in {"http", "https"}
+                or not parsed.netloc
+                or parsed.path
+                or parsed.query
+                or parsed.fragment
+            ):
                 raise ValueError("CSRF_TRUSTED_ORIGINS must contain complete origins without paths")
         ZoneInfo(self.TIME_ZONE)
         if not self.DEBUG:
             secret = self.values.get("SECRET_KEY")
             if not isinstance(secret, str) or len(secret) < 32:
-                raise ValueError("Set FLAXON_SECRET_KEY to a persistent secret of at least 32 characters in production")
+                raise ValueError(
+                    "Set FLAXON_SECRET_KEY to a persistent secret of at least 32 characters in production"
+                )
             if "*" in self.ALLOWED_HOSTS:
                 raise ValueError("Use explicit ALLOWED_HOSTS in production")
 

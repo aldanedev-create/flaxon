@@ -8,7 +8,9 @@ class DictionaryLoader:
     def __init__(self, mapping: dict[str, str] | None = None) -> None:
         self.mapping = mapping or {}
 
-    def get_source(self, environment: Any, template: str) -> tuple[str, str | None, Callable[[], bool] | None]:
+    def get_source(
+        self, environment: Any, template: str
+    ) -> tuple[str, str | None, Callable[[], bool] | None]:
         if template not in self.mapping:
             raise FileNotFoundError(f"Template '{template}' not found in dictionary")
 

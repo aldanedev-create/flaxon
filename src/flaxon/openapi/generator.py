@@ -97,7 +97,7 @@ class OpenAPIGenerator:
         description = route.description or "\n".join(line for line in doc_lines[1:] if line.strip()).strip()
         try:
             hints = typing.get_type_hints(endpoint)
-        except Exception:
+        except (NameError, TypeError, AttributeError):
             hints = getattr(endpoint, "__annotations__", {}) or {}
         signature = inspect.signature(endpoint)
         body_schema = self._find_body_schema(signature, hints, route)
@@ -122,8 +122,11 @@ class OpenAPIGenerator:
 
             parameters: list[dict[str, Any]] = []
             converter_types = {
-                "int": "integer", "float": "number", "str": "string",
-                "path": "string", "uuid": "string",
+                "int": "integer",
+                "float": "number",
+                "str": "string",
+                "path": "string",
+                "uuid": "string",
             }
             for name, converter_name in getattr(route, "parameters", []):
                 parameter: dict[str, Any] = {
@@ -141,7 +144,11 @@ class OpenAPIGenerator:
                 annotation = hints.get(name, parameter.annotation)
                 if not isinstance(declaration, Query):
                     path_names = {item[0] for item in getattr(route, "parameters", [])}
-                    if name in path_names or name in {"request", "socket", "websocket"} or not is_scalar_query(annotation):
+                    if (
+                        name in path_names
+                        or name in {"request", "socket", "websocket"}
+                        or not is_scalar_query(annotation)
+                    ):
                         continue
                     default = MISSING if parameter.default is inspect.Parameter.empty else parameter.default
                     declaration = Query(default=default)
@@ -187,7 +194,9 @@ class OpenAPIGenerator:
             self._apply_responses(operation, getattr(route, "responses", None))
             self.add_path(openapi_path, method, operation)
 
-    def _find_body_schema(self, signature: inspect.Signature, hints: dict[str, Any], route: Any) -> dict[str, Any] | None:
+    def _find_body_schema(
+        self, signature: inspect.Signature, hints: dict[str, Any], route: Any
+    ) -> dict[str, Any] | None:
         path_names = {name for name, _ in getattr(route, "parameters", [])}
         for name, parameter in signature.parameters.items():
             if name in path_names or name in {"request", "socket", "websocket"}:
@@ -205,12 +214,14 @@ class OpenAPIGenerator:
             return False
         try:
             from flaxon.validation import Schema
+
             if issubclass(annotation, Schema):
                 return True
         except (ImportError, TypeError):
             pass
         try:
             from flaxon.integrations.pydantic import is_pydantic_model_type
+
             return is_pydantic_model_type(annotation)
         except ImportError:
             return False
@@ -234,7 +245,10 @@ class OpenAPIGenerator:
         if origin in (list, tuple, set, frozenset):
             return {"type": "array", "items": self._schema_for_annotation(args[0]) if args else {}}
         if origin is dict:
-            return {"type": "object", "additionalProperties": self._schema_for_annotation(args[1]) if len(args) > 1 else {}}
+            return {
+                "type": "object",
+                "additionalProperties": self._schema_for_annotation(args[1]) if len(args) > 1 else {},
+            }
         if origin is typing.Literal:
             values = list(args)
             schema = self._schema_for_annotation(type(values[0])) if values else {"type": "string"}
@@ -278,6 +292,7 @@ class OpenAPIGenerator:
     def _native_model_schema(self, model: type[Any]) -> dict[str, Any] | None:
         try:
             from flaxon.validation import Schema
+
             if not issubclass(model, Schema):
                 return None
         except (ImportError, TypeError):
@@ -304,6 +319,7 @@ class OpenAPIGenerator:
     def _pydantic_model_schema(self, model: type[Any]) -> tuple[str, dict[str, Any]] | None:
         try:
             from flaxon.integrations.pydantic import is_pydantic_model_type
+
             if not is_pydantic_model_type(model):
                 return None
         except ImportError:
@@ -335,7 +351,9 @@ class OpenAPIGenerator:
                     "content": {"application/json": {"schema": schema}},
                 }
                 continue
-            if isinstance(value, dict) and any(item in value for item in ("description", "content", "$ref", "headers")):
+            if isinstance(value, dict) and any(
+                item in value for item in ("description", "content", "$ref", "headers")
+            ):
                 responses[key] = value
                 continue
             if isinstance(value, type):

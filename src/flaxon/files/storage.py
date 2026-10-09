@@ -69,7 +69,13 @@ class FileStorage:
 
     def delete(self, file_path: str) -> bool:
         try:
-            path = self._safe_path(Path(file_path).relative_to(self.base_path).parent.as_posix(), Path(file_path).name) if Path(file_path).is_absolute() else self._safe_path(file_path)
+            path = (
+                self._safe_path(
+                    Path(file_path).relative_to(self.base_path).parent.as_posix(), Path(file_path).name
+                )
+                if Path(file_path).is_absolute()
+                else self._safe_path(file_path)
+            )
             if path.exists():
                 path.unlink()
                 return True
@@ -89,13 +95,21 @@ class FileStorage:
 
     def exists(self, file_path: str) -> bool:
         try:
-            path = self._safe_path(Path(file_path).relative_to(self.base_path).as_posix()) if Path(file_path).is_absolute() else self._safe_path(file_path)
+            path = (
+                self._safe_path(Path(file_path).relative_to(self.base_path).as_posix())
+                if Path(file_path).is_absolute()
+                else self._safe_path(file_path)
+            )
         except ValueError:
             return False
         return path.exists()
 
     def get_size(self, file_path: str) -> int:
-        path = self._safe_path(Path(file_path).relative_to(self.base_path).as_posix()) if Path(file_path).is_absolute() else self._safe_path(file_path)
+        path = (
+            self._safe_path(Path(file_path).relative_to(self.base_path).as_posix())
+            if Path(file_path).is_absolute()
+            else self._safe_path(file_path)
+        )
         if path.exists():
             return path.stat().st_size
         return 0
@@ -113,7 +127,11 @@ class FileStorage:
 
     def get_file_info(self, file_path: str) -> dict[str, Any]:
         try:
-            path = self._safe_path(Path(file_path).relative_to(self.base_path).as_posix()) if Path(file_path).is_absolute() else self._safe_path(file_path)
+            path = (
+                self._safe_path(Path(file_path).relative_to(self.base_path).as_posix())
+                if Path(file_path).is_absolute()
+                else self._safe_path(file_path)
+            )
         except ValueError:
             return {}
         if not path.exists():
@@ -133,7 +151,12 @@ class FileStorage:
         """Create a bounded JPEG thumbnail beside a stored image when Pillow is available."""
         try:
             from PIL import Image
-            source = self._safe_path(Path(file_path).relative_to(self.base_path).as_posix()) if Path(file_path).is_absolute() else self._safe_path(file_path)
+
+            source = (
+                self._safe_path(Path(file_path).relative_to(self.base_path).as_posix())
+                if Path(file_path).is_absolute()
+                else self._safe_path(file_path)
+            )
             thumbnail_path = self._safe_path("thumbnails", f"{source.stem}.jpg")
             thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
             with Image.open(source) as image:

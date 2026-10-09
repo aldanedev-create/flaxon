@@ -34,7 +34,9 @@ class MigrateCommand(Command):
             "--steps", type=int, default=1, help="For --direction down: number of migrations to roll back"
         )
         parser.add_argument("--status", action="store_true", help="Show migration status and exit")
-        parser.add_argument("--dry-run", action="store_true", help="Show what would be applied without applying it")
+        parser.add_argument(
+            "--dry-run", action="store_true", help="Show what would be applied without applying it"
+        )
 
     def _build_adapter(self, database: str) -> Any:
         if "://" not in database:
@@ -94,9 +96,7 @@ class MigrateCommand(Command):
             try:
                 if args.status:
                     status = await runner.status()
-                    console.info(
-                        f"{status['applied_count']} applied, {status['pending_count']} pending"
-                    )
+                    console.info(f"{status['applied_count']} applied, {status['pending_count']} pending")
                     for m in status["migrations"]:
                         mark = "[x]" if m["applied"] else "[ ]"
                         console.info(f"  {mark} {m['version']}  {m['name']}")

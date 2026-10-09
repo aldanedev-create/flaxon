@@ -84,23 +84,23 @@ class OperationBuilder:
         return self
 
     def with_json_request(self, schema: dict[str, Any]) -> OperationBuilder:
-        self.operation.request_body({
-            "application/json": {"schema": schema}
-        })
+        self.operation.request_body({"application/json": {"schema": schema}})
         return self
 
-    def with_json_response(self, status: int, schema: dict[str, Any], description: str = "Successful response") -> OperationBuilder:
+    def with_json_response(
+        self, status: int, schema: dict[str, Any], description: str = "Successful response"
+    ) -> OperationBuilder:
         self.operation.responses({
             str(status): {
                 "description": description,
-                "content": {
-                    "application/json": {"schema": schema}
-                },
+                "content": {"application/json": {"schema": schema}},
             }
         })
         return self
 
-    def with_path_parameter(self, name: str, schema_type: str = "string", description: str = "", required: bool = True) -> OperationBuilder:
+    def with_path_parameter(
+        self, name: str, schema_type: str = "string", description: str = "", required: bool = True
+    ) -> OperationBuilder:
         param = {
             "name": name,
             "in": "path",
@@ -115,7 +115,9 @@ class OperationBuilder:
         self.operation.parameters(*params)
         return self
 
-    def with_query_parameter(self, name: str, schema_type: str = "string", description: str = "", required: bool = False) -> OperationBuilder:
+    def with_query_parameter(
+        self, name: str, schema_type: str = "string", description: str = "", required: bool = False
+    ) -> OperationBuilder:
         param = {
             "name": name,
             "in": "query",

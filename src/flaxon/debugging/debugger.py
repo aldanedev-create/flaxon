@@ -101,9 +101,9 @@ main{{max-width:1100px;margin:auto}} .card{{background:#111827;border:1px solid 
 h1{{color:#7dd3fc}} code,pre{{font-family:ui-monospace,monospace}} pre{{white-space:pre-wrap;overflow-wrap:anywhere;background:#020617;padding:1rem;border-radius:10px}}
 .badge{{display:inline-block;background:#7f1d1d;padding:.25rem .5rem;border-radius:6px}}
 </style></head><body><main>
-<p class="badge">FX-DEV-500</p><h1>{html.escape(str(details['type']))}: {escaped_message}</h1>
-<div class="card"><strong>Request</strong><p>{html.escape(str(details['method']))} {html.escape(str(details['path']))}</p>
-<p>Request ID: <code>{html.escape(str(details['request_id']))}</code></p></div>
+<p class="badge">FX-DEV-500</p><h1>{html.escape(str(details["type"]))}: {escaped_message}</h1>
+<div class="card"><strong>Request</strong><p>{html.escape(str(details["method"]))} {html.escape(str(details["path"]))}</p>
+<p>Request ID: <code>{html.escape(str(details["request_id"]))}</code></p></div>
 <div class="card"><strong>Traceback</strong><pre>{escaped_trace}</pre></div>
 <p>This page is shown only because debug mode is enabled.</p>
 </main></body></html>"""

@@ -35,7 +35,16 @@ class Reloader:
 
     def _should_watch(self, path: Path) -> bool:
         extensions = {".py", ".vel", ".html", ".css", ".js", ".toml", ".yaml", ".yml", ".json"}
-        skip_dirs = {".flaxon", ".venv", "venv", "__pycache__", ".git", ".pytest_cache", ".mypy_cache","node_modules"}
+        skip_dirs = {
+            ".flaxon",
+            ".venv",
+            "venv",
+            "__pycache__",
+            ".git",
+            ".pytest_cache",
+            ".mypy_cache",
+            "node_modules",
+        }
 
         if any(part in skip_dirs for part in path.parts):
             return False

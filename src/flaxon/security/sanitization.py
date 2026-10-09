@@ -26,7 +26,9 @@ class Sanitizer:
             # Keep the historical Flaxon behavior of removing active markup
             # while retaining its text content (``<script>bad()</script>``
             # becomes ``bad()``), which is useful for editorial previews.
-            value = re.sub(r"</?\s*(script|style|iframe|object|embed)\b[^>]*>", "", str(value), flags=re.IGNORECASE)
+            value = re.sub(
+                r"</?\s*(script|style|iframe|object|embed)\b[^>]*>", "", str(value), flags=re.IGNORECASE
+            )
             try:
                 return nh3.clean(
                     str(value),
@@ -50,7 +52,9 @@ class Sanitizer:
                 if attr.lower() in attributes and not re.match(r"(?i)\s*(javascript|data):", val):
                     safe.append(f'{attr.lower()}="{html.escape(val, quote=True)}"')
             return f"<{name}{(' ' + ' '.join(safe)) if safe else ''}>"
+
         return re.sub(r"<\s*(/?)\s*([\w-]+)([^>]*)>", clean_tag, str(value))
+
     @staticmethod
     def html_escape(value: str) -> str:
         return html.escape(value)
@@ -81,9 +85,24 @@ class Sanitizer:
     @staticmethod
     def strip_sql(value: str) -> str:
         sql_keywords = [
-            "SELECT", "INSERT", "UPDATE", "DELETE", "DROP", "CREATE",
-            "ALTER", "TRUNCATE", "EXEC", "EXECUTE", "UNION", "JOIN",
-            "WHERE", "HAVING", "GROUP BY", "ORDER BY", "LIMIT", "OFFSET",
+            "SELECT",
+            "INSERT",
+            "UPDATE",
+            "DELETE",
+            "DROP",
+            "CREATE",
+            "ALTER",
+            "TRUNCATE",
+            "EXEC",
+            "EXECUTE",
+            "UNION",
+            "JOIN",
+            "WHERE",
+            "HAVING",
+            "GROUP BY",
+            "ORDER BY",
+            "LIMIT",
+            "OFFSET",
         ]
         pattern = "|".join(rf"\b{kw}\b" for kw in sql_keywords)
         return re.sub(pattern, "", value, flags=re.IGNORECASE)

@@ -1,11 +1,13 @@
 """Session-bound Admin CSRF tokens with per-request context and stable signing keys."""
+
 from __future__ import annotations
 
 import hashlib
 import secrets
 from contextvars import ContextVar
 from typing import Any
-from flaxon.http import Request, JSONResponse
+
+from flaxon.http import JSONResponse, Request
 from flaxon.security.csrf import CSRF
 
 _binding: ContextVar[str | None] = ContextVar("flaxon_admin_csrf_binding", default=None)
@@ -26,7 +28,9 @@ class AdminCSRFMiddleware:
     def __init__(self, app: Any, dashboard: Any) -> None:
         self.app = app
         self.dashboard = dashboard
-        self.cookie_name = f"flaxon_admin_csrf_{hashlib.sha256(dashboard.url_prefix.encode()).hexdigest()[:8]}"
+        self.cookie_name = (
+            f"flaxon_admin_csrf_{hashlib.sha256(dashboard.url_prefix.encode()).hexdigest()[:8]}"
+        )
 
     async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
         prefix = self.dashboard.url_prefix
@@ -46,8 +50,11 @@ class AdminCSRFMiddleware:
                 same_origin = f"{scope.get('scheme', 'http')}://{host}"
                 trusted = self.dashboard.app.config.get("CSRF_TRUSTED_ORIGINS", [])
                 if origin and origin != same_origin and origin not in trusted:
-                    await JSONResponse({"error": "Untrusted Admin request origin"}, status_code=403)(scope, receive, send)
+                    await JSONResponse({"error": "Untrusted Admin request origin"}, status_code=403)(
+                        scope, receive, send
+                    )
                     return
+
             async def send_response(message):
                 if message.get("type") == "http.response.start" and self.cookie_name not in request.cookies:
                     headers = list(message.get("headers", []))
@@ -57,6 +64,7 @@ class AdminCSRFMiddleware:
                     headers.append((b"set-cookie", cookie.encode()))
                     message = {**message, "headers": headers}
                 await send(message)
+
             await self.app(scope, receive, send_response)
         finally:
             _binding.reset(token)

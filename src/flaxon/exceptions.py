@@ -87,7 +87,9 @@ class PayloadTooLarge(HTTPException):
 
     def __init__(self, max_size: int, detail: str | None = None) -> None:
         self.max_size = max_size
-        super().__init__(413, detail or f"Request body exceeds the {max_size}-byte limit", code="FX-PAYLOAD-001")
+        super().__init__(
+            413, detail or f"Request body exceeds the {max_size}-byte limit", code="FX-PAYLOAD-001"
+        )
 
 
 class TooManyRequests(HTTPException):

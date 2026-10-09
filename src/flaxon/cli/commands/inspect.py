@@ -20,7 +20,9 @@ class InspectCommand(Command):
         parser.add_argument("application", help="Application import string, e.g., app:app")
         parser.add_argument("--middleware", action="store_true", help="Show middleware stack")
         parser.add_argument("--config", action="store_true", help="Show configuration")
-        parser.add_argument("--format", choices=["json", "yaml", "table"], default="table", help="Output format")
+        parser.add_argument(
+            "--format", choices=["json", "yaml", "table"], default="table", help="Output format"
+        )
 
     def _run(self, args: argparse.Namespace, console: Any) -> int:
         from flaxon.utils.import_string import import_string
@@ -44,6 +46,7 @@ class InspectCommand(Command):
         elif args.format == "yaml":
             try:
                 import yaml
+
                 print(yaml.dump(data))
             except ImportError:
                 console.warning("yaml not installed, falling back to json")

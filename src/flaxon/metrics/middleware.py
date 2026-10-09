@@ -53,7 +53,9 @@ class MetricsMiddleware:
             if self.include_status:
                 labels["status"] = str(status_code)
 
-            self.collector.timer("http_request_duration_ms", "HTTP request duration").observe(duration, **labels)
+            self.collector.timer("http_request_duration_ms", "HTTP request duration").observe(
+                duration, **labels
+            )
 
             if status_code >= 500:
                 self.collector.counter("http_errors_total", "HTTP errors").inc(**labels)

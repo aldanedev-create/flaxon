@@ -5,7 +5,9 @@ from typing import Any
 
 
 class RedisSubscriptionBackend:
-    def __init__(self, redis_url: str = "redis://localhost:6379/0", prefix: str = "graphql:subscription") -> None:
+    def __init__(
+        self, redis_url: str = "redis://localhost:6379/0", prefix: str = "graphql:subscription"
+    ) -> None:
         self.redis_url = redis_url
         self.prefix = prefix
         self._client = None
@@ -16,11 +18,14 @@ class RedisSubscriptionBackend:
     async def connect(self) -> None:
         try:
             import redis.asyncio as redis
+
             self._client = redis.from_url(self.redis_url, decode_responses=True)
             self._pub = redis.from_url(self.redis_url, decode_responses=True)
             self._sub = redis.from_url(self.redis_url, decode_responses=True)
         except ImportError as exc:
-            raise RuntimeError("redis package is required for RedisSubscriptionBackend. Install with: pip install redis") from exc
+            raise RuntimeError(
+                "redis package is required for RedisSubscriptionBackend. Install with: pip install redis"
+            ) from exc
 
     async def disconnect(self) -> None:
         if self._client:
@@ -38,6 +43,7 @@ class RedisSubscriptionBackend:
 
     async def subscribe(self, operation_id: str, context: Any, variables: dict[str, Any]) -> str:
         import uuid
+
         subscription_id = str(uuid.uuid4())
         self._sub_map[subscription_id] = operation_id
 

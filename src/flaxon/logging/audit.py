@@ -52,7 +52,9 @@ class AuditLogger:
 
         self.logger.info("", extra=log_data)
 
-    def log_login(self, user_id: str | int, ip: str | None = None, user_agent: str | None = None, success: bool = True) -> None:
+    def log_login(
+        self, user_id: str | int, ip: str | None = None, user_agent: str | None = None, success: bool = True
+    ) -> None:
         self.log(
             action="login",
             user_id=user_id,
@@ -69,7 +71,9 @@ class AuditLogger:
             user_agent=user_agent,
         )
 
-    def log_create(self, user_id: str | int, resource: str, data: dict[str, Any], ip: str | None = None) -> None:
+    def log_create(
+        self, user_id: str | int, resource: str, data: dict[str, Any], ip: str | None = None
+    ) -> None:
         self.log(
             action="create",
             user_id=user_id,
@@ -78,7 +82,9 @@ class AuditLogger:
             ip=ip,
         )
 
-    def log_update(self, user_id: str | int, resource: str, changes: dict[str, Any], ip: str | None = None) -> None:
+    def log_update(
+        self, user_id: str | int, resource: str, changes: dict[str, Any], ip: str | None = None
+    ) -> None:
         self.log(
             action="update",
             user_id=user_id,

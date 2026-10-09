@@ -12,7 +12,9 @@ class FileSystemLoader:
         self.encoding = encoding
         self._cache: dict[str, tuple[str, float]] = {}
 
-    def get_source(self, environment: Any, template: str) -> tuple[str, str | None, Callable[[], bool] | None]:
+    def get_source(
+        self, environment: Any, template: str
+    ) -> tuple[str, str | None, Callable[[], bool] | None]:
         path = self.search_path / template
 
         if not path.exists():

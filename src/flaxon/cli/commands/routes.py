@@ -17,7 +17,9 @@ class RoutesCommand(Command):
 
     def _add_arguments(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("application", help="Application import string, e.g., app:app")
-        parser.add_argument("--format", choices=["table", "json", "csv"], default="table", help="Output format")
+        parser.add_argument(
+            "--format", choices=["table", "json", "csv"], default="table", help="Output format"
+        )
         parser.add_argument("--output", help="Output file path")
 
     def _run(self, args: argparse.Namespace, console: Any) -> int:
@@ -42,10 +44,12 @@ class RoutesCommand(Command):
 
         if args.format == "json":
             import json
+
             output = json.dumps({"routes": rows}, indent=2)
         elif args.format == "csv":
             import csv
             import io
+
             output = io.StringIO()
             writer = csv.writer(output)
             writer.writerow(["Method", "Path", "Name"])

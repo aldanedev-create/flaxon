@@ -1,0 +1,61 @@
+{
+  "baseline_commit": "f4ab3cd440234750f6220ee2fc107dde58b93132",
+  "cpu": "AMD EPYC 9V74",
+  "platform": "Linux x86_64 container",
+  "samples": 7,
+  "lookups_per_sample": 3000,
+  "route_pairs": [
+    10,
+    100,
+    1000
+  ],
+  "scope": "Router.match only; no HTTP server or database",
+  "before": {
+    "python": "3.12.14",
+    "unit": "ns/lookup",
+    "cases": {
+      "10": {
+        "dynamic": 7626.5,
+        "static": 374.5,
+        "missing": 7932.6,
+        "wrong_method": 8822.7
+      },
+      "100": {
+        "dynamic": 27299.0,
+        "static": 375.7,
+        "missing": 33146.3,
+        "wrong_method": 36135.7
+      },
+      "1000": {
+        "dynamic": 245951.6,
+        "static": 416.5,
+        "missing": 298526.2,
+        "wrong_method": 296615.8
+      }
+    }
+  },
+  "after": {
+    "python": "3.12.14",
+    "unit": "ns/lookup",
+    "cases": {
+      "10": {
+        "dynamic": 1819.4,
+        "static": 398.8,
+        "missing": 1762.4,
+        "wrong_method": 2444.9
+      },
+      "100": {
+        "dynamic": 1913.0,
+        "static": 385.4,
+        "missing": 1711.6,
+        "wrong_method": 2612.6
+      },
+      "1000": {
+        "dynamic": 2198.5,
+        "static": 466.2,
+        "missing": 1888.9,
+        "wrong_method": 2726.3
+      }
+    }
+  }
+}

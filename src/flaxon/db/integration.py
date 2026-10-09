@@ -1,9 +1,11 @@
 """Application-local Tortoise configuration and connection lifecycle."""
+
 from __future__ import annotations
 
 import importlib.util
 from contextlib import contextmanager
 from typing import Any
+
 from tortoise.context import TortoiseContext, _current_context
 
 
@@ -28,7 +30,11 @@ class Database:
     def configuration(self) -> dict[str, Any]:
         apps = {}
         if optional_module("models"):
-            apps["models"] = {"models": ["models"], "default_connection": "default", "migrations": "migrations"}
+            apps["models"] = {
+                "models": ["models"],
+                "default_connection": "default",
+                "migrations": "migrations",
+            }
         for module in getattr(self.app, "_orm_modules", []):
             if not module.models_module:
                 continue
@@ -37,13 +43,23 @@ class Database:
             apps[module.name] = {
                 "models": [module.models_module],
                 "default_connection": "default",
-                "migrations": module.migrations_module or f"{module.models_module.rsplit('.', 1)[0]}.migrations",
+                "migrations": module.migrations_module
+                or f"{module.models_module.rsplit('.', 1)[0]}.migrations",
             }
         if getattr(self.settings, "ADMIN_STORE_BACKEND", "sqlite") == "orm":
-            apps["flaxon_admin"] = {"models": ["flaxon.db.storemodels"], "default_connection": "default", "migrations": "admin_migrations"}
+            apps["flaxon_admin"] = {
+                "models": ["flaxon.db.storemodels"],
+                "default_connection": "default",
+                "migrations": "admin_migrations",
+            }
         if not apps:
             raise ValueError("Create models.py or declare models_module on a mounted FlaxonModule")
-        return {"connections": {"default": self.settings.DATABASE_URL}, "apps": apps, "use_tz": True, "timezone": self.settings.TIME_ZONE}
+        return {
+            "connections": {"default": self.settings.DATABASE_URL},
+            "apps": apps,
+            "use_tz": True,
+            "timezone": self.settings.TIME_ZONE,
+        }
 
     @contextmanager
     def bind(self):
