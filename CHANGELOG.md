@@ -1,13 +1,20 @@
 # Changelog
 
-## [0.2.7] 
+## Unreleased
+
+- Avoid session storage and cookies for untouched requests; prepare endpoint arguments at registration while resolving dependencies per request.
+- Infer and validate scalar query parameters, returning 422 for invalid input and documenting them in OpenAPI.
+- Replace custom JWT signing with PyJWT, require expiry and support configured issuer/audience and trusted key rotation. Legacy tokens require sign-in again.
+- Default to Argon2id, retain legacy PBKDF2 verification, upgrade Admin hashes after successful login, and default explicit session cookies to Secure.
+- Surface isolated plugin failures, propagate unexpected auth/permission errors, fix compression ASGI handling and missing imports, and repair the mypy platform setting.
+
+## [0.2.7]
 
 - Project CLI: discover commands once, avoid importing project commands for new/version, flush setup messages, show environment progress and stop after a 120-second timeout with recovery instructions.
 - Admin/CMS: distinguish the ORM lifecycle object from legacy SQL adapters so generated ORM applications use their metadata store without page errors.
 - Documentation: shared settings/management/ORM workflow and a verified 15-chapter, complete-code project-manager ebook covering Teloce HTML, scoped CSS, signals, SPA routing, staff Admin/CMS and Render.
 
 
-## [0.2.7] 
 
 - Bundle Alpine.js for essential Admin/CMS interactions.
 - Add permission-filtered relationship selectors, many-to-many forms, optional

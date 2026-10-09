@@ -8,6 +8,7 @@ to detect and handle dead connections.
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from typing import Any
 
@@ -95,8 +96,8 @@ class Heartbeat:
                 if time.time() - last_pong > self.timeout:
                     try:
                         await socket.close(1000, "Heartbeat timeout")
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logging.getLogger(__name__).warning("Isolated callback or cleanup failed (%s)", type(exc).__name__)
                     await self.stop(socket)
                     return
 

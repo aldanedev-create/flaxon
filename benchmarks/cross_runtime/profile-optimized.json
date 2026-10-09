@@ -1,0 +1,226 @@
+[
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/application/app.py",
+    "line": 481,
+    "function": "__call__",
+    "calls": 5000,
+    "self_seconds": 0.003327417,
+    "cumulative_seconds": 0.19658129100000002
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/middleware/request_id.py",
+    "line": 18,
+    "function": "__call__",
+    "calls": 5000,
+    "self_seconds": 0.007012048000000001,
+    "cumulative_seconds": 0.19271232600000002
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/middleware/security_headers.py",
+    "line": 19,
+    "function": "__call__",
+    "calls": 5000,
+    "self_seconds": 0.002029503,
+    "cumulative_seconds": 0.175401664
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/application/app.py",
+    "line": 513,
+    "function": "_dispatch",
+    "calls": 5000,
+    "self_seconds": 0.005113671,
+    "cumulative_seconds": 0.17337216100000002
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/application/app.py",
+    "line": 536,
+    "function": "_handle_http",
+    "calls": 5000,
+    "self_seconds": 0.009801752,
+    "cumulative_seconds": 0.167169082
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/http/response.py",
+    "line": 30,
+    "function": "from_value",
+    "calls": 5000,
+    "self_seconds": 0.003148337,
+    "cumulative_seconds": 0.050037901
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/http/response.py",
+    "line": 43,
+    "function": "__call__",
+    "calls": 5000,
+    "self_seconds": 0.005089417000000001,
+    "cumulative_seconds": 0.046999021
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/http/response.py",
+    "line": 53,
+    "function": "__init__",
+    "calls": 5000,
+    "self_seconds": 0.004234329,
+    "cumulative_seconds": 0.045908830000000005
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/http/request.py",
+    "line": 17,
+    "function": "__init__",
+    "calls": 5000,
+    "self_seconds": 0.017775969000000003,
+    "cumulative_seconds": 0.036583697000000005
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/middleware/security_headers.py",
+    "line": 20,
+    "function": "send_wrapper",
+    "calls": 10000,
+    "self_seconds": 0.008291745,
+    "cumulative_seconds": 0.030145639000000002
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/http/response.py",
+    "line": 17,
+    "function": "__init__",
+    "calls": 5000,
+    "self_seconds": 0.007033541000000001,
+    "cumulative_seconds": 0.025631942
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/routing/router.py",
+    "line": 98,
+    "function": "match",
+    "calls": 5000,
+    "self_seconds": 0.006737740000000001,
+    "cumulative_seconds": 0.013765443
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/http/headers.py",
+    "line": 40,
+    "function": "to_asgi",
+    "calls": 5000,
+    "self_seconds": 0.0058628000000000005,
+    "cumulative_seconds": 0.011763965000000001
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/middleware/request_id.py",
+    "line": 22,
+    "function": "send_wrapper",
+    "calls": 10000,
+    "self_seconds": 0.007010476000000001,
+    "cumulative_seconds": 0.010743831
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/application/app.py",
+    "line": 582,
+    "function": "_invoke",
+    "calls": 5000,
+    "self_seconds": 0.004261541000000001,
+    "cumulative_seconds": 0.007165702
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/http/headers.py",
+    "line": 24,
+    "function": "__setitem__",
+    "calls": 10000,
+    "self_seconds": 0.0047086590000000005,
+    "cumulative_seconds": 0.006831005
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/http/headers.py",
+    "line": 21,
+    "function": "__getitem__",
+    "calls": 15000,
+    "self_seconds": 0.004844247,
+    "cumulative_seconds": 0.006714785
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/middleware/security_headers.py",
+    "line": 23,
+    "function": "<genexpr>",
+    "calls": 15000,
+    "self_seconds": 0.0037698040000000003,
+    "cumulative_seconds": 0.006174492
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/routing/route.py",
+    "line": 62,
+    "function": "match",
+    "calls": 5000,
+    "self_seconds": 0.002329888,
+    "cumulative_seconds": 0.004520691
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/http/headers.py",
+    "line": 11,
+    "function": "__init__",
+    "calls": 10000,
+    "self_seconds": 0.001316923,
+    "cumulative_seconds": 0.001316923
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/http/cookies.py",
+    "line": 40,
+    "function": "__getitem__",
+    "calls": 5000,
+    "self_seconds": 0.001052214,
+    "cumulative_seconds": 0.001052214
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/http/cookies.py",
+    "line": 36,
+    "function": "__init__",
+    "calls": 5000,
+    "self_seconds": 0.001041106,
+    "cumulative_seconds": 0.001041106
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/dependency_injection/resolver.py",
+    "line": 27,
+    "function": "resolve_plan",
+    "calls": 5000,
+    "self_seconds": 0.000727228,
+    "cumulative_seconds": 0.000727228
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/http/headers.py",
+    "line": 43,
+    "function": "<genexpr>",
+    "calls": 5000,
+    "self_seconds": 0.0005745440000000001,
+    "cumulative_seconds": 0.0005745440000000001
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/middleware/request_id.py",
+    "line": 19,
+    "function": "<genexpr>",
+    "calls": 5000,
+    "self_seconds": 0.00045910300000000004,
+    "cumulative_seconds": 0.00045910300000000004
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/middleware/request_id.py",
+    "line": 14,
+    "function": "__init__",
+    "calls": 1,
+    "self_seconds": 2.763e-06,
+    "cumulative_seconds": 3.996e-06
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/middleware/security_headers.py",
+    "line": 15,
+    "function": "__init__",
+    "calls": 1,
+    "self_seconds": 2.965e-06,
+    "cumulative_seconds": 3.3350000000000003e-06
+  },
+  {
+    "file": "/workspace/scratch/67da7b153f3e/flaxon-orm/src/flaxon/middleware/base.py",
+    "line": 11,
+    "function": "__init__",
+    "calls": 2,
+    "self_seconds": 6.81e-07,
+    "cumulative_seconds": 6.81e-07
+  }
+]

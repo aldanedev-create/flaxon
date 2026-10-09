@@ -17,7 +17,7 @@ class SessionManager:
         ttl: int = 86400,
         cookie_path: str = "/",
         cookie_domain: str | None = None,
-        cookie_secure: bool = False,
+        cookie_secure: bool = True,
         cookie_httponly: bool = True,
         cookie_samesite: str = "lax",
     ) -> None:

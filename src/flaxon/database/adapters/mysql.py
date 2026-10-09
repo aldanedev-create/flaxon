@@ -49,12 +49,14 @@ class MySQLAdapter(BaseAdapter):
             return cursor
 
     async def fetch_one(self, query: str, *args: Any) -> dict[str, Any] | None:
-        async with self._conn.cursor(aiomysql.DictCursor) as cursor:
+        from aiomysql import DictCursor
+        async with self._conn.cursor(DictCursor) as cursor:
             await cursor.execute(query, args)
             return await cursor.fetchone()
 
     async def fetch_all(self, query: str, *args: Any) -> list[dict[str, Any]]:
-        async with self._conn.cursor(aiomysql.DictCursor) as cursor:
+        from aiomysql import DictCursor
+        async with self._conn.cursor(DictCursor) as cursor:
             await cursor.execute(query, args)
             return await cursor.fetchall()
 

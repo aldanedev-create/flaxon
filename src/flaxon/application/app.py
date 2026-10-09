@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import inspect
 import json
-from pathlib import Path
 import secrets
 import time
 import traceback
 import types
 import typing
-from collections.abc import Callable
-from typing import Any
 import uuid
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
 
 from flaxon.admin import AdminConfig, AdminDashboard
 from flaxon.debugging import Dashboard, Debugger, ErrorStore
@@ -27,6 +27,7 @@ from flaxon.metrics import MetricsCollector, PrometheusExporter
 from flaxon.middleware import RequestIDMiddleware, SecurityHeadersMiddleware
 from flaxon.plugins import PluginManager
 from flaxon.routing import MISSING, Query, Router
+from flaxon.routing.execution import EndpointPlan, is_scalar_query
 from flaxon.sessions import SessionManager
 from flaxon.sessions.backends.memory import MemoryBackend
 from flaxon.validation import Schema, ValidationError
@@ -537,22 +538,18 @@ class Flaxon:
 
         # Session Middleware Initialization
         session_cookie = request.cookies.get(self.sessions.cookie_name)
-        session_is_new = True
         if session_cookie:
             parsed = self.sessions.parse_cookie(session_cookie)
             if parsed:
                 existing = await self.sessions.get(parsed[0])
                 if existing is not None and not existing.is_expired():
                     request.session = existing
-                    session_is_new = False
-        if session_is_new:
-            request.session = await self.sessions.create()
 
         # Routing and Execution
         try:
             matched = self.router.match(request.path, request.method)
             request.path_params = matched.params
-            result = await self._invoke(matched.route.endpoint, request, matched.params)
+            result = await self._invoke(matched.route.endpoint, request, matched.params, matched.route.execution_plan)
             response = Response.from_value(result)
         except HTTPException as exc:
             response = JSONResponse(exc.to_dict(), status_code=exc.status_code)
@@ -570,9 +567,11 @@ class Flaxon:
                 )
 
         # Save session header updates
-        if session_is_new or request.session.is_dirty():
-            await self.sessions.save(request.session)
-            response.headers.add("set-cookie", self.sessions.create_cookie(request.session))
+        session = request._session
+        if session is not None and session.is_dirty():
+            await self.sessions.save(session)
+            response.headers.add("set-cookie", self.sessions.create_cookie(session))
+            session.mark_clean()
 
         if request.method == "HEAD":
             response.body = b""
@@ -580,16 +579,12 @@ class Flaxon:
 
         await response(scope, receive, send)
 
-    async def _invoke(self, endpoint: Callable[..., Any], request: Request | WebSocket, params: dict[str, Any]) -> Any:
-        signature = inspect.signature(endpoint)
-        try:
-            hints = typing.get_type_hints(endpoint)
-        except Exception:
-            hints = {}
-        container_kwargs = self.container.resolve(endpoint)
+    async def _invoke(self, endpoint: Callable[..., Any], request: Request | WebSocket,
+                      params: dict[str, Any], plan: EndpointPlan | None = None) -> Any:
+        plan = plan or EndpointPlan.prepare(endpoint)
+        container_kwargs = self.container._resolver.resolve_plan(plan)
         kwargs: dict[str, Any] = {}
-        for name, parameter in signature.parameters.items():
-            annotation = hints.get(name, parameter.annotation)
+        for name, parameter, annotation in plan.parameters:
             if name in params:
                 kwargs[name] = params[name]
             elif name in {"request", "socket", "websocket"}:
@@ -598,6 +593,9 @@ class Flaxon:
                 kwargs[name] = container_kwargs[name]
             elif isinstance(parameter.default, Query):
                 kwargs[name] = self._resolve_query_parameter(request, name, annotation, parameter.default)
+            elif isinstance(request, Request) and is_scalar_query(annotation):
+                default = MISSING if parameter.default is inspect.Parameter.empty else parameter.default
+                kwargs[name] = self._resolve_query_parameter(request, name, annotation, Query(default=default))
             else:
                 body_value = await self._resolve_body_parameter(request, annotation)
                 if body_value is not _UNRESOLVED:
@@ -628,6 +626,7 @@ class Flaxon:
         origin = typing.get_origin(target)
         if origin in (typing.Union, types.UnionType):
             target = next((item for item in typing.get_args(target) if item is not type(None)), str)
+        converted: Any
         try:
             if target is bool:
                 normalized = str(value).strip().lower()

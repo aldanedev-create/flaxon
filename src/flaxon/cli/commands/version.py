@@ -31,7 +31,7 @@ class VersionCommand(Command):
                 import sys
                 console.info(f"Python: {sys.version}")
                 console.info(f"Platform: {platform.platform()}")
-            except Exception:
-                pass
+            except OSError:
+                console.warning("Platform details unavailable")
 
         return 0

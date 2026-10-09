@@ -337,3 +337,7 @@ or create a private security advisory through the Flaxon GitHub repository.
 
 Please do not publicly disclose security issues before they are reviewed and addressed.
 
+
+## Authentication and session migration
+
+See [request security upgrades](guides/request-security-upgrade.md) for standard JWTs, Argon2 upgrades, typed query validation and lazy session creation.

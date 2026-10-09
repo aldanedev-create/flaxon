@@ -161,7 +161,8 @@ class TestClient:
     def __del__(self) -> None:
         try:
             self.close()
-        except Exception:
+        except (RuntimeError, AttributeError):
+            # Best-effort finalizer; explicit close() still reports errors.
             pass
 
     def get(self, path: str, **kwargs: Any) -> TestResponse:

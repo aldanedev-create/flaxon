@@ -5,6 +5,8 @@ import typing
 from collections.abc import Callable
 from typing import Any
 
+from flaxon.routing.execution import EndpointPlan
+
 from .exceptions import DependencyNotFoundError
 
 
@@ -21,13 +23,13 @@ class Resolver:
         self.container = container
 
     def resolve(self, func: Callable) -> dict[str, Any]:
-        signature = inspect.signature(func)
-        hints = _resolved_hints(func)
+        return self.resolve_plan(EndpointPlan.prepare(func))
+
+    def resolve_plan(self, plan: EndpointPlan) -> dict[str, Any]:
+        """Resolve current providers from precomputed endpoint metadata."""
         params = {}
 
-        for name, param in signature.parameters.items():
-            annotation = hints.get(name, param.annotation)
-
+        for name, param, annotation in plan.parameters:
             if self.container.has(name):
                 params[name] = self.container.get(name)
             elif isinstance(annotation, type):

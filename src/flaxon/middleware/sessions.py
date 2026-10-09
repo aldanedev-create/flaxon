@@ -24,7 +24,7 @@ class Session:
         data: dict[str, Any] | None = None,
         *,
         ttl: int = 86400,
-        secure: bool = False,
+        secure: bool = True,
         httponly: bool = True,
         samesite: str = "lax",
     ) -> None:
@@ -104,7 +104,7 @@ class SessionMiddleware(Middleware):
         secret_key: str,
         cookie_name: str = "session",
         ttl: int = 86400,
-        secure: bool = False,
+        secure: bool = True,
         httponly: bool = True,
         samesite: str = "lax",
     ) -> None:

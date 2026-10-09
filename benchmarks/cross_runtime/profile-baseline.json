@@ -1,0 +1,330 @@
+[
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/application/app.py",
+    "line": 480,
+    "function": "__call__",
+    "calls": 5000,
+    "self_seconds": 0.003970157,
+    "cumulative_seconds": 0.49340802500000003
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/middleware/request_id.py",
+    "line": 18,
+    "function": "__call__",
+    "calls": 5000,
+    "self_seconds": 0.008039379000000001,
+    "cumulative_seconds": 0.48883477100000006
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/middleware/security_headers.py",
+    "line": 19,
+    "function": "__call__",
+    "calls": 5000,
+    "self_seconds": 0.0024825990000000003,
+    "cumulative_seconds": 0.469025324
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/application/app.py",
+    "line": 512,
+    "function": "_dispatch",
+    "calls": 5000,
+    "self_seconds": 0.006402107000000001,
+    "cumulative_seconds": 0.46654272500000005
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/application/app.py",
+    "line": 535,
+    "function": "_handle_http",
+    "calls": 5000,
+    "self_seconds": 0.019088087,
+    "cumulative_seconds": 0.45892214400000003
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/application/app.py",
+    "line": 583,
+    "function": "_invoke",
+    "calls": 5000,
+    "self_seconds": 0.009934791,
+    "cumulative_seconds": 0.15342688100000001
+  },
+  {
+    "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/inspect.py",
+    "line": 3346,
+    "function": "signature",
+    "calls": 10000,
+    "self_seconds": 0.003687627,
+    "cumulative_seconds": 0.10212320000000001
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/dependency_injection/container.py",
+    "line": 65,
+    "function": "resolve",
+    "calls": 5000,
+    "self_seconds": 0.002077387,
+    "cumulative_seconds": 0.07327329
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/dependency_injection/resolver.py",
+    "line": 23,
+    "function": "resolve",
+    "calls": 5000,
+    "self_seconds": 0.005697992000000001,
+    "cumulative_seconds": 0.071195903
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/http/response.py",
+    "line": 30,
+    "function": "from_value",
+    "calls": 5000,
+    "self_seconds": 0.00377012,
+    "cumulative_seconds": 0.059608339
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/http/response.py",
+    "line": 43,
+    "function": "__call__",
+    "calls": 5000,
+    "self_seconds": 0.006162832,
+    "cumulative_seconds": 0.057636351
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/http/response.py",
+    "line": 53,
+    "function": "__init__",
+    "calls": 5000,
+    "self_seconds": 0.004807767,
+    "cumulative_seconds": 0.054852119000000005
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/sessions/manager.py",
+    "line": 41,
+    "function": "create",
+    "calls": 5000,
+    "self_seconds": 0.0043409220000000005,
+    "cumulative_seconds": 0.044787788
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/sessions/manager.py",
+    "line": 70,
+    "function": "create_cookie",
+    "calls": 5000,
+    "self_seconds": 0.00716708,
+    "cumulative_seconds": 0.044573589000000004
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/http/request.py",
+    "line": 17,
+    "function": "__init__",
+    "calls": 5000,
+    "self_seconds": 0.019615917,
+    "cumulative_seconds": 0.041951921
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/middleware/security_headers.py",
+    "line": 20,
+    "function": "send_wrapper",
+    "calls": 10000,
+    "self_seconds": 0.009270886,
+    "cumulative_seconds": 0.03459454
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/http/response.py",
+    "line": 17,
+    "function": "__init__",
+    "calls": 5000,
+    "self_seconds": 0.008235255,
+    "cumulative_seconds": 0.03008065
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/sessions/session.py",
+    "line": 9,
+    "function": "__init__",
+    "calls": 5000,
+    "self_seconds": 0.004864814,
+    "cumulative_seconds": 0.028269758000000002
+  },
+  {
+    "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/typing.py",
+    "line": 2219,
+    "function": "get_type_hints",
+    "calls": 10000,
+    "self_seconds": 0.016993417,
+    "cumulative_seconds": 0.026895517
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/sessions/backends/memory.py",
+    "line": 31,
+    "function": "save",
+    "calls": 10000,
+    "self_seconds": 0.010930058000000001,
+    "cumulative_seconds": 0.023566657
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/sessions/manager.py",
+    "line": 34,
+    "function": "_sign",
+    "calls": 5000,
+    "self_seconds": 0.004783375,
+    "cumulative_seconds": 0.023112116000000002
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/http/headers.py",
+    "line": 40,
+    "function": "to_asgi",
+    "calls": 5000,
+    "self_seconds": 0.006933771,
+    "cumulative_seconds": 0.016878979000000002
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/routing/router.py",
+    "line": 98,
+    "function": "match",
+    "calls": 5000,
+    "self_seconds": 0.008224524,
+    "cumulative_seconds": 0.016822614
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/dependency_injection/resolver.py",
+    "line": 11,
+    "function": "_resolved_hints",
+    "calls": 5000,
+    "self_seconds": 0.001696596,
+    "cumulative_seconds": 0.014603266
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/sessions/cookie.py",
+    "line": 30,
+    "function": "to_header",
+    "calls": 5000,
+    "self_seconds": 0.008055649,
+    "cumulative_seconds": 0.013382897000000001
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/sessions/manager.py",
+    "line": 57,
+    "function": "save",
+    "calls": 5000,
+    "self_seconds": 0.0017386040000000001,
+    "cumulative_seconds": 0.013128153
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/middleware/request_id.py",
+    "line": 22,
+    "function": "send_wrapper",
+    "calls": 10000,
+    "self_seconds": 0.007993004,
+    "cumulative_seconds": 0.011917115
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/http/headers.py",
+    "line": 21,
+    "function": "__getitem__",
+    "calls": 15000,
+    "self_seconds": 0.005896603,
+    "cumulative_seconds": 0.007970950000000001
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/middleware/security_headers.py",
+    "line": 23,
+    "function": "<genexpr>",
+    "calls": 15000,
+    "self_seconds": 0.005200675,
+    "cumulative_seconds": 0.007911568
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/http/headers.py",
+    "line": 24,
+    "function": "__setitem__",
+    "calls": 10000,
+    "self_seconds": 0.005365815,
+    "cumulative_seconds": 0.007806106
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/routing/route.py",
+    "line": 60,
+    "function": "match",
+    "calls": 5000,
+    "self_seconds": 0.002996522,
+    "cumulative_seconds": 0.0057910800000000005
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/http/headers.py",
+    "line": 30,
+    "function": "add",
+    "calls": 5000,
+    "self_seconds": 0.002519884,
+    "cumulative_seconds": 0.0038790570000000004
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/http/headers.py",
+    "line": 43,
+    "function": "<genexpr>",
+    "calls": 10000,
+    "self_seconds": 0.002405121,
+    "cumulative_seconds": 0.0036992460000000002
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/http/headers.py",
+    "line": 11,
+    "function": "__init__",
+    "calls": 10000,
+    "self_seconds": 0.001493125,
+    "cumulative_seconds": 0.001493125
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/http/cookies.py",
+    "line": 36,
+    "function": "__init__",
+    "calls": 5000,
+    "self_seconds": 0.00126362,
+    "cumulative_seconds": 0.00126362
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/http/cookies.py",
+    "line": 40,
+    "function": "__getitem__",
+    "calls": 5000,
+    "self_seconds": 0.001209549,
+    "cumulative_seconds": 0.001209549
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/sessions/cookie.py",
+    "line": 8,
+    "function": "__init__",
+    "calls": 5000,
+    "self_seconds": 0.000911496,
+    "cumulative_seconds": 0.000911496
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/middleware/request_id.py",
+    "line": 19,
+    "function": "<genexpr>",
+    "calls": 5000,
+    "self_seconds": 0.00052024,
+    "cumulative_seconds": 0.00052024
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/middleware/request_id.py",
+    "line": 14,
+    "function": "__init__",
+    "calls": 1,
+    "self_seconds": 2.0440000000000003e-06,
+    "cumulative_seconds": 3.225e-06
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/middleware/security_headers.py",
+    "line": 15,
+    "function": "__init__",
+    "calls": 1,
+    "self_seconds": 1.7530000000000002e-06,
+    "cumulative_seconds": 2.153e-06
+  },
+  {
+    "file": "/tmp/flaxon-performance-baseline/src/flaxon/middleware/base.py",
+    "line": 11,
+    "function": "__init__",
+    "calls": 2,
+    "self_seconds": 6.7e-07,
+    "cumulative_seconds": 6.7e-07
+  }
+]

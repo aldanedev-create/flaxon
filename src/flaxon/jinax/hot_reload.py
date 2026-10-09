@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import Callable
 from pathlib import Path
@@ -58,8 +59,8 @@ class HotReloader:
         for listener in self._listeners:
             try:
                 listener(path)
-            except Exception:
-                pass
+            except Exception as exc:
+                logging.getLogger(__name__).warning("Isolated callback or cleanup failed (%s)", type(exc).__name__)
 
     async def run(self) -> None:
         import asyncio

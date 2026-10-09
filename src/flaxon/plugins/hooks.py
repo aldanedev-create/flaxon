@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from typing import Any
 
@@ -20,8 +21,8 @@ class PluginHook:
         for handler in self._handlers:
             try:
                 handler(*args, **kwargs)
-            except Exception:
-                pass
+            except Exception as exc:
+                logging.getLogger(__name__).warning("Isolated callback or cleanup failed (%s)", type(exc).__name__)
 
     async def trigger_async(self, *args: Any, **kwargs: Any) -> None:
         for handler in self._handlers:
@@ -29,8 +30,8 @@ class PluginHook:
                 result = handler(*args, **kwargs)
                 if hasattr(result, "__await__"):
                     await result
-            except Exception:
-                pass
+            except Exception as exc:
+                logging.getLogger(__name__).warning("Isolated callback or cleanup failed (%s)", type(exc).__name__)
 
 
 class PluginHooks:

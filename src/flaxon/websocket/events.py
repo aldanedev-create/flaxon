@@ -8,6 +8,7 @@ connection events, message events, and disconnect events.
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
@@ -166,8 +167,8 @@ class EventHandler:
                 result = listener(event)
                 if asyncio.iscoroutine(result):
                     await result
-            except Exception:
-                pass
+            except Exception as exc:
+                logging.getLogger(__name__).warning("Isolated callback or cleanup failed (%s)", type(exc).__name__)
 
 
 class WebSocketEvents:

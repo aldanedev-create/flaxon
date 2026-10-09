@@ -1,62 +1,77 @@
 from __future__ import annotations
 
-import base64
 import functools
-import hashlib
-import hmac
-import json
 import time
-from typing import Any
+from typing import Any, cast
+
+import jwt as pyjwt
 
 from flaxon.exceptions import Unauthorized
 from flaxon.http import Request
 
 
 class JWT:
-    def __init__(self, secret_key: str, algorithm: str = "HS256") -> None:
-        self.secret_key = secret_key.encode()
+    """Standard JWTs with a fixed algorithm and optional trusted key rotation."""
+
+    def __init__(self, secret_key: str, algorithm: str = "HS256", *,
+                 issuer: str | None = None, audience: str | None = None,
+                 key_id: str | None = None,
+                 verification_keys: dict[str, str] | None = None,
+                 leeway: int = 0) -> None:
+        if not secret_key:
+            raise ValueError("JWT requires a nonempty secret key")
+        if algorithm not in {"HS256", "HS384", "HS512"}:
+            raise ValueError("JWT supports explicitly configured HS256, HS384, or HS512")
+        if leeway < 0:
+            raise ValueError("JWT leeway must be nonnegative")
+        self.secret_key = secret_key
         self.algorithm = algorithm
-
-    def _sign(self, data: str) -> str:
-        return hmac.new(self.secret_key, data.encode(), hashlib.sha256).hexdigest()
-
-    def _base64_encode(self, data: str) -> str:
-        return base64.urlsafe_b64encode(data.encode()).decode().rstrip("=")
-
-    def _base64_decode(self, data: str) -> str:
-        padding = "=" * (4 - len(data) % 4)
-        return base64.urlsafe_b64decode(data + padding).decode()
+        self.issuer = issuer
+        self.audience = audience
+        self.key_id = key_id
+        self.verification_keys = dict(verification_keys or {})
+        if any(not value for value in self.verification_keys.values()):
+            raise ValueError("JWT verification keys must be nonempty")
+        if key_id is not None:
+            if key_id in self.verification_keys and self.verification_keys[key_id] != secret_key:
+                raise ValueError("JWT active key ID must match the signing secret")
+            self.verification_keys[key_id] = secret_key
+        self.leeway = leeway
 
     def encode(self, payload: dict[str, Any], expires_in: int = 3600) -> str:
-        header = {"alg": self.algorithm, "typ": "JWT"}
-        payload_data = {
-            **payload,
-            "iat": int(time.time()),
-            "exp": int(time.time()) + expires_in,
-        }
-        header_encoded = self._base64_encode(json.dumps(header))
-        payload_encoded = self._base64_encode(json.dumps(payload_data))
-        signature = self._sign(f"{header_encoded}.{payload_encoded}")
-        return f"{header_encoded}.{payload_encoded}.{signature}"
+        """Issue a standard base64url JWT; configuration owns registered claims."""
+        now = int(time.time())
+        claims = {**payload, "iat": now, "exp": now + expires_in}
+        if self.issuer is not None:
+            claims["iss"] = self.issuer
+        if self.audience is not None:
+            claims["aud"] = self.audience
+        headers = {"kid": self.key_id} if self.key_id is not None else None
+        return cast(str, pyjwt.encode(claims, self.secret_key, algorithm=self.algorithm, headers=headers))
 
     def decode(self, token: str) -> dict[str, Any]:
+        """Verify expiry, fixed algorithm, configured claims, and trusted key IDs."""
         try:
-            parts = token.split(".")
-            if len(parts) != 3:
-                raise Unauthorized("Invalid token format")
-
-            header_encoded, payload_encoded, signature = parts
-
-            expected = self._sign(f"{header_encoded}.{payload_encoded}")
-            if not hmac.compare_digest(expected, signature):
-                raise Unauthorized("Invalid token signature")
-
-            payload_data = json.loads(self._base64_decode(payload_encoded))
-            if payload_data.get("exp", 0) < time.time():
-                raise Unauthorized("Token has expired")
-
-            return payload_data
-        except (json.JSONDecodeError, ValueError, TypeError) as exc:
+            header = pyjwt.get_unverified_header(token)
+            if header.get("alg") != self.algorithm:
+                raise Unauthorized("Invalid token algorithm")
+            key = self.secret_key
+            if "kid" in header:
+                kid = header["kid"]
+                if not isinstance(kid, str) or kid not in self.verification_keys:
+                    raise Unauthorized("Unknown token key")
+                key = self.verification_keys[kid]
+            required = ["exp"]
+            if self.issuer is not None:
+                required.append("iss")
+            if self.audience is not None:
+                required.append("aud")
+            return cast(dict[str, Any], pyjwt.decode(token, key, algorithms=[self.algorithm],
+                                issuer=self.issuer, audience=self.audience,
+                                leeway=self.leeway, options={"require": required}))
+        except pyjwt.ExpiredSignatureError as exc:
+            raise Unauthorized("Token has expired") from exc
+        except (pyjwt.InvalidTokenError, ValueError, TypeError, OverflowError) as exc:
             raise Unauthorized("Invalid token") from exc
 
 

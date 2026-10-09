@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .converters import get_converter
+from .execution import EndpointPlan
 
 _PARAMETER = re.compile(r"<(?:(?P<converter>[a-zA-Z_][a-zA-Z0-9_]*):)?(?P<name>[a-zA-Z_][a-zA-Z0-9_]*)>")
 
@@ -48,6 +49,7 @@ class Route:
 
     def __post_init__(self) -> None:
         self.pattern, self.parameters = compile_path(self.path)
+        self.execution_plan = EndpointPlan.prepare(self.endpoint)
 
     @property
     def specificity(self) -> tuple[int, int, int]:
@@ -79,6 +81,7 @@ class WebSocketRoute:
 
     def __post_init__(self) -> None:
         self.pattern, self.parameters = compile_path(self.path)
+        self.execution_plan = EndpointPlan.prepare(self.endpoint)
 
     def match(self, path: str) -> dict[str, Any] | None:
         """Return typed parameters when the path matches."""

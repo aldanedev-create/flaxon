@@ -7,7 +7,11 @@ import string
 
 
 class PasswordHasher:
-    def __init__(self, algorithm: str = "pbkdf2_sha256", iterations: int = 100000) -> None:
+    def __init__(self, algorithm: str = "argon2", iterations: int = 600000) -> None:
+        if algorithm not in {"argon2", "pbkdf2_sha256"}:
+            raise ValueError("Unsupported password hashing algorithm")
+        if iterations < 1:
+            raise ValueError("Password iterations must be positive")
         self.algorithm = algorithm
         self.iterations = iterations
         self._argon2 = None
@@ -16,7 +20,7 @@ class PasswordHasher:
                 from argon2 import PasswordHasher as Argon2Hasher
             except ImportError as exc:  # pragma: no cover - optional dependency
                 raise RuntimeError("PasswordHasher(algorithm='argon2') requires argon2-cffi.") from exc
-            self._argon2 = Argon2Hasher()
+            self._argon2 = Argon2Hasher(time_cost=2, memory_cost=19456, parallelism=1)
 
     def hash(self, password: str) -> str:
         if self._argon2 is not None:
@@ -25,38 +29,39 @@ class PasswordHasher:
         return self._hash_with_salt(password, salt)
 
     def verify(self, password: str, hashed: str) -> bool:
+        if not isinstance(password, str) or not isinstance(hashed, str):
+            return False
         if hashed.startswith("$argon2"):
-            if self._argon2 is None:
-                try:
-                    from argon2 import PasswordHasher as Argon2Hasher
-                    from argon2.exceptions import VerificationError
-                except ImportError:
-                    return False
-                self._argon2 = Argon2Hasher()
-            else:
-                try:
-                    from argon2.exceptions import VerificationError
-                except ImportError:  # pragma: no cover - defensive
-                    VerificationError = ValueError
+            from argon2 import PasswordHasher as Argon2Hasher
+            from argon2.exceptions import InvalidHashError, VerificationError
+            verifier = self._argon2 or Argon2Hasher(time_cost=2, memory_cost=19456, parallelism=1)
             try:
-                return bool(self._argon2.verify(hashed, password))
-            except (VerificationError, ValueError, TypeError):
+                return bool(verifier.verify(hashed, password))
+            except (VerificationError, InvalidHashError, ValueError, TypeError):
                 return False
         try:
             algorithm, iterations, salt, hash_value = hashed.split("$")
-            if algorithm != self.algorithm:
+            if algorithm != "pbkdf2_sha256" or not salt:
                 return False
             iterations = int(iterations)
+            if iterations < 1:
+                return False
             new_hash = self._hash_raw(password, salt, iterations)
             return hmac.compare_digest(new_hash, hash_value)
         except (ValueError, TypeError):
             return False
 
     def needs_rehash(self, hashed: str) -> bool:
+        if not isinstance(hashed, str):
+            return True
         if hashed.startswith("$argon2"):
             if self._argon2 is None:
                 return self.algorithm != "argon2"
-            return bool(self._argon2.check_needs_rehash(hashed))
+            from argon2.exceptions import InvalidHashError
+            try:
+                return bool(self._argon2.check_needs_rehash(hashed))
+            except InvalidHashError:
+                return True
         try:
             algorithm, iterations, salt, hash_value = hashed.split("$")
             return algorithm != self.algorithm or int(iterations) < self.iterations

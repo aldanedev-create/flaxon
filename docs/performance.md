@@ -224,3 +224,7 @@ For extremely high-performance components, applications can combine Flaxon with:
 
 The goal is not to replace every technology, but to provide a flexible foundation for building scalable applications with Python.
 
+
+## Measured request-path improvements
+
+Endpoint argument metadata is prepared at route registration, and untouched sessions are not stored. See [request performance and migration](guides/request-security-upgrade.md) and the reproducible `benchmarks/cross_runtime/` suite. Results are workload-specific; development time and developer-defect reduction remain unmeasured.

@@ -24,6 +24,7 @@ class Request:
         self.path_params: dict[str, Any] = dict(scope.get("path_params", {}))
         self.user = scope.get("user")
         self._body: bytes | None = None
+        self._session = None if getattr(self.app, "sessions", None) is not None else scope.get("session")
         cookie_data = {}
         for item in self.headers.get("cookie", "").split(";"):
             if "=" in item:
@@ -37,6 +38,19 @@ class Request:
         parsed_query = parse_qs(raw_query, keep_blank_values=True)
         self.query: dict[str, str] = {key: values[0] for key, values in parsed_query.items()}
         self.query_params = self.query
+
+    @property
+    def session(self) -> Any:
+        """Create an unsaved session on first access; persist only mutations."""
+        if self._session is None:
+            from flaxon.sessions.session import Session
+            manager = getattr(self.app, "sessions", None)
+            self._session = Session(ttl=getattr(manager, "ttl", 86400))
+        return self._session
+
+    @session.setter
+    def session(self, value: Any) -> None:
+        self._session = value
 
     async def body(self) -> bytes:
         """Read and cache the complete request body."""
