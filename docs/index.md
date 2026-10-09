@@ -211,3 +211,5 @@ Use the guides for explanations, the API pages for reference, and the examples f
 - [JSON serialization and migration](guides/json-serialization.md)
 
 - [Release readiness audit](releases/readiness-audit.md)
+
+- [Routing and quality audit](quality-audit.md)
