@@ -1,0 +1,10 @@
+# Extra dependencies for the six-framework ASGI comparison.
+# Install Flaxon editable and its standard extra separately.
+fastapi==0.143.0
+starlette==1.7.0
+litestar==2.24.0
+sanic==25.12.1
+falcon==4.4.0
+uvicorn==0.54.0
+uvloop==0.23.0
+httptools==0.8.0
