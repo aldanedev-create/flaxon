@@ -209,3 +209,5 @@ Use the guides for explanations, the API pages for reference, and the examples f
 - [15 | Production build and Render](fullstack/project-manager/15.md)
 
 - [JSON serialization and migration](guides/json-serialization.md)
+
+- [Release readiness audit](releases/readiness-audit.md)

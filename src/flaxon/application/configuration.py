@@ -68,7 +68,7 @@ class Config(dict[str, Any]):
         for key, value in os.environ.items():
             if key.startswith(prefix):
                 config_key = key[len(prefix):]
-                self[config_key] = _coerce(value)
+                self[config_key] = value if config_key == "SECRET_KEY" else _coerce(value)
 
     def __getattr__(self, name: str) -> Any:
         """Allow attribute-style access to configuration values."""

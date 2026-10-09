@@ -13,6 +13,8 @@ include .env.example
 # Include package data
 recursive-include src/flaxon *.py
 recursive-include tests *.py
+recursive-include tests/fixtures *.js LICENSE
+recursive-include scripts *.py
 
 # Include examples
 recursive-include examples *.py

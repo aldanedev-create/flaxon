@@ -161,10 +161,10 @@ benchmark = [
 flaxon = "flaxon.cli.main:main"
 
 [project.urls]
-Homepage = "https://github.com/aldanedev-create/Flaxon-Backend-Framework"
-Repository = "https://github.com/aldanedev-create/Flaxon-Backend-Framework"
-"Bug Tracker" = "https://github.com/aldanedev-create/Flaxon-Backend-Framework/issues"
-Changelog = "https://github.com/aldanedev-create/Flaxon-Backend-Framework/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/aldanedev-create/flaxon"
+Repository = "https://github.com/aldanedev-create/flaxon"
+"Bug Tracker" = "https://github.com/aldanedev-create/flaxon/issues"
+Changelog = "https://github.com/aldanedev-create/flaxon/blob/main/CHANGELOG.md"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

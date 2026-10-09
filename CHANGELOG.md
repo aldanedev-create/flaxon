@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Release readiness: preserve environment secret strings, repair version/changelog/artifact/tag tooling, support prerelease versions, verify installed wheels, and make CDN browser tests reproducible.
+
 - Use browser-safe orjson encoding by default; add explicit legacy response and settings modes. See [migration rules](docs/guides/json-serialization.md).
 - Parse request headers, cookies, and query parameters lazily.
 - Prepare dependency names once and order route candidates during registration.

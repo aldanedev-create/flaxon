@@ -35,6 +35,12 @@ def test_typescript_converter_and_cdn_collapse(tmp_path):
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch()
             page = browser.new_page()
+            # Verify head injection and the real pinned library without CDN availability.
+            bootstrap = Path(__file__).resolve().parents[1] / "fixtures/bootstrap/bootstrap.bundle.min.js"
+            page.route("https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js",
+                       lambda route: route.fulfill(path=str(bootstrap), content_type="application/javascript"))
+            page.route("https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css",
+                       lambda route: route.fulfill(body="", content_type="text/css"))
             errors = []
             page.on("pageerror", lambda error: errors.append(str(error)))
             page.goto(f"http://127.0.0.1:{port}/")
