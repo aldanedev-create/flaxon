@@ -22,7 +22,6 @@ class Dashboard:
         import json
 
         stats_json = json.dumps(stats, indent=2, default=str)
-        recent_json = json.dumps(recent, indent=2, default=str)
 
         return f"""<!doctype html>
 <html lang="en">

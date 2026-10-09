@@ -8,6 +8,8 @@ from typing import Any
 
 
 class FileSystemBackend:
+    """Store cache values and expiration metadata in JSON files."""
+
     def __init__(self, cache_dir: str = ".cache", default_ttl: int = 300) -> None:
         self.cache_dir = Path(cache_dir)
         self.default_ttl = default_ttl
@@ -30,6 +32,7 @@ class FileSystemBackend:
             return True
 
     async def get(self, key: str) -> Any:
+        """Read a cached value through this storage backend."""
         self._ensure_dir()
         path = self._key_path(key)
 
@@ -48,6 +51,7 @@ class FileSystemBackend:
             return None
 
     async def set(self, key: str, value: Any, ttl: int | None = None) -> None:
+        """Store a value with the supplied expiration settings."""
         self._ensure_dir()
         path = self._key_path(key)
         ttl = ttl or self.default_ttl
@@ -62,11 +66,13 @@ class FileSystemBackend:
             json.dump(data, f, default=str, ensure_ascii=False)
 
     async def delete(self, key: str) -> None:
+        """Remove a cache entry if it exists."""
         path = self._key_path(key)
         if path.exists():
             path.unlink(missing_ok=True)
 
     async def clear(self) -> None:
+        """Remove cache entries managed by this backend."""
         self._ensure_dir()
         for path in self.cache_dir.glob("*.cache"):
             try:
@@ -75,12 +81,14 @@ class FileSystemBackend:
                 pass
 
     async def exists(self, key: str) -> bool:
+        """Check whether a key has an unexpired cache entry."""
         path = self._key_path(key)
         if not path.exists():
             return False
         return not self._is_expired(path)
 
     async def expire(self, key: str, ttl: int) -> None:
+        """Change the expiration of an existing cache entry."""
         path = self._key_path(key)
         if not path.exists():
             return
@@ -95,6 +103,7 @@ class FileSystemBackend:
             pass
 
     async def get_many(self, keys: list[str]) -> dict[str, Any]:
+        """Read multiple keys and return their available values."""
         result = {}
         for key in keys:
             value = await self.get(key)
@@ -103,14 +112,17 @@ class FileSystemBackend:
         return result
 
     async def set_many(self, items: dict[str, Any], ttl: int | None = None) -> None:
+        """Store multiple key-value pairs with the supplied expiration settings."""
         for key, value in items.items():
             await self.set(key, value, ttl)
 
     async def delete_many(self, keys: list[str]) -> None:
+        """Remove the requested cache keys."""
         for key in keys:
             await self.delete(key)
 
     async def increment(self, key: str, amount: int = 1) -> int:
+        """Increase a numeric cache value by the requested amount."""
         async with self._lock:
             value = await self.get(key)
             if value is None:
@@ -121,9 +133,11 @@ class FileSystemBackend:
             return new_value
 
     async def decrement(self, key: str, amount: int = 1) -> int:
+        """Decrease a numeric cache value by the requested amount."""
         return await self.increment(key, -amount)
 
     def get_stats(self) -> dict[str, Any]:
+        """Return cache entry counts or backend statistics."""
         self._ensure_dir()
         files = list(self.cache_dir.glob("*.cache"))
         return {

@@ -50,14 +50,14 @@ class SQLiteAdapter(BaseAdapter):
         if row is None:
             return None
         columns = [desc[0] for desc in cursor.description]
-        return dict(zip(columns, row))
+        return dict(zip(columns, row, strict=True))
 
     async def fetch_all(self, query: str, *args: Any) -> list[dict[str, Any]]:
         query, args = self._adapt(query, args)
         cursor = await self._conn.execute(query, args)
         rows = await cursor.fetchall()
         columns = [desc[0] for desc in cursor.description]
-        return [dict(zip(columns, row)) for row in rows]
+        return [dict(zip(columns, row, strict=True)) for row in rows]
 
     async def fetch_val(self, query: str, *args: Any) -> Any:
         query, args = self._adapt(query, args)

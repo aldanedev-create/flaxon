@@ -73,11 +73,7 @@ class Room:
             return_exceptions=True,
         )
 
-        failed = [
-            socket
-            for socket, res in zip(targets, results)
-            if isinstance(res, Exception)
-        ]
+        failed = [socket for socket, res in zip(targets, results, strict=True) if isinstance(res, Exception)]
 
         if failed:
             async with self._lock:
@@ -102,11 +98,7 @@ class Room:
             return_exceptions=True,
         )
 
-        failed = [
-            socket
-            for socket, res in zip(targets, results)
-            if isinstance(res, Exception)
-        ]
+        failed = [socket for socket, res in zip(targets, results, strict=True) if isinstance(res, Exception)]
 
         if failed:
             async with self._lock:
@@ -197,9 +189,7 @@ class RoomManager:
     async def delete_empty(self) -> None:
         """Delete all empty rooms."""
         async with self._lock:
-            empty = [
-                name for name, room in self._rooms.items() if room.is_empty()
-            ]
+            empty = [name for name, room in self._rooms.items() if room.is_empty()]
             for name in empty:
                 del self._rooms[name]
 

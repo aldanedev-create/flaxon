@@ -7,7 +7,7 @@ import re
 import time
 from typing import Any
 
-from ..session import Session
+from flaxon.sessions.session import Session
 
 # Allow standard SQL table identifiers (letters, numbers, underscores)
 _TABLE_NAME_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")

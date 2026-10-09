@@ -37,7 +37,7 @@ def _normalize(value: Any, active: set[int] | None = None) -> Any:
         return str(value)
     if isinstance(value, dt.datetime):
         if value.utcoffset() is not None:
-            return value.astimezone(dt.timezone.utc).isoformat().replace('+00:00', 'Z')
+            return value.astimezone(dt.UTC).isoformat().replace('+00:00', 'Z')
         return value.isoformat()
     if isinstance(value, (dt.date, dt.time)):
         return value.isoformat()

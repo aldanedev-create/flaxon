@@ -44,7 +44,9 @@ def cached(
 
             asyncio.create_task(cache_obj.set(key, result, ttl))
             return result
+
         return wrapper
+
     return decorator
 
 
@@ -69,7 +71,9 @@ def cached_async(
 
             await cache_obj.set(key, result, ttl)
             return result
+
         return wrapper
+
     return decorator
 
 
@@ -87,7 +91,9 @@ def invalidate_cache(
             asyncio.create_task(cache_obj.delete(key))
 
             return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -100,7 +106,9 @@ def invalidate_pattern(
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             result = func(*args, **kwargs)
             return result
+
         return wrapper
+
     return decorator
 
 
@@ -134,5 +142,7 @@ def cache_method(
 
             await cache_obj.set(key, result, ttl)
             return result
+
         return wrapper
+
     return decorator

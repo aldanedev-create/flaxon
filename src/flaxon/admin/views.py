@@ -94,7 +94,7 @@ class ChangeListView(AdminView):
                     obj
                     for obj in objects
                     if any(
-                        needle in str((obj.get(f) if isinstance(obj, dict) else getattr(obj, f, ""))).lower()
+                        needle in str(obj.get(f) if isinstance(obj, dict) else getattr(obj, f, "")).lower()
                         for f in fields
                     )
                 ]
@@ -104,7 +104,7 @@ class ChangeListView(AdminView):
                     objects = [
                         obj
                         for obj in objects
-                        if str((obj.get(field) if isinstance(obj, dict) else getattr(obj, field, "")))
+                        if str(obj.get(field) if isinstance(obj, dict) else getattr(obj, field, ""))
                         == value
                     ]
             ordering = self.request.query.get("order_by")

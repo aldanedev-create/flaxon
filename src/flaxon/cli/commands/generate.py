@@ -4,8 +4,8 @@ import argparse
 from pathlib import Path
 from typing import Any
 
-from ..base import Command
-from ..generator import Generator
+from flaxon.cli.base import Command
+from flaxon.cli.generator import Generator
 
 
 class GenerateCommand(Command):

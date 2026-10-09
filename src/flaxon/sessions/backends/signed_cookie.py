@@ -5,7 +5,7 @@ import hmac
 import json
 import time
 
-from ..session import Session
+from flaxon.sessions.session import Session
 
 
 class SignedCookieBackend:

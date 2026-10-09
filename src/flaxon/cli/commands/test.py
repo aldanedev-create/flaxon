@@ -4,7 +4,7 @@ import argparse
 import subprocess
 from typing import Any
 
-from ..base import Command
+from flaxon.cli.base import Command
 
 
 class TestCommand(Command):

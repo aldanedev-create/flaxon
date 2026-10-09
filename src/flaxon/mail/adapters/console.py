@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from ..message import Email
+from flaxon.mail.message import Email
 
 
 class ConsoleAdapter:

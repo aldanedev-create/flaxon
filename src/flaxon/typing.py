@@ -30,7 +30,7 @@ HeadersType = Union[
 ]
 
 # Query parameters type
-QueryParamsType = dict[str, Union[str, list[str]]]
+QueryParamsType = dict[str, str | list[str]]
 
 # Cookies type
 CookiesType = dict[str, str]
@@ -54,7 +54,7 @@ Endpoint = Callable[
 ]
 
 # WebSocket endpoint type
-WebSocketEndpoint = Callable[..., Union[None, Awaitable[None]]]
+WebSocketEndpoint = Callable[..., None | Awaitable[None]]
 
 # Middleware callable type
 MiddlewareCallable = Callable[
@@ -170,14 +170,14 @@ AppState = dict[str, Any]
 # Event Types
 # ============================================================
 
-EventListener = Callable[[Any], Union[None, Awaitable[None]]]
+EventListener = Callable[[Any], None | Awaitable[None]]
 EventDispatcher = Callable[[str, Any], Awaitable[None]]
 
 # ============================================================
 # Plugin Types
 # ============================================================
 
-PluginHook = Callable[..., Union[None, Awaitable[None]]]
+PluginHook = Callable[..., None | Awaitable[None]]
 PluginRegistry = dict[str, dict[str, PluginHook]]
 
 # ============================================================

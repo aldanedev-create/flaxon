@@ -7,12 +7,15 @@ from typing import Any
 
 
 class Cache:
+    """An async in-process cache with expiration and numeric counters."""
+
     def __init__(self, default_ttl: int = 300) -> None:
         self.default_ttl = default_ttl
         self._cache: dict[str, tuple[Any, float, float]] = {}
         self._lock = asyncio.Lock()
 
     async def get(self, key: str, default: Any = None) -> Any:
+        """Read a cached value, returning the supplied fallback on a miss."""
         async with self._lock:
             if key not in self._cache:
                 return default
@@ -25,20 +28,24 @@ class Cache:
             return value
 
     async def set(self, key: str, value: Any, ttl: int | None = None) -> None:
+        """Store a value with the supplied expiration settings."""
         ttl = ttl or self.default_ttl
         expires = time.time() + ttl if ttl > 0 else None
         async with self._lock:
             self._cache[key] = (value, expires, time.time())
 
     async def delete(self, key: str) -> None:
+        """Remove a cache entry if it exists."""
         async with self._lock:
             self._cache.pop(key, None)
 
     async def clear(self) -> None:
+        """Remove cache entries managed by this backend."""
         async with self._lock:
             self._cache.clear()
 
     async def exists(self, key: str) -> bool:
+        """Check whether a key has an unexpired cache entry."""
         async with self._lock:
             if key not in self._cache:
                 return False
@@ -51,6 +58,7 @@ class Cache:
             return True
 
     async def get_or_set(self, key: str, func: Callable, ttl: int | None = None) -> Any:
+        """Compute and cache a value when its current cached value is missing."""
         value = await self.get(key)
         if value is not None:
             return value
@@ -65,6 +73,7 @@ class Cache:
         return value
 
     async def increment(self, key: str, amount: int = 1) -> int:
+        """Increase a numeric cache value by the requested amount."""
         async with self._lock:
             now = time.time()
             entry = self._cache.get(key)
@@ -85,9 +94,11 @@ class Cache:
             return new_value
 
     async def decrement(self, key: str, amount: int = 1) -> int:
+        """Decrease a numeric cache value by the requested amount."""
         return await self.increment(key, -amount)
 
     async def expire(self, key: str, ttl: int) -> None:
+        """Change the expiration of an existing cache entry."""
         async with self._lock:
             if key not in self._cache:
                 return
@@ -97,6 +108,7 @@ class Cache:
             self._cache[key] = (value, expires, created)
 
     async def touch(self, key: str) -> None:
+        """Refresh an existing entry using its recorded expiration interval."""
         async with self._lock:
             if key not in self._cache:
                 return
@@ -107,6 +119,7 @@ class Cache:
                 self._cache[key] = (value, expires, created)
 
     async def get_many(self, *keys: str) -> dict[str, Any]:
+        """Read multiple keys and return their available values."""
         result = {}
         for key in keys:
             value = await self.get(key)
@@ -115,14 +128,17 @@ class Cache:
         return result
 
     async def set_many(self, items: dict[str, Any], ttl: int | None = None) -> None:
+        """Store multiple key-value pairs with the supplied expiration settings."""
         for key, value in items.items():
             await self.set(key, value, ttl)
 
     async def delete_many(self, *keys: str) -> None:
+        """Remove the requested cache keys."""
         for key in keys:
             await self.delete(key)
 
     def get_stats(self) -> dict[str, Any]:
+        """Return cache entry counts or backend statistics."""
         total = len(self._cache)
         expired = 0
         current_time = time.time()

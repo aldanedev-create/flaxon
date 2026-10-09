@@ -3,12 +3,14 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from ..exceptions import TaskNotFoundError
-from ..result import TaskResult
-from ..task import Task, TaskStatus
+from flaxon.tasks.exceptions import TaskNotFoundError
+from flaxon.tasks.result import TaskResult
+from flaxon.tasks.task import Task, TaskStatus
 
 
 class DatabaseBackend:
+    """Store task records and results through a database manager."""
+
     def __init__(
         self,
         db_manager: Any,
@@ -20,6 +22,7 @@ class DatabaseBackend:
         self.result_table = result_table
 
     async def initialize(self) -> None:
+        """Create the task and result tables if they do not exist."""
         await self.db.execute(f"""
             CREATE TABLE IF NOT EXISTS {self.table_name} (
                 id VARCHAR(64) PRIMARY KEY,
@@ -47,6 +50,7 @@ class DatabaseBackend:
         """)
 
     async def store_task(self, task: Task) -> None:
+        """Save a task record using its task identifier."""
         await self.db.execute(
             f"""
             INSERT OR REPLACE INTO {self.table_name}
@@ -66,6 +70,7 @@ class DatabaseBackend:
         )
 
     async def get_task(self, task_id: str) -> Task | None:
+        """Read a task record, returning None when it is absent."""
         row = await self.db.fetch_one(
             f"SELECT * FROM {self.table_name} WHERE id = $1",
             task_id,
@@ -89,18 +94,21 @@ class DatabaseBackend:
         return task
 
     async def get_task_required(self, task_id: str) -> Task:
+        """Read a task record or raise TaskNotFoundError if it is absent."""
         task = await self.get_task(task_id)
         if task is None:
             raise TaskNotFoundError(f"Task '{task_id}' not found")
         return task
 
     async def remove_task(self, task_id: str) -> None:
+        """Remove the stored task identified by task_id."""
         await self.db.execute(
             f"DELETE FROM {self.table_name} WHERE id = $1",
             task_id,
         )
 
     async def store_result(self, result: TaskResult) -> None:
+        """Save the result snapshot for a task."""
         await self.db.execute(
             f"""
             INSERT OR REPLACE INTO {self.result_table}
@@ -116,6 +124,7 @@ class DatabaseBackend:
         )
 
     async def get_result(self, task_id: str) -> TaskResult | None:
+        """Read a stored task result, returning None when it is absent."""
         row = await self.db.fetch_one(
             f"SELECT * FROM {self.result_table} WHERE task_id = $1",
             task_id,
@@ -134,18 +143,21 @@ class DatabaseBackend:
         )
 
     async def get_result_required(self, task_id: str) -> TaskResult:
+        """Read a stored result or raise TaskNotFoundError if it is absent."""
         result = await self.get_result(task_id)
         if result is None:
             raise TaskNotFoundError(f"Result for task '{task_id}' not found")
         return result
 
     async def remove_result(self, task_id: str) -> None:
+        """Remove the stored result identified by task_id."""
         await self.db.execute(
             f"DELETE FROM {self.result_table} WHERE task_id = $1",
             task_id,
         )
 
     async def list_tasks(self, status: TaskStatus | None = None) -> list[Task]:
+        """Return stored tasks using the available queue and status filters."""
         if status is None:
             rows = await self.db.fetch_all(f"SELECT * FROM {self.table_name}")
         else:
@@ -174,5 +186,6 @@ class DatabaseBackend:
         return tasks
 
     async def clear(self) -> None:
+        """Remove stored task and result records."""
         await self.db.execute(f"DELETE FROM {self.table_name}")
         await self.db.execute(f"DELETE FROM {self.result_table}")

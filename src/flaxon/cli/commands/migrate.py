@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from typing import Any
 
-from ..base import Command
+from flaxon.cli.base import Command
 
 
 class MigrateCommand(Command):

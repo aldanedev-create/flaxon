@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import smtplib
 
-from ..message import Email
+from flaxon.mail.message import Email
 
 
 class SMTPAdapter:
