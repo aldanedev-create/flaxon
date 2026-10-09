@@ -125,6 +125,7 @@ dev = [
     "redis>=5.0.0",         
     "ruff>=0.5.0",
     "mypy>=1.10,<2",
+    "pydantic>=2.0,<3", # Required by the configured mypy plugin
     "types-pyyaml>=6.0.0", # Added stubs for mypy strict typing
     "build>=1.2.0",
     "twine>=5.0.0",
@@ -375,6 +376,7 @@ commands =
 description = Run mypy type checker
 deps =
     mypy>=1.10,<2
+    pydantic>=2.0,<3
     -e .[standard,dev]
 commands =
     mypy .
