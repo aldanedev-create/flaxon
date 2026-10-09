@@ -207,3 +207,5 @@ Use the guides for explanations, the API pages for reference, and the examples f
 - [14 | Full-stack verification](fullstack/project-manager/14.md)
 
 - [15 | Production build and Render](fullstack/project-manager/15.md)
+
+- [JSON serialization and migration](guides/json-serialization.md)

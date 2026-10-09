@@ -5,7 +5,7 @@ import inspect
 import types
 import typing
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -14,6 +14,13 @@ class EndpointPlan:
     """Parameters and resolved annotations; dependency values remain request-local."""
 
     parameters: tuple[tuple[str, inspect.Parameter, Any], ...]
+
+    dependency_names: tuple[tuple[str, str | None], ...] = field(init=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "dependency_names", tuple(
+            (name, annotation.__name__ if isinstance(annotation, type) else None)
+            for name, _, annotation in self.parameters))
 
     @classmethod
     def prepare(cls, endpoint: Callable[..., Any]) -> EndpointPlan:

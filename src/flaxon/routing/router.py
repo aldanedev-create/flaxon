@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 import logging
+from bisect import insort
+from heapq import merge
 import re
 from typing import Any
 
@@ -67,7 +69,7 @@ class Router:
             self._registration_order += 1
             self._warn_collisions(route)
             self.routes.append(route)
-            self._match_buckets.setdefault(self._first_segment(route.path), []).append(route)
+            insort(self._match_buckets.setdefault(self._first_segment(route.path), []), route, key=self._priority)
             if not route.parameters:
                 self._static_routes.setdefault(route.path, []).append(route)
             return endpoint
@@ -97,14 +99,18 @@ class Router:
 
     def match(self, path: str, method: str) -> RouteMatch:
         """Find the HTTP route matching a path and method."""
+        method = method.upper()
         method_allowed = False
-        candidates = self._static_routes.get(path)
-        if candidates is not None and method.upper() not in {method for route in candidates for method in route.methods}:
-            candidates = candidates + self._match_buckets.get("*", [])
-        if candidates is None:
-            first = self._first_segment(path)
-            candidates = self._match_buckets.get(first, []) + self._match_buckets.get("*", [])
-            candidates = sorted(candidates, key=lambda route: (-route.specificity[0], route.specificity[1], -route.specificity[2], route.registration_order))
+        exact = self._static_routes.get(path, ())
+        for route in exact:
+            if method in route.methods:
+                return RouteMatch(route, {})
+        first = self._first_segment(path)
+        candidates = merge(
+            self._match_buckets.get(first, ()),
+            self._match_buckets.get("*", ()) if first != "*" else (),
+            key=self._priority,
+        )
         for route in candidates:
             params = route.match(path)
             if params is None:
@@ -158,7 +164,7 @@ class Router:
             self._registration_order += 1
             self._warn_collisions(route)
             self.routes.append(route)
-            self._match_buckets.setdefault(self._first_segment(route.path), []).append(route)
+            insort(self._match_buckets.setdefault(self._first_segment(route.path), []), route, key=self._priority)
             if not route.parameters:
                 self._static_routes.setdefault(route.path, []).append(route)
         for source in router.websocket_routes:
@@ -181,9 +187,14 @@ class Router:
         return f"{self.prefix}{path}" if self.prefix else path
 
     @staticmethod
+    def _priority(route: Route) -> tuple[int, int, int, int]:
+        return (-route.specificity[0], route.specificity[1],
+                -route.specificity[2], route.registration_order)
+
+    @staticmethod
     def _first_segment(path: str) -> str:
         segment = next((part for part in path.strip("/").split("/") if part), "")
-        return "*" if segment.startswith("<") else segment
+        return "*" if "<" in segment else segment
 
     def _warn_collisions(self, route: Route) -> None:
         candidates: dict[int, Route] = {}

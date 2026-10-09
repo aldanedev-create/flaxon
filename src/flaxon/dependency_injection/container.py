@@ -43,6 +43,13 @@ class Container:
 
         raise DependencyNotFoundError(f"Dependency '{name}' not found")
 
+    def get_provider(self, name: str) -> tuple[Provider, Container] | None:
+        """Find a current provider once, including parent registrations."""
+        provider = self._providers.get(name)
+        if provider is None and self.parent is not None:
+            return self.parent.get_provider(name)
+        return (provider, self) if provider is not None else None
+
     def get_optional(self, name: str, default: Any = None) -> Any:
         try:
             return self.get(name)

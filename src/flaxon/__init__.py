@@ -14,6 +14,7 @@ __all__ = [
     "HTMLResponse",
     "HTTPException",
     "JSONResponse",
+    "LegacyJSONResponse",
     "MethodNotAllowed",
     "NotFound",
     "RedirectResponse",
@@ -52,6 +53,7 @@ def __getattr__(name: str) -> object:
     if name in {
         "HTMLResponse",
         "JSONResponse",
+        "LegacyJSONResponse",
         "RedirectResponse",
         "Request",
         "Response",

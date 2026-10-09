@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Use browser-safe orjson encoding by default; add explicit legacy response and settings modes. See [migration rules](docs/guides/json-serialization.md).
+- Parse request headers, cookies, and query parameters lazily.
+- Prepare dependency names once and order route candidates during registration.
+- Fix dynamic method fallback when a static path exists for another method.
+
 - Avoid session storage and cookies for untouched requests; prepare endpoint arguments at registration while resolving dependencies per request.
 - Infer and validate scalar query parameters, returning 422 for invalid input and documenting them in OpenAPI.
 - Replace custom JWT signing with PyJWT, require expiry and support configured issuer/audience and trusted key rotation. Legacy tokens require sign-in again.
