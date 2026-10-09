@@ -21,15 +21,29 @@ commands={
 for name, target in [('FastAPI', 'fastapi_app'), ('Starlette', 'starlette_app')]:
  commands[name] = [*commands['Flaxon']]
  commands[name][3] = 'python_servers:' + target
+for name in ['Litestar', 'Sanic', 'Falcon']:
+ commands[name] = commands['Flaxon'].copy()
+ commands[name][3] = 'framework_apps:' + name.lower() + '_app'
+if args.flaxon_app == 'framework_apps:flaxon_app':
+ for name in ['FastAPI', 'Starlette']:
+  commands[name][3] = 'framework_apps:' + name.lower() + '_app'
 if args.baseline_source:
  commands['Flaxon baseline'] = commands['Flaxon'].copy()
 if args.runtimes:
  commands = {name: command for name, command in commands.items() if name in args.runtimes.split(',')}
-from importlib.metadata import version
+from importlib.metadata import version, PackageNotFoundError
 import flaxon
 result={'environment':{'python':sys.version,'node':subprocess.check_output(['node','--version'],text=True).strip(),'go':subprocess.check_output([args.go,'version'],text=True).strip(),'flaxon':flaxon.__version__,'flaxon_distribution_metadata':version('flaxon'),'flaxon_source':flaxon.__file__,'fastapi':version('fastapi'),'starlette':version('starlette'),'uvicorn':version('uvicorn'),'uvloop':version('uvloop'),'httptools':version('httptools'),'os':platform.platform(),'cpu_model':next((s.split(':',1)[1].strip() for s in pathlib.Path('/proc/cpuinfo').read_text().splitlines() if s.startswith('model name')),''),'cpu_quota':pathlib.Path('/sys/fs/cgroup/cpu.max').read_text().strip(),'affinity':[server_cpu,client_cpu],'git_revision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()},'method':{'seconds':args.seconds,'repeats':args.repeats,'concurrency':32,'warmup_seconds':1,'workers':1,'seed':42,'client':'Node raw TCP HTTP/1.1 keepalive, no pipelining','caveat':'Shared virtual host; client and server pinned to separate CPUs; core Node and Go servers, not full-stack frameworks.'},'runs':[],'source_sha256':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in ROOT.iterdir() if p.suffix in {'.py','.mjs','.go'}}}
+for package in ['litestar', 'sanic', 'falcon']:
+ try:
+  result['environment'][package] = version(package)
+ except PackageNotFoundError:
+  continue
 def load(path,seconds):
- return json.loads(subprocess.check_output(['taskset','-c',str(client_cpu),'node',str(ROOT/('load.mjs' if path in {'/session','/db'} or path.startswith('/validate') else 'load-stateless.mjs')),'8765',path,str(seconds),'32'],text=True))
+ row = json.loads(subprocess.check_output(['taskset','-c',str(client_cpu),'node',str(ROOT/('load.mjs' if path in {'/session','/db'} or path.startswith('/validate') else 'load-stateless.mjs')),'8765',path,str(seconds),'32'],text=True))
+ if row['errors'] or row['requests'] == 0:
+  raise RuntimeError('Invalid benchmark responses: ' + json.dumps(row))
+ return row
 schedule=[(name,path,rep) for rep in range(args.repeats) for name in commands for path in args.paths]
 random.Random(42).shuffle(schedule)
 for name,path,rep in schedule:
