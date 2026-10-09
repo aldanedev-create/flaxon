@@ -57,6 +57,6 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install -e ".[standard,admin]" pytest pytest-asyncio pytest-timeout httpx ruff "mypy>=1.10,<2"
-      - run: python -m pytest -o addopts='' tests/security tests/expanded/security tests/expanded/state tests/integration/test_authentication.py -q
+      - run: python -m pytest -o addopts='' tests/unit/test_json_contract.py tests/security tests/expanded/security tests/expanded/state tests/integration/test_authentication.py -q
       - run: ruff check --select E9,F63,F7,F82 src/flaxon
-      - run: mypy --no-incremental --follow-imports=skip src/flaxon/routing/execution.py src/flaxon/security/jwt.py
+      - run: mypy --no-incremental --follow-imports=skip src/flaxon/routing/execution.py src/flaxon/security/jwt.py src/flaxon/http/serialization.py

@@ -20,24 +20,67 @@ class Request:
         self.app = app or scope.get("app")
         self.method = str(scope.get("method", "GET")).upper()
         self.path = str(scope.get("path", "/"))
-        self.headers = Headers(scope.get("headers", []))
+        self._headers: Headers | None = None
+        self._cookies: Cookies | None = None
+        self._query: dict[str, str] | None = None
         self.path_params: dict[str, Any] = dict(scope.get("path_params", {}))
         self.user = scope.get("user")
         self._body: bytes | None = None
         self._session = None if getattr(self.app, "sessions", None) is not None else scope.get("session")
-        cookie_data = {}
-        for item in self.headers.get("cookie", "").split(";"):
-            if "=" in item:
-                key, value = item.strip().split("=", 1)
-                cookie_data[key] = value
-        self.cookies = Cookies(cookie_data)
+    @property
+    def headers(self) -> Headers:
+        """Materialize a mutable header mapping once, when accessed."""
+        if self._headers is None:
+            self._headers = Headers(self.scope.get("headers", []))
+        return self._headers
 
-        raw_query = scope.get("query_string", b"")
-        if isinstance(raw_query, bytes):
-            raw_query = raw_query.decode("utf-8")
-        parsed_query = parse_qs(raw_query, keep_blank_values=True)
-        self.query: dict[str, str] = {key: values[0] for key, values in parsed_query.items()}
-        self.query_params = self.query
+    @headers.setter
+    def headers(self, value: Headers) -> None:
+        self._headers = value
+
+    @property
+    def cookies(self) -> Cookies:
+        """Decode cookies only when a handler or middleware uses them."""
+        if self._cookies is None:
+            data = {}
+            if self._headers is None:
+                values = [v.decode("latin-1") for k, v in self.scope.get("headers", []) if k.lower() == b"cookie"]
+                raw = "; ".join(values)
+            else:
+                raw = self._headers.get("cookie", "")
+            for item in raw.split(";"):
+                if "=" in item:
+                    key, value = item.strip().split("=", 1)
+                    data[key] = value
+            self._cookies = Cookies(data)
+        return self._cookies
+
+    @cookies.setter
+    def cookies(self, value: Cookies) -> None:
+        self._cookies = value
+
+    @property
+    def query(self) -> dict[str, str]:
+        """Parse query values once and retain the historical first-value rule."""
+        if self._query is None:
+            raw = self.scope.get("query_string", b"")
+            if isinstance(raw, bytes):
+                raw = raw.decode("utf-8")
+            self._query = {key: values[0] for key, values in parse_qs(raw, keep_blank_values=True).items()}
+        return self._query
+
+    @query.setter
+    def query(self, value: dict[str, str]) -> None:
+        self._query = value
+
+    @property
+    def query_params(self) -> dict[str, str]:
+        """Alias the same cached query mapping."""
+        return self.query
+
+    @query_params.setter
+    def query_params(self, value: dict[str, str]) -> None:
+        self.query = value
 
     @property
     def session(self) -> Any:

@@ -29,14 +29,12 @@ class Resolver:
         """Resolve current providers from precomputed endpoint metadata."""
         params = {}
 
-        for name, param, annotation in plan.parameters:
-            if self.container.has(name):
-                params[name] = self.container.get(name)
-            elif isinstance(annotation, type):
-                try:
-                    params[name] = self.container.get(annotation.__name__)
-                except DependencyNotFoundError:
-                    pass
+        for name, type_name in plan.dependency_names:
+            provider = self.container.get_provider(name)
+            if provider is None and type_name is not None:
+                provider = self.container.get_provider(type_name)
+            if provider is not None:
+                params[name] = provider[0].get(provider[1])
 
         return params
 

@@ -4,13 +4,14 @@ from .cookies import Cookies
 from .headers import Headers
 from .query_params import QueryParams
 from .request import Request
-from .response import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse, TextResponse
+from .response import HTMLResponse, JSONResponse, LegacyJSONResponse, RedirectResponse, Response, StreamingResponse, TextResponse
 
 __all__ = [
     "Cookies",
     "HTMLResponse",
     "Headers",
     "JSONResponse",
+    "LegacyJSONResponse",
     "QueryParams",
     "RedirectResponse",
     "Request",

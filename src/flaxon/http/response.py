@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import AsyncIterable, Iterable
 from typing import Any
 
 from .headers import Headers
+from .serialization import dumps, legacy_default
 
 
 class Response:
@@ -28,17 +28,17 @@ class Response:
         self.headers.setdefault("content-length", str(len(self.body)))
 
     @classmethod
-    def from_value(cls, value: Any) -> Response:
+    def from_value(cls, value: Any, *, json_mode: str = "modern") -> Response:
         """Convert a conventional endpoint return value into a response."""
         if isinstance(value, Response):
             return value
         if value is None:
             return cls(status_code=204)
         if isinstance(value, (dict, list, tuple)):
-            return JSONResponse(value)
+            return JSONResponse(value, legacy=json_mode == "legacy")
         if isinstance(value, (str, bytes)):
             return cls(value)
-        return JSONResponse(value)
+        return JSONResponse(value, legacy=json_mode == "legacy")
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
         await send({"type": "http.response.start", "status": self.status_code, "headers": self.headers.to_asgi()})
@@ -50,21 +50,21 @@ class JSONResponse(Response):
 
     media_type = "application/json; charset=utf-8"
 
-    def __init__(self, content: Any, status_code: int = 200, headers: dict[str, str] | None = None) -> None:
-        super().__init__(
-            json.dumps(content, ensure_ascii=False, default=_json_default),
-            status_code,
-            headers,
-            self.media_type,
-        )
+    def __init__(self, content: Any, status_code: int = 200,
+                 headers: dict[str, str] | None = None, *, legacy: bool = False) -> None:
+        super().__init__(dumps(content, legacy=legacy), status_code, headers, self.media_type)
 
 
-def _json_default(value: Any) -> Any:
-    """Serialize framework-supported model objects without hard dependencies."""
-    model_dump = getattr(value, "model_dump", None)
-    if callable(model_dump):
-        return model_dump()
-    return str(value)
+class LegacyJSONResponse(JSONResponse):
+    """Explicit historical JSON encoding for migrating existing clients."""
+
+    def __init__(self, content: Any, status_code: int = 200,
+                 headers: dict[str, str] | None = None) -> None:
+        super().__init__(content, status_code, headers, legacy=True)
+
+
+# Private compatibility alias for existing serializer benchmark tooling.
+_json_default = legacy_default
 
 
 class HTMLResponse(Response):

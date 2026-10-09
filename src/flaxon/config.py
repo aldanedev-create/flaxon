@@ -49,6 +49,7 @@ class Settings:
         self.root = Path(getattr(module, "BASE_DIR", getattr(module, "ROOT", Path(module.__file__).parent))).resolve()
         self.values = {key: getattr(module, key) for key in dir(module) if key.isupper()}
         self.values.setdefault("DEBUG", False)
+        self.values.setdefault("JSON_SERIALIZER", "modern")
         self.values.setdefault("PROJECT_NAME", self.root.name)
         self.values.setdefault("TIME_ZONE", "UTC")
         self.values.setdefault("DATABASE_URL", f"sqlite://{self.root / 'data/app.sqlite3'}")
@@ -68,6 +69,8 @@ class Settings:
             raise AttributeError(key) from exc
 
     def validate(self) -> None:
+        if self.JSON_SERIALIZER not in {"modern", "legacy"}:
+            raise ValueError("JSON_SERIALIZER must be modern or legacy")
         if self.ADMIN_STORE_BACKEND not in {"sqlite", "orm"}:
             raise ValueError("ADMIN_STORE_BACKEND must be sqlite or orm")
         if type(self.DEBUG) is not bool:

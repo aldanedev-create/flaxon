@@ -56,6 +56,9 @@ class Flaxon:
         if debug is not None:
             self.config["DEBUG"] = debug
         self.debug = bool(self.config["DEBUG"])
+        self.json_mode = self.config.get("JSON_SERIALIZER", "modern")
+        if self.json_mode not in {"modern", "legacy"}:
+            raise ValueError("JSON_SERIALIZER must be modern or legacy")
         
         # Core Infrastructure
         self.router = Router()
@@ -537,7 +540,8 @@ class Flaxon:
         request = Request(scope, receive, self)
 
         # Session Middleware Initialization
-        session_cookie = request.cookies.get(self.sessions.cookie_name)
+        has_cookie = any(key.lower() == b"cookie" for key, _ in scope.get("headers", []))
+        session_cookie = request.cookies.get(self.sessions.cookie_name) if has_cookie else None
         if session_cookie:
             parsed = self.sessions.parse_cookie(session_cookie)
             if parsed:
@@ -550,7 +554,7 @@ class Flaxon:
             matched = self.router.match(request.path, request.method)
             request.path_params = matched.params
             result = await self._invoke(matched.route.endpoint, request, matched.params, matched.route.execution_plan)
-            response = Response.from_value(result)
+            response = Response.from_value(result, json_mode=self.json_mode)
         except HTTPException as exc:
             response = JSONResponse(exc.to_dict(), status_code=exc.status_code)
         except Exception as exc:
