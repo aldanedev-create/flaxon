@@ -91,12 +91,20 @@ def build_all() -> None:
     print("All distributions built successfully.")
 
 
+def distribution_files() -> list[str]:
+    """Only upload/check actual distributions, never a literal shell wildcard."""
+    files = sorted(str(path) for path in Path("dist").iterdir()
+                   if path.is_file() and (path.name.endswith(".whl") or path.name.endswith(".tar.gz"))) if Path("dist").is_dir() else []
+    if not files:
+        raise FileNotFoundError("Build wheel and source distributions first")
+    return files
+
+
 def check_dist() -> None:
     """Check distributions with twine."""
     print("Checking distributions...")
     result = subprocess.run(
-        [sys.executable, "-m", "twine", "check", "dist/*"],
-        shell=True,
+        [sys.executable, "-m", "twine", "check", *distribution_files()],
         capture_output=True,
         text=True,
     )

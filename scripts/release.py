@@ -6,34 +6,32 @@ This script handles the release process including version updates,
 changelog generation, and PyPI publishing.
 """
 
-import json
 import re
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 
 def get_current_version() -> str:
     """Get the current version from the package."""
-    init_file = Path("src/flaxon/__init__.py")
+    init_file = Path("src/flaxon/version.py")
     content = init_file.read_text()
 
-    match = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', content)
+    match = re.search(r'__version__(?:\s*:\s*str)?\s*=\s*["\']([^"\']+)["\']', content)
     if match:
         return match.group(1)
 
-    raise ValueError("Could not find version in __init__.py")
+    raise ValueError("Could not find version in version.py")
 
 
 def update_version(version: str) -> None:
-    """Update the version in __init__.py."""
-    init_file = Path("src/flaxon/__init__.py")
+    """Update the authoritative version in version.py."""
+    init_file = Path("src/flaxon/version.py")
     content = init_file.read_text()
 
     content = re.sub(
-        r'__version__\s*=\s*["\']([^"\']+)["\']',
+        r'__version__(?:\s*:\s*str)?\s*=\s*["\']([^"\']+)["\']',
         f'__version__ = "{version}"',
         content,
     )
@@ -50,17 +48,20 @@ def update_changelog(version: str) -> None:
     today = datetime.now().strftime("%Y-%m-%d")
 
     # Find the unreleased section
-    unreleased_pattern = r"## \[Unreleased\](.*?)(?=\n## \[|$)"
-    match = re.search(unreleased_pattern, content, re.DOTALL)
+    unreleased_pattern = r"^## (?:\[Unreleased\]|Unreleased)\s*\n(.*?)(?=^## |\Z)"
+    match = re.search(unreleased_pattern, content, re.DOTALL | re.MULTILINE)
 
-    if match:
-        unreleased_content = match.group(1)
-        new_entry = f"""## [{version}] - {today}{unreleased_content}"""
+    if match is None:
+        raise ValueError("CHANGELOG.md must contain an Unreleased section")
+    entry = f"## [Unreleased]\n\n## [{version}] - {today}\n\n{match.group(1)}"
+    changelog.write_text(content[:match.start()] + entry + content[match.end():])
+    print(f"Updated changelog with version {version}")
 
-        content = content.replace(f"## [Unreleased]{unreleased_content}", new_entry)
 
-        changelog.write_text(content)
-        print(f"Updated changelog with version {version}")
+def commit_release(version: str) -> None:
+    """The release tag must point at the new version and changelog."""
+    subprocess.run(["git", "add", "src/flaxon/version.py", "CHANGELOG.md"], check=True)
+    subprocess.run(["git", "commit", "-m", f"Release {version}"], check=True)
 
 
 def create_git_tag(version: str) -> None:
@@ -97,12 +98,21 @@ def push_git_tag(version: str) -> None:
     print(f"Pushed tag: {tag}")
 
 
+def distribution_files() -> list[str]:
+    """Resolve artifact paths without requiring shell wildcard expansion."""
+    files = sorted(str(path) for path in Path("dist").iterdir()
+                   if path.is_file() and (path.name.endswith(".whl") or path.name.endswith(".tar.gz"))) if Path("dist").is_dir() else []
+    if not files:
+        raise FileNotFoundError("Build wheel and source distributions first")
+    return files
+
+
 def publish_to_pypi() -> None:
     """Publish the package to PyPI."""
     print("Publishing to PyPI...")
 
     result = subprocess.run(
-        [sys.executable, "-m", "twine", "upload", "dist/*"],
+        [sys.executable, "-m", "twine", "upload", *distribution_files()],
         capture_output=True,
         text=True,
     )
@@ -126,7 +136,7 @@ def publish_to_testpypi() -> None:
             "upload",
             "--repository-url",
             "https://test.pypi.org/legacy/",
-            "dist/*",
+            *distribution_files(),
         ],
         capture_output=True,
         text=True,
@@ -172,10 +182,14 @@ def main() -> None:
     args = parser.parse_args()
 
     version = args.version
+    if not re.fullmatch(r"\d+\.\d+\.\d+(?:(?:a|b|rc)\d+)?(?:\.post\d+)?(?:\.dev\d+)?", version):
+        parser.error("Use a version such as 0.3.0 or 0.3.0rc1")
     current_version = get_current_version()
 
     print(f"Current version: {current_version}")
     print(f"New version: {version}")
+    if version == current_version:
+        parser.error("Choose a new release version; do not republish the current version")
 
     if not args.dry_run:
         confirm = input("Proceed with release? (y/N): ")
@@ -186,6 +200,15 @@ def main() -> None:
     if args.dry_run:
         print("DRY RUN - No changes will be made")
 
+    if args.dry_run:
+        print("Would update the version/changelog, build, validate, tag and publish as selected")
+        return
+
+    if not args.no_tag:
+        status = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True, check=True)
+        if status.stdout.strip():
+            parser.error("Commit or stash working-tree changes before a tagged release")
+
     # Update version
     if not args.dry_run:
         update_version(version)
@@ -193,10 +216,11 @@ def main() -> None:
 
     # Build distributions
     print("Building distributions...")
-    subprocess.run([sys.executable, "scripts/build.py", "--clean"], check=True)
+    subprocess.run([sys.executable, "scripts/build.py", "--clean", "--check"], check=True)
 
     # Create and push tag
     if not args.dry_run and not args.no_tag:
+        commit_release(version)
         create_git_tag(version)
         push_git_tag(version)
 
