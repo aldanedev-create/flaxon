@@ -62,25 +62,25 @@ class Dashboard:
             <h1>Flaxon Debug Dashboard</h1>
             <p class="subtitle">Error monitoring and debugging interface</p>
         </div>
-        <span class="badge badge-success">Debug Mode: {'Enabled' if self.debug else 'Disabled'}</span>
+        <span class="badge badge-success">Debug Mode: {"Enabled" if self.debug else "Disabled"}</span>
     </div>
 
     <div class="grid">
         <div class="card">
             <h2>Total Errors</h2>
-            <div class="value">{stats.get('total', 0)}</div>
+            <div class="value">{stats.get("total", 0)}</div>
         </div>
         <div class="card">
             <h2>Error Types</h2>
-            <div class="value">{len(stats.get('by_type', {}))}</div>
+            <div class="value">{len(stats.get("by_type", {}))}</div>
             <div class="mt-2 text-muted" style="font-size:0.875rem;">
-                {', '.join(list(stats.get('by_type', {}).keys())[:3]) if stats.get('by_type') else 'None'}
+                {", ".join(list(stats.get("by_type", {}).keys())[:3]) if stats.get("by_type") else "None"}
             </div>
         </div>
         <div class="card">
             <h2>Status</h2>
-            <div class="value" style="color: {'#6ee7b7' if stats.get('total', 0) < 10 else '#fcd34d' if stats.get('total', 0) < 50 else '#fca5a5'};">
-                {'Healthy' if stats.get('total', 0) < 10 else 'Warning' if stats.get('total', 0) < 50 else 'Critical'}
+            <div class="value" style="color: {"#6ee7b7" if stats.get("total", 0) < 10 else "#fcd34d" if stats.get("total", 0) < 50 else "#fca5a5"};">
+                {"Healthy" if stats.get("total", 0) < 10 else "Warning" if stats.get("total", 0) < 50 else "Critical"}
             </div>
         </div>
     </div>
@@ -114,7 +114,7 @@ class Dashboard:
                 <td><span class="badge badge-danger">{error_type}</span></td>
                 <td>{path}</td>
                 <td class="timestamp">{dt}</td>
-                <td><code style="font-size:0.75rem; color:#94a3b8;">{error.get('error_id', '')[:8]}</code></td>
+                <td><code style="font-size:0.75rem; color:#94a3b8;">{error.get("error_id", "")[:8]}</code></td>
             </tr>
             """
 

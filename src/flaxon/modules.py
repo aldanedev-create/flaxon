@@ -60,8 +60,8 @@ import inspect
 from pathlib import Path
 from typing import Any, Callable
 
-from flaxon.routing.router import Router
 from flaxon.routing.route import WebSocketRoute
+from flaxon.routing.router import Router
 
 
 class ModuleDependencyError(Exception):
@@ -154,43 +154,56 @@ class FlaxonModule:
 
     def before_request(self, callback: Callable[..., Any]) -> Callable[..., Any]:
         """Run before every request handled by this module's routes.
-        Receives the request/socket. Raising here blocks the handler."""
+        Receives the request/socket. Raising here blocks the handler.
+        """
         self._before_request_hooks.append(callback)
         return callback
 
     def after_request(self, callback: Callable[..., Any]) -> Callable[..., Any]:
         """Run after a successful request handled by this module's routes.
-        Receives (request, result)."""
+        Receives (request, result).
+        """
         self._after_request_hooks.append(callback)
         return callback
 
-    def errorhandler(self, exc_type: type[BaseException]) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def errorhandler(
+        self, exc_type: type[BaseException]
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Register a handler for exceptions raised within this module's
         routes. Receives (request, exc); its return value becomes the
         response. Only exceptions from this module's own routes are
-        caught -- unrelated routes elsewhere in the app are unaffected."""
+        caught -- unrelated routes elsewhere in the app are unaffected.
+        """
+
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             self._error_handlers[exc_type] = func
             return func
+
         return decorator
 
     # -- CLI commands -------------------------------------------------------
 
-    def cli_command(self, name: str, help_text: str = "") -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def cli_command(
+        self, name: str, help_text: str = ""
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Register a CLI command owned by this module. The decorated
         function receives `console` (and optionally `args`). Expose the
         module's commands via `module.install_cli_commands(globals())`
         from a `flaxon_cli.py` at your project root -- Flaxon's existing
         CLI plugin discovery picks them up automatically from there, no
-        core CLI changes needed."""
+        core CLI changes needed.
+        """
+
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             self._cli_commands.append((name, func, help_text))
             return func
+
         return decorator
 
     def as_commands(self) -> list[Any]:
         """Return this module's CLI commands as real `Command` objects,
-        ready to be picked up by Flaxon's CLI plugin discovery."""
+        ready to be picked up by Flaxon's CLI plugin discovery.
+        """
         from flaxon.cli.base import Command
 
         commands = []
@@ -229,7 +242,8 @@ class FlaxonModule:
     def register_module(self, child: "FlaxonModule", prefix: str = "") -> None:
         """Nest another module's routes/static/templates/hooks/commands
         into this one, merged at mount time under `prefix` (relative to
-        wherever this parent module itself ends up mounted)."""
+        wherever this parent module itself ends up mounted).
+        """
         if child is self:
             raise ModuleCycleError(f"Module '{self.name}' cannot nest itself.")
         seen = {self.name}
@@ -253,6 +267,7 @@ def _make_cli_handler(func: Callable[..., Any]) -> Callable[[Any, Any], int]:
         else:
             result = func(console, args) if _accepts_args(func) else func(console)
         return result if isinstance(result, int) else 0
+
     return handler
 
 
@@ -317,7 +332,9 @@ def _wrap_endpoint(module: FlaxonModule, endpoint: Callable[..., Any]) -> Callab
     return wrapped
 
 
-def _merge_module(app: Any, module: FlaxonModule, prefix: str, mount_name: str, mounted: dict[str, str]) -> None:
+def _merge_module(
+    app: Any, module: FlaxonModule, prefix: str, mount_name: str, mounted: dict[str, str]
+) -> None:
     if mount_name in mounted:
         raise ModuleAlreadyMountedError(
             f"Module '{mount_name}' is already mounted at '{mounted[mount_name]}'. "
@@ -377,9 +394,10 @@ def _merge_module(app: Any, module: FlaxonModule, prefix: str, mount_name: str, 
             # App templates take precedence; module templates are the
             # fallback -- mirrors Flask's blueprint template-namespacing
             # intent without requiring a <module_name>/ prefix convention.
-            app.jinax.environment.loader = CompositeLoader(
-                [app.jinax.environment.loader, FileSystemLoader(module.template_dir)]
-            )
+            app.jinax.environment.loader = CompositeLoader([
+                app.jinax.environment.loader,
+                FileSystemLoader(module.template_dir),
+            ])
 
     if module.ui_dir:
         from flaxon.teloce import TeloceSource

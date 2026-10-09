@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Index dynamic HTTP candidates by their full literal prefix and cache route specificity, preserving typed converters, method fallback, mounted routes, and registration-order ties.
+- Log task signal and worker failures; use bounded worker retry delays; propagate S3 access/backend errors instead of reporting missing objects.
+- Narrow request decoding, annotation resolution, persisted-query, and WebSocket token error boundaries.
+- Fix mypy source-package discovery, check 11 core modules, consolidate tool configuration, and add a per-file/rule lint budget in CI. See [quality audit](docs/quality-audit.md) for remaining debt and route-only measurements.
+
 - Release readiness: preserve environment secret strings, repair version/changelog/artifact/tag tooling, support prerelease versions, verify installed wheels, and make CDN browser tests reproducible.
 
 - Use browser-safe orjson encoding by default; add explicit legacy response and settings modes. See [migration rules](docs/guides/json-serialization.md).

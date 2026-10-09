@@ -4,7 +4,13 @@ from typing import Any
 
 
 class Directive:
-    def __init__(self, name: str, description: str | None = None, locations: list[str] | None = None, args: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self,
+        name: str,
+        description: str | None = None,
+        locations: list[str] | None = None,
+        args: dict[str, Any] | None = None,
+    ) -> None:
         self.name = name
         self.description = description
         self.locations = locations or []
@@ -46,7 +52,13 @@ class DeprecatedDirective(Directive):
             name="deprecated",
             description="Deprecate this field.",
             locations=["FIELD_DEFINITION", "ENUM_VALUE"],
-            args={"reason": {"type": "String", "description": "Deprecation reason", "default": "No longer supported"}},
+            args={
+                "reason": {
+                    "type": "String",
+                    "description": "Deprecation reason",
+                    "default": "No longer supported",
+                }
+            },
         )
 
 

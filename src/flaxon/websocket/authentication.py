@@ -40,9 +40,7 @@ class WebSocketAuth:
         ```
     """
 
-    def __init__(
-        self, secret_key: str, token_header: str = "authorization"
-    ) -> None:
+    def __init__(self, secret_key: str, token_header: str = "authorization") -> None:
         """Initialize the WebSocket authentication.
 
         Args:
@@ -136,18 +134,14 @@ class WebSocketAuth:
             user = json.loads(base64.urlsafe_b64decode(payload + "=="))
             return user
 
-        except Exception:
+        except (ValueError, UnicodeDecodeError):
             return None
 
     def _sign(self, data: str) -> str:
         """Sign data with HMAC."""
-        return hmac.new(
-            self.secret_key, data.encode(), hashlib.sha256
-        ).hexdigest()
+        return hmac.new(self.secret_key, data.encode(), hashlib.sha256).hexdigest()
 
-    def create_token(
-        self, user: dict[str, Any], expires_in: int = 86400
-    ) -> str:
+    def create_token(self, user: dict[str, Any], expires_in: int = 86400) -> str:
         """Create a token for a user.
 
         Args:
@@ -158,22 +152,17 @@ class WebSocketAuth:
             The token string.
         """
         header = (
-            base64.urlsafe_b64encode(
-                json.dumps({"alg": "HS256", "typ": "JWT"}).encode()
-            )
-            .decode()
-            .rstrip("=")
+            base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode()).decode().rstrip("=")
         )
         payload = (
-            base64.urlsafe_b64encode(
-                json.dumps(
-                    {
-                        **user,
-                        "iat": int(time.time()),
-                        "exp": int(time.time()) + expires_in,
-                        "jti": uuid.uuid4().hex[:16],
-                    }
-                ).encode()
+            base64
+            .urlsafe_b64encode(
+                json.dumps({
+                    **user,
+                    "iat": int(time.time()),
+                    "exp": int(time.time()) + expires_in,
+                    "jti": uuid.uuid4().hex[:16],
+                }).encode()
             )
             .decode()
             .rstrip("=")
@@ -217,9 +206,7 @@ class WebSocketAuthMiddleware:
         self.auth = WebSocketAuth(secret_key, token_header)
         self.require_auth = require_auth
 
-    async def __call__(
-        self, scope: dict[str, Any], receive: Any, send: Any
-    ) -> None:
+    async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
         """Process the request with authentication."""
         if scope.get("type") != "websocket":
             await self.app(scope, receive, send)

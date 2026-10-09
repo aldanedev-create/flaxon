@@ -48,6 +48,7 @@ class UploadedFile:
     @property
     def extension(self) -> str:
         import mimetypes
+
         ext = mimetypes.guess_extension(self.content_type)
         if ext:
             return ext
@@ -58,6 +59,7 @@ class UploadedFile:
     @property
     def safe_filename(self) -> str:
         import re
+
         return re.sub(r"[^a-zA-Z0-9._-]", "_", self.filename)
 
 
@@ -83,6 +85,7 @@ class FileUpload:
 
     def _extract_boundary(self, content_type: str) -> str | None:
         import re
+
         match = re.search(r'boundary="?([^";]+)"?', content_type)
         if match:
             return match.group(1)
@@ -133,6 +136,7 @@ class FileUpload:
 
     def _get_field_name(self, headers: list[bytes]) -> str | None:
         import re
+
         for header in headers:
             if header.lower().startswith(b"content-disposition:"):
                 match = re.search(rb'name="([^"]+)"', header)
@@ -149,6 +153,7 @@ class FileUpload:
 
     def _get_filename(self, headers: list[bytes]) -> str:
         import re
+
         for header in headers:
             if header.lower().startswith(b"content-disposition:"):
                 match = re.search(rb'filename="([^"]+)"', header)
@@ -171,4 +176,6 @@ class FileUpload:
                     if os.path.exists(path):
                         os.unlink(path)
             except Exception as exc:
-                logging.getLogger(__name__).warning("Isolated callback or cleanup failed (%s)", type(exc).__name__)
+                logging.getLogger(__name__).warning(
+                    "Isolated callback or cleanup failed (%s)", type(exc).__name__
+                )

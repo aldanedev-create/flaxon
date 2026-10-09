@@ -18,18 +18,29 @@ class AdminView:
     async def invalid_form(self, error, data, template, obj=None):
         adapter = self.admin_model.model
         schema = await adapter.form_schema() if hasattr(adapter, "form_schema") else {}
-        context = {"model": self.admin_model, "models": self.dashboard.registry.get_all(),
-                   "verbose_name": self.admin_model.get_verbose_name(), "fields": self.admin_model.fields,
-                   "readonly_fields": self.admin_model.readonly_fields, "form_schema": schema,
-                   "field_values": data, "field_raw_values": data,
-                   "field_errors": getattr(error, "field_errors", {}), "form_error": str(error),
-                   "user": getattr(self.request, "user", None), "object": obj,
-                   "object_id": getattr(self, "object_id", ""),
-                   "version": await adapter.version(obj) if obj is not None and hasattr(adapter, "version") else "",
-                   "verbose_name_plural": self.admin_model.get_verbose_name_plural(),
-                   "record_label": str(getattr(obj, "pk", "")), "history_count": 0, "history_entries": [],
-                   "last_modified": "", "can_delete": False,
-                   "inline_schema": await adapter.inline_schema(obj) if hasattr(adapter, "inline_schema") else {}}
+        context = {
+            "model": self.admin_model,
+            "models": self.dashboard.registry.get_all(),
+            "verbose_name": self.admin_model.get_verbose_name(),
+            "fields": self.admin_model.fields,
+            "readonly_fields": self.admin_model.readonly_fields,
+            "form_schema": schema,
+            "field_values": data,
+            "field_raw_values": data,
+            "field_errors": getattr(error, "field_errors", {}),
+            "form_error": str(error),
+            "user": getattr(self.request, "user", None),
+            "object": obj,
+            "object_id": getattr(self, "object_id", ""),
+            "version": await adapter.version(obj) if obj is not None and hasattr(adapter, "version") else "",
+            "verbose_name_plural": self.admin_model.get_verbose_name_plural(),
+            "record_label": str(getattr(obj, "pk", "")),
+            "history_count": 0,
+            "history_entries": [],
+            "last_modified": "",
+            "can_delete": False,
+            "inline_schema": await adapter.inline_schema(obj) if hasattr(adapter, "inline_schema") else {},
+        }
         for name, inline in context["inline_schema"].items():
             submitted = data.get(f"_inline_{name}")
             if isinstance(submitted, str):
@@ -47,7 +58,6 @@ class AdminView:
     @staticmethod
     def _form_dict(form: Any) -> dict[str, Any]:
         """Normalize framework FormData and test/client dictionaries alike."""
-
         if hasattr(form, "to_dict"):
             return form.to_dict()
         if isinstance(form, dict):
@@ -64,6 +74,7 @@ class ChangeListView(AdminView):
             per_page = min(200, max(1, int(self.request.query.get("per_page", "25") or 25)))
         except (ValueError, TypeError) as exc:
             from flaxon.exceptions import BadRequest
+
             raise BadRequest("page and per_page must be integers") from exc
         query_result = None
         if hasattr(model_class, "query"):
@@ -79,19 +90,39 @@ class ChangeListView(AdminView):
             needle = self.request.query.get("q", "").lower()
             if needle:
                 fields = self.admin_model.search_fields or self.admin_model.fields
-                objects = [obj for obj in objects if any(needle in str((obj.get(f) if isinstance(obj, dict) else getattr(obj, f, ""))).lower() for f in fields)]
+                objects = [
+                    obj
+                    for obj in objects
+                    if any(
+                        needle in str((obj.get(f) if isinstance(obj, dict) else getattr(obj, f, ""))).lower()
+                        for f in fields
+                    )
+                ]
             for field in self.admin_model.list_filter:
                 value = self.request.query.get(f"filter_{field}", "")
                 if value:
-                    objects = [obj for obj in objects if str((obj.get(field) if isinstance(obj, dict) else getattr(obj, field, ""))) == value]
+                    objects = [
+                        obj
+                        for obj in objects
+                        if str((obj.get(field) if isinstance(obj, dict) else getattr(obj, field, "")))
+                        == value
+                    ]
             ordering = self.request.query.get("order_by")
             if ordering:
                 reverse = ordering.startswith("-")
                 key = ordering.lstrip("-")
-                objects.sort(key=lambda obj: (obj.get(key) if isinstance(obj, dict) else getattr(obj, key, None)), reverse=reverse)
+                objects.sort(
+                    key=lambda obj: obj.get(key) if isinstance(obj, dict) else getattr(obj, key, None),
+                    reverse=reverse,
+                )
             total = len(objects)
             objects = objects[(page - 1) * per_page : page * per_page]
-            query_result = {"total": total, "pages": max(1, (total + per_page - 1) // per_page), "page": page, "per_page": per_page}
+            query_result = {
+                "total": total,
+                "pages": max(1, (total + per_page - 1) // per_page),
+                "page": page,
+                "per_page": per_page,
+            }
 
         # Object-level read rules are applied after the adapter query so
         # custom Admin models can keep their data source unchanged.
@@ -104,7 +135,11 @@ class ChangeListView(AdminView):
                     visible.append(obj)
             objects = visible
             if query_result is not None:
-                query_result = {**query_result, "total": len(visible), "pages": page + int(len(objects) == per_page)}
+                query_result = {
+                    **query_result,
+                    "total": len(visible),
+                    "pages": page + int(len(objects) == per_page),
+                }
 
         context = {
             "model": self.admin_model,
@@ -116,18 +151,30 @@ class ChangeListView(AdminView):
             "list_filter": self.admin_model.list_filter,
             "search_fields": self.admin_model.search_fields,
             "actions": {
-                name: action for name, action in self.admin_model.get_actions().items()
+                name: action
+                for name, action in self.admin_model.get_actions().items()
                 if self._can_action(name)
             },
             "user": getattr(self.request, "user", None),
             "request": self.request,
             "query": self.request.query.get("q", ""),
-            "pagination": query_result or {"total": len(objects), "pages": 1, "page": 1, "per_page": len(objects)},
-            "can_add": self.dashboard.can_access_model(getattr(self.request, "user", None), self.admin_model.get_name(), "create"),
-            "can_change": self.dashboard.can_access_model(getattr(self.request, "user", None), self.admin_model.get_name(), "update"),
-            "can_delete": self.dashboard.can_access_model(getattr(self.request, "user", None), self.admin_model.get_name(), "delete"),
-            "can_import": self.dashboard.can_access_model(getattr(self.request, "user", None), self.admin_model.get_name(), "create"),
-            "can_export": self.dashboard.can_access_model(getattr(self.request, "user", None), self.admin_model.get_name(), "read"),
+            "pagination": query_result
+            or {"total": len(objects), "pages": 1, "page": 1, "per_page": len(objects)},
+            "can_add": self.dashboard.can_access_model(
+                getattr(self.request, "user", None), self.admin_model.get_name(), "create"
+            ),
+            "can_change": self.dashboard.can_access_model(
+                getattr(self.request, "user", None), self.admin_model.get_name(), "update"
+            ),
+            "can_delete": self.dashboard.can_access_model(
+                getattr(self.request, "user", None), self.admin_model.get_name(), "delete"
+            ),
+            "can_import": self.dashboard.can_access_model(
+                getattr(self.request, "user", None), self.admin_model.get_name(), "create"
+            ),
+            "can_export": self.dashboard.can_access_model(
+                getattr(self.request, "user", None), self.admin_model.get_name(), "read"
+            ),
         }
         return await self.dashboard.jinax.render_response("admin/list.html", context)
 
@@ -169,8 +216,12 @@ class DetailView(AdminView):
             "object_id": self.object_id,
             "fields": self.admin_model.fields,
             "user": getattr(self.request, "user", None),
-            "can_change": self.dashboard.can_access_model(getattr(self.request, "user", None), self.admin_model.get_name(), "update"),
-            "can_delete": self.dashboard.can_access_model(getattr(self.request, "user", None), self.admin_model.get_name(), "delete"),
+            "can_change": self.dashboard.can_access_model(
+                getattr(self.request, "user", None), self.admin_model.get_name(), "update"
+            ),
+            "can_delete": self.dashboard.can_access_model(
+                getattr(self.request, "user", None), self.admin_model.get_name(), "delete"
+            ),
         }
         return await self.dashboard.jinax.render_response("admin/detail.html", context)
 
@@ -197,7 +248,9 @@ class CreateView(AdminView):
                         result = await result
                 except BadRequest as exc:
                     return await self.invalid_form(exc, form_data, "admin/add.html")
-            record_id = str(result.get("id", "")) if isinstance(result, dict) else str(getattr(result, "pk", ""))
+            record_id = (
+                str(result.get("id", "")) if isinstance(result, dict) else str(getattr(result, "pk", ""))
+            )
             self.dashboard.record_activity("created", self.admin_model.get_name(), self.request, record_id)
 
             return RedirectResponse(
@@ -206,8 +259,12 @@ class CreateView(AdminView):
             )
 
         context = {
-            "inline_schema": await self.admin_model.model.inline_schema(locals().get("obj")) if hasattr(self.admin_model.model, "inline_schema") else {},
-            "form_schema": await self.admin_model.model.form_schema() if hasattr(self.admin_model.model, "form_schema") else {},
+            "inline_schema": await self.admin_model.model.inline_schema(locals().get("obj"))
+            if hasattr(self.admin_model.model, "inline_schema")
+            else {},
+            "form_schema": await self.admin_model.model.form_schema()
+            if hasattr(self.admin_model.model, "form_schema")
+            else {},
             "model": self.admin_model,
             "models": self.dashboard.registry.get_all(),
             "verbose_name": self.admin_model.get_verbose_name(),
@@ -235,7 +292,6 @@ class UpdateView(AdminView):
     @staticmethod
     def _snapshot(obj: Any) -> dict[str, Any]:
         """Create a JSON-safe audit snapshot for adapters and custom models."""
-
         if obj is None:
             return {}
         if isinstance(obj, dict):
@@ -281,7 +337,13 @@ class UpdateView(AdminView):
             form_data = {key: value for key, value in form_data.items() if key not in readonly_fields}
             current = await self._get_object()
             if expected_version not in (None, "") and not hasattr(model_class, "version"):
-                current_version = current.get("updated_at") if isinstance(current, dict) else getattr(current, "updated_at", None) if current is not None else None
+                current_version = (
+                    current.get("updated_at")
+                    if isinstance(current, dict)
+                    else getattr(current, "updated_at", None)
+                    if current is not None
+                    else None
+                )
                 if str(expected_version) != str(current_version):
                     raise Conflict("This record was changed by another user. Reload before saving.")
 
@@ -289,7 +351,13 @@ class UpdateView(AdminView):
             result = None
             if hasattr(model_class, "update_instance"):
                 try:
-                    result = model_class.update_instance(self.object_id, form_data, expected_version=expected_version) if hasattr(model_class, "version") else model_class.update_instance(self.object_id, form_data)
+                    result = (
+                        model_class.update_instance(
+                            self.object_id, form_data, expected_version=expected_version
+                        )
+                        if hasattr(model_class, "version")
+                        else model_class.update_instance(self.object_id, form_data)
+                    )
                     if hasattr(result, "__await__"):
                         result = await result
                 except BadRequest as exc:
@@ -330,6 +398,7 @@ class UpdateView(AdminView):
 
         if hasattr(model_class, "relationship_fields"):
             from tortoise.fields.relational import ManyToManyFieldInstance
+
             for name, relation in model_class.relationship_fields.items():
                 if isinstance(relation, ManyToManyFieldInstance):
                     field_values[name] = json.dumps([str(row.pk) for row in await getattr(obj, name).all()])
@@ -346,8 +415,12 @@ class UpdateView(AdminView):
         last_modified = field_values.get("updated_at") or field_values.get("created_at") or ""
 
         context = {
-            "inline_schema": await self.admin_model.model.inline_schema(locals().get("obj")) if hasattr(self.admin_model.model, "inline_schema") else {},
-            "form_schema": await self.admin_model.model.form_schema() if hasattr(self.admin_model.model, "form_schema") else {},
+            "inline_schema": await self.admin_model.model.inline_schema(locals().get("obj"))
+            if hasattr(self.admin_model.model, "inline_schema")
+            else {},
+            "form_schema": await self.admin_model.model.form_schema()
+            if hasattr(self.admin_model.model, "form_schema")
+            else {},
             "model": self.admin_model,
             "models": self.dashboard.registry.get_all(),
             "object": obj,
@@ -356,9 +429,15 @@ class UpdateView(AdminView):
             "fields": self.admin_model.fields,
             "verbose_name_plural": self.admin_model.get_verbose_name_plural(),
             "readonly_fields": self.admin_model.readonly_fields,
-            "version": await model_class.version(obj) if hasattr(model_class, "version") else (obj.get("updated_at") if isinstance(obj, dict) else getattr(obj, "updated_at", "")) if obj is not None else "",
+            "version": await model_class.version(obj)
+            if hasattr(model_class, "version")
+            else (obj.get("updated_at") if isinstance(obj, dict) else getattr(obj, "updated_at", ""))
+            if obj is not None
+            else "",
             "user": getattr(self.request, "user", None),
-            "can_delete": self.dashboard.can_access_model(getattr(self.request, "user", None), self.admin_model.get_name(), "delete"),
+            "can_delete": self.dashboard.can_access_model(
+                getattr(self.request, "user", None), self.admin_model.get_name(), "delete"
+            ),
             "field_values": field_values,
             "field_raw_values": field_raw_values,
             "history_entries": entries,
@@ -384,7 +463,9 @@ class DeleteView(AdminView):
                 result = model_class.delete_instance(self.object_id)
                 if hasattr(result, "__await__"):
                     await result
-            self.dashboard.record_activity("deleted", self.admin_model.get_name(), self.request, self.object_id)
+            self.dashboard.record_activity(
+                "deleted", self.admin_model.get_name(), self.request, self.object_id
+            )
 
             return RedirectResponse(
                 f"{self.dashboard.url_prefix}/{self.admin_model.get_name()}",
@@ -403,7 +484,9 @@ class DeleteView(AdminView):
             "verbose_name": self.admin_model.get_verbose_name(),
             "object_id": self.object_id,
             "object": obj,
-            "deletion_preview": await model_class.deletion_preview(self.object_id) if hasattr(model_class, "deletion_preview") else [],
+            "deletion_preview": await model_class.deletion_preview(self.object_id)
+            if hasattr(model_class, "deletion_preview")
+            else [],
             "fields": self.admin_model.fields,
             "user": getattr(self.request, "user", None),
         }

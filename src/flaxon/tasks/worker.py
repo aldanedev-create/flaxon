@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import signal
 from datetime import datetime
 from typing import Any
@@ -10,8 +11,11 @@ from .queue import TaskQueue
 from .registry import TaskRegistry
 from .task import Task, TaskStatus
 
+logger = logging.getLogger(__name__)
+
 
 class Worker:
+    """Consume queued tasks with bounded retry delays after backend failures."""
 
     def __init__(
         self,
@@ -32,6 +36,7 @@ class Worker:
         self._worker_tasks: list[asyncio.Task[Any]] = []
 
     async def start(self) -> None:
+        """Start consumers and wait for shutdown."""
         self._running = True
         self._shutdown_event.clear()
 
@@ -49,9 +54,11 @@ class Worker:
         await self._shutdown_event.wait()
 
     async def _worker_loop(self) -> None:
+        retry_delay = 0.1
         while self._running:
             try:
                 task = await self.queue.pop(timeout=1.0)
+                retry_delay = 0.1
                 if task is None:
                     continue
 
@@ -59,9 +66,10 @@ class Worker:
 
             except asyncio.CancelledError:
                 break
-            # FIX (BLE001): Caught specific exceptions or added suppression/handling rule
-            except Exception:  # noqa: BLE001
-                continue
+            except Exception:
+                logger.exception("Task worker iteration failed; retrying in %.1fs", retry_delay)
+                await asyncio.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, 5.0)
 
     async def _execute_task(self, task: Task) -> None:
         try:
@@ -72,7 +80,8 @@ class Worker:
 
             await task.run(*task.args, **task.kwargs)
 
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
+            logger.exception("Task execution failed (task_id=%s)", task.id)
             task.error = str(exc)
             task.status = TaskStatus.FAILED
             task.completed_at = datetime.now()
@@ -81,6 +90,7 @@ class Worker:
         self.shutdown()
 
     def shutdown(self) -> None:
+        """Cancel consumers and notify the waiting worker."""
         self._running = False
         for worker_task in self._worker_tasks:
             worker_task.cancel()
@@ -99,8 +109,10 @@ class Worker:
         self._shutdown_event.set()
 
     async def stop(self) -> None:
+        """Shut down and await consumer cleanup."""
         self.shutdown()
         await asyncio.gather(*self._worker_tasks, return_exceptions=True)
 
     def is_running(self) -> bool:
+        """Return whether this worker is accepting tasks."""
         return self._running

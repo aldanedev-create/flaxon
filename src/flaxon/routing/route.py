@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Any
 
 from .converters import get_converter
@@ -27,7 +28,7 @@ def compile_path(path: str) -> tuple[re.Pattern[str], list[tuple[str, str]]]:
         parameters.append((name, converter_name))
         position = match.end()
     parts.append(re.escape(path[position:]))
-    return re.compile("^" + "".join(parts) + "$") , parameters
+    return re.compile("^" + "".join(parts) + "$"), parameters
 
 
 @dataclass
@@ -51,7 +52,7 @@ class Route:
         self.pattern, self.parameters = compile_path(self.path)
         self.execution_plan = EndpointPlan.prepare(self.endpoint)
 
-    @property
+    @cached_property
     def specificity(self) -> tuple[int, int, int]:
         """Rank literal routes ahead of parameterized routes."""
         segments = [segment for segment in self.path.strip("/").split("/") if segment]

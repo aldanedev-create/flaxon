@@ -38,7 +38,7 @@ class DatabaseBackend:
                 created_at REAL NOT NULL,
                 expires_at REAL NOT NULL
             )
-            """  # noqa: S608
+            """
         )
 
     async def save(self, session: Session) -> None:
@@ -48,7 +48,7 @@ class DatabaseBackend:
             INSERT OR REPLACE INTO {self.table_name}
             (id, data, ttl, created_at, expires_at)
             VALUES ($1, $2, $3, $4, $5)
-            """,  # noqa: S608
+            """,
             session.id,
             json.dumps(session.to_dict(), default=str),
             session.ttl,
@@ -59,7 +59,7 @@ class DatabaseBackend:
     async def get(self, session_id: str) -> Session | None:
         """Fetch an active session by its ID."""
         row = await self.db.fetch_one(
-            f"SELECT * FROM {self.table_name} WHERE id = $1 AND expires_at > $2",  # noqa: S608
+            f"SELECT * FROM {self.table_name} WHERE id = $1 AND expires_at > $2",
             session_id,
             time.time(),
         )
@@ -78,18 +78,18 @@ class DatabaseBackend:
     async def delete(self, session_id: str) -> None:
         """Delete a specific session by its ID."""
         await self.db.execute(
-            f"DELETE FROM {self.table_name} WHERE id = $1",  # noqa: S608
+            f"DELETE FROM {self.table_name} WHERE id = $1",
             session_id,
         )
 
     async def clear(self) -> None:
         """Remove all sessions from the database table."""
-        await self.db.execute(f"DELETE FROM {self.table_name}")  # noqa: S608
+        await self.db.execute(f"DELETE FROM {self.table_name}")
 
     async def exists(self, session_id: str) -> bool:
         """Check if an active session exists."""
         row = await self.db.fetch_one(
-            f"SELECT 1 FROM {self.table_name} WHERE id = $1 AND expires_at > $2",  # noqa: S608
+            f"SELECT 1 FROM {self.table_name} WHERE id = $1 AND expires_at > $2",
             session_id,
             time.time(),
         )
@@ -98,7 +98,7 @@ class DatabaseBackend:
     async def cleanup(self) -> int:
         """Purge expired sessions from the database."""
         result = await self.db.execute(
-            f"DELETE FROM {self.table_name} WHERE expires_at <= $1",  # noqa: S608
+            f"DELETE FROM {self.table_name} WHERE expires_at <= $1",
             time.time(),
         )
         return result if isinstance(result, int) else 0

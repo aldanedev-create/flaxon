@@ -1,6 +1,5 @@
 """flaxon.admin.cms — a small, self-contained CMS for the Flaxon admin.
 
-
     from flaxon.admin.cms import CMS, ContentType, CMSField
 
     cms = CMS(app, url_prefix="/admin/cms", title="My Site CMS", auth=admin.auth)
@@ -27,14 +26,14 @@ AdminStore or the configured database persists content and revision records.
 
 from __future__ import annotations
 
-import re
-import uuid
 import csv
+import hashlib
 import io
 import json
-import hashlib
+import re
 import secrets
 import time
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -43,6 +42,7 @@ from typing import Any, Callable
 from flaxon.exceptions import BadRequest, Forbidden, NotFound
 from flaxon.http import HTMLResponse, JSONResponse, Request, Response
 from flaxon.security import Sanitizer
+
 from .authorization import canonical_model_permission
 from .services import AdminAuth
 
@@ -472,7 +472,7 @@ class CMS:
                                 )
                             if published:
                                 await self._save_content(content_type)
-                        except Exception as exc:  # noqa: BLE001
+                        except Exception as exc:
                             for record in due:
                                 job_id = f"{content_type.name}:{record['id']}"
                                 attempts = int(self.scheduler_jobs.get(job_id, {}).get("attempts", 0))
@@ -552,7 +552,6 @@ class CMS:
 
     def _sync_scheduler_job(self, content_type: ContentType, record: dict[str, Any]) -> None:
         """Keep a durable scheduler record for every scheduled item."""
-
         job_id = f"{content_type.name}:{record['id']}"
         if not content_type.has_status or record.get("status") != "scheduled" or not record.get("publish_at"):
             existing = self.scheduler_jobs.get(job_id)
@@ -680,7 +679,6 @@ class CMS:
         the configured Admin services; empty sections are explicit rather than
         pretending that an integration exists.
         """
-
         user = await self._require_user(request, "admin.view_dashboard")
         section = section.strip().lower().replace("_", "-")
         records = [record | {"content_type": name} for name, content_type in self.content_types.items() for record in content_type.items.values()]
@@ -745,7 +743,6 @@ class CMS:
         empty.  Reusing the dashboard pipeline also preserves validation,
         scanner, metadata, and thumbnail behavior.
         """
-
         dashboard = getattr(self.app, "_flaxon_admin_dashboard", None)
         if dashboard is None:
             raise BadRequest("CMS file fields require an AdminDashboard media configuration.")
@@ -968,7 +965,6 @@ class CMS:
 
     async def api_media(self, request: Request) -> Response:
         """Expose reusable Admin media to CMS fields without duplicating storage."""
-
         dashboard = getattr(self.app, "_flaxon_admin_dashboard", None)
         if dashboard is None:
             return JSONResponse([])

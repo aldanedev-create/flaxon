@@ -123,7 +123,7 @@ dev = [
     "pytest-timeout>=2.3.0",
     "aiosqlite>=0.20.0",
     "redis>=5.0.0",         
-    "ruff>=0.5.0",
+    "ruff==0.16.10",
     "mypy>=1.10,<2",
     "pydantic>=2.0,<3", # Required by the configured mypy plugin
     "types-pyyaml>=6.0.0", # Added stubs for mypy strict typing
@@ -186,102 +186,7 @@ version = {attr = "flaxon.__version__"}
 line-length = 110
 target-version = ["py311", "py312", "py313"]
 
-[tool.ruff]
-line-length = 110
-target-version = "py311"
-src = ["src"]
-extend-exclude = [
-    ".venv/",
-    ".tox/",
-    "build/",
-    "dist/",
-    "*.egg-info/",
-]
-
-[tool.ruff.lint]
-select = [
-    "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings
-    "F",   # pyflakes
-    "I",   # isort
-    "C",   # flake8-comprehensions
-    "B",   # flake8-bugbear
-    "UP",  # pyupgrade
-    "N",   # pep8-naming
-    "D",   # pydocstyle
-    "SIM", # flake8-simplify
-    "PL",  # pylint
-    "RUF", # ruff specific
-]
-ignore = [
-    "D100",   # Missing docstring in public module
-    "D104",   # Missing docstring in public package
-    "D105",   # Missing docstring in magic method
-    "D107",   # Missing docstring in __init__
-    "D203",   # 1 blank line required before class docstring
-    "D212",   # Multi-line docstring summary should start at the first line
-    "D401",   # First line of docstring should be in imperative mood
-    "PLR0913", # Too many arguments
-    "PLR2004", # Magic number
-    "B008",   # Do not perform function calls in argument defaults
-    "B904",   # Raise from None
-    "SIM117", # Combine with statements
-]
-
-[tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["F401", "D", "I001", "I002", "I003"]
-"tests/**/*.py" = ["D", "PLR", "B", "S", "SIM"]
-"examples/**/*.py" = ["D", "PLR", "B", "S", "SIM"]
-
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
-skip-magic-trailing-comma = false
-line-ending = "auto"
-docstring-code-format = true
-
-[tool.mypy]
-python_version = "3.11"
-platform = "linux"
-warn_return_any = true
-warn_unused_configs = true
-warn_unused_ignores = true
-warn_redundant_casts = true
-warn_unreachable = true
-strict_optional = true
-warn_no_return = true
-disallow_untyped_defs = true
-disallow_any_generics = true
-disallow_subclassing_any = true
-disallow_untyped_calls = true
-disallow_untyped_decorators = true
-ignore_missing_imports = false
-no_implicit_optional = true
-strict_equality = true
-show_error_codes = true
-enable_error_code = [
-    "ignore-without-code",
-    "redundant-expr",
-    "truthy-bool",
-]
-exclude = [
-    "^build/",
-    "^dist/",
-    "^.venv/",
-    "^.tox/",
-    "^tests/",
-    "^examples/",
-    "^docs/.*", 
-]
-
-
-[[tool.mypy.overrides]]
-module = "flaxon.jinax.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "tests.*"
-disallow_untyped_defs = false
+# Lint and type settings live in ruff.toml and mypy.ini.
 
 [tool.pytest.ini_options]
 minversion = "8.0"
@@ -347,47 +252,7 @@ directory = "htmlcov"
 [tool.coverage.xml]
 output = "coverage.xml"
 
-[tool.tox]
-legacy_tox_ini = """
-[tox]
-env_list =
-    py311
-    py312
-    py313
-    lint
-    type-check
-min_version = 4.0
-
-[testenv]
-description = Run the test suite under Python {envname}
-deps =
-    -e .[standard,dev]
-commands =
-    pytest {posargs}
-
-[testenv:lint]
-description = Run ruff linter
-deps =
-    ruff>=0.5.0
-commands =
-    ruff check .
-
-[testenv:type-check]
-description = Run mypy type checker
-deps =
-    mypy>=1.10,<2
-    pydantic>=2.0,<3
-    -e .[standard,dev]
-commands =
-    mypy .
-
-[testenv:format]
-description = Run ruff formatter
-deps =
-    ruff>=0.5.0
-commands =
-    ruff format --check .
-"""
+# Development environments are configured in tox.ini.
 
 [tool.pytest-benchmark]
 group_by = "group"

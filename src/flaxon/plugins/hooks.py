@@ -22,7 +22,9 @@ class PluginHook:
             try:
                 handler(*args, **kwargs)
             except Exception as exc:
-                logging.getLogger(__name__).warning("Isolated callback or cleanup failed (%s)", type(exc).__name__)
+                logging.getLogger(__name__).warning(
+                    "Isolated callback or cleanup failed (%s)", type(exc).__name__
+                )
 
     async def trigger_async(self, *args: Any, **kwargs: Any) -> None:
         for handler in self._handlers:
@@ -31,7 +33,9 @@ class PluginHook:
                 if hasattr(result, "__await__"):
                     await result
             except Exception as exc:
-                logging.getLogger(__name__).warning("Isolated callback or cleanup failed (%s)", type(exc).__name__)
+                logging.getLogger(__name__).warning(
+                    "Isolated callback or cleanup failed (%s)", type(exc).__name__
+                )
 
 
 class PluginHooks:

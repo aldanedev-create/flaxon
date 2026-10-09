@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
 from typing import Any
 
 from .converters import CONVERTERS
-
 
 MISSING = object()
 
@@ -23,9 +22,11 @@ class Parameter:
         self.converter = CONVERTERS[type_name]
 
     def convert(self, value: str) -> Any:
+        """Convert a path value using the registered converter."""
         return self.converter.cast(value)
 
     def matches(self, value: str) -> bool:
+        """Check the value against the converter pattern."""
         return bool(re.fullmatch(self.converter.regex, value))
 
     def __repr__(self) -> str:

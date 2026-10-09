@@ -18,8 +18,11 @@ class GenerateCommand(Command):
         )
 
     def _add_arguments(self, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("type", choices=["controller", "schema", "service", "middleware", "model", "task"],
-                            help="Type of code to generate")
+        parser.add_argument(
+            "type",
+            choices=["controller", "schema", "service", "middleware", "model", "task"],
+            help="Type of code to generate",
+        )
         parser.add_argument("name", help="Name of the generated component")
         parser.add_argument("--path", default=".", help="Output path")
 
@@ -40,12 +43,12 @@ class GenerateCommand(Command):
             return 1
 
     def _generate_model(self, name: str, path: Path) -> None:
-        template = f'''class {name.capitalize()}(Schema):
+        template = f"""class {name.capitalize()}(Schema):
     id = fields.Integer(required=True)
     name = fields.StrField(required=True, max_length=255)
     created_at = fields.DateTime()
     updated_at = fields.DateTime()
-'''
+"""
         path.mkdir(parents=True, exist_ok=True)
         file_path = path / f"{name}_model.py"
         file_path.write_text(template, encoding="utf-8")

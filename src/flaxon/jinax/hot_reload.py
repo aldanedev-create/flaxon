@@ -60,7 +60,9 @@ class HotReloader:
             try:
                 listener(path)
             except Exception as exc:
-                logging.getLogger(__name__).warning("Isolated callback or cleanup failed (%s)", type(exc).__name__)
+                logging.getLogger(__name__).warning(
+                    "Isolated callback or cleanup failed (%s)", type(exc).__name__
+                )
 
     async def run(self) -> None:
         import asyncio
@@ -85,6 +87,7 @@ class HotReloadMiddleware:
 
         if self._reload_task is None:
             import asyncio
+
             self._reload_task = asyncio.create_task(self.reloader.run())
 
         await self.app(scope, receive, send)

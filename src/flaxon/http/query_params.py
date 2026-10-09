@@ -12,7 +12,11 @@ class QueryParams(Mapping[str, str]):
     def __init__(self, value: bytes | str | Mapping[str, str] | None = None) -> None:
         if isinstance(value, bytes):
             value = value.decode("utf-8")
-        self._data = parse_qs(value, keep_blank_values=True) if isinstance(value, str) else {key: [item] for key, item in (value or {}).items()}
+        self._data = (
+            parse_qs(value, keep_blank_values=True)
+            if isinstance(value, str)
+            else {key: [item] for key, item in (value or {}).items()}
+        )
 
     def __getitem__(self, key: str) -> str:
         return self._data[key][-1]

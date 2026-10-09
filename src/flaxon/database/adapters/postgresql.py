@@ -26,6 +26,7 @@ class PostgreSQLAdapter(BaseAdapter):
     async def connect(self) -> None:
         try:
             import asyncpg
+
             self._conn = await asyncpg.connect(
                 host=self.host,
                 port=self.port,
@@ -35,7 +36,9 @@ class PostgreSQLAdapter(BaseAdapter):
                 **self.kwargs,
             )
         except ImportError as exc:
-            raise RuntimeError("asyncpg is required for PostgreSQL. Install with: pip install asyncpg") from exc
+            raise RuntimeError(
+                "asyncpg is required for PostgreSQL. Install with: pip install asyncpg"
+            ) from exc
 
     async def disconnect(self) -> None:
         if self._conn:

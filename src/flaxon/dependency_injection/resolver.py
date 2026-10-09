@@ -10,19 +10,22 @@ from flaxon.routing.execution import EndpointPlan
 from .exceptions import DependencyNotFoundError
 
 
-def _resolved_hints(func: Callable) -> dict[str, Any]:
+def _resolved_hints(func: Callable[..., Any]) -> dict[str, Any]:
     """Best-effort resolution of string annotations (PEP 563) back to real types."""
     try:
         return typing.get_type_hints(func)
-    except Exception:
+    except (NameError, TypeError, AttributeError):
         return {}
 
 
 class Resolver:
+    """Resolve current dependency providers for endpoint parameters."""
+
     def __init__(self, container: Any) -> None:
         self.container = container
 
-    def resolve(self, func: Callable) -> dict[str, Any]:
+    def resolve(self, func: Callable[..., Any]) -> dict[str, Any]:
+        """Prepare endpoint metadata and resolve its current providers."""
         return self.resolve_plan(EndpointPlan.prepare(func))
 
     def resolve_plan(self, plan: EndpointPlan) -> dict[str, Any]:
@@ -39,6 +42,7 @@ class Resolver:
         return params
 
     def resolve_parameter(self, name: str, annotation: Any) -> Any:
+        """Find a dependency by parameter name or annotated type."""
         if self.container.has(name):
             return self.container.get(name)
 
@@ -51,6 +55,7 @@ class Resolver:
         raise DependencyNotFoundError(f"Cannot resolve parameter '{name}'")
 
     def resolve_dependencies(self, dependencies: dict[str, Any]) -> dict[str, Any]:
+        """Resolve explicit names and types, preserving literal values."""
         result = {}
 
         for name, dep in dependencies.items():
@@ -63,7 +68,8 @@ class Resolver:
 
         return result
 
-    def get_dependencies(self, func: Callable) -> dict[str, Any]:
+    def get_dependencies(self, func: Callable[..., Any]) -> dict[str, Any]:
+        """Resolve registered parameters and retain unresolved defaults."""
         signature = inspect.signature(func)
         hints = _resolved_hints(func)
         deps = {}

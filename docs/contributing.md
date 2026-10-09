@@ -45,10 +45,16 @@ We use several linting tools to maintain consistency:
 Run linters manually:
 
 ```bash
-poetry run ruff check src/
+python scripts/check_lint_budget.py
 poetry run ruff format src/
-poetry run mypy src/
+python scripts/typecheck.py
 ```
+
+The lint budget prevents increases by file and rule; `ruff check src/flaxon`
+still reports all legacy findings. Do not expand the budget to hide new debt.
+The typing command checks 11 core modules without following unchecked imports.
+Use `python scripts/typecheck.py --full` for the wider audit, which currently
+reports existing failures. [Quality audit and measurements](quality-audit.md).
 
 ## Debugging Issues
 

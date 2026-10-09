@@ -2,25 +2,27 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib
 import json
-import hashlib
 from contextvars import ContextVar
-from tortoise.transactions import in_transaction
 from typing import Any
+
 from tortoise import fields
+from tortoise.exceptions import IntegrityError, ValidationError
+from tortoise.expressions import Q
 from tortoise.fields.relational import (
     BackwardFKRelation,
     BackwardOneToOneRelation,
-    ManyToManyFieldInstance,
     ForeignKeyFieldInstance,
+    ManyToManyFieldInstance,
 )
-from tortoise.exceptions import IntegrityError, ValidationError
-from tortoise.expressions import Q
 from tortoise.models import Model
-from flaxon.exceptions import BadRequest, Conflict, NotFound, Forbidden
-from .integration import optional_module
+from tortoise.transactions import in_transaction
 
+from flaxon.exceptions import BadRequest, Conflict, Forbidden, NotFound
+
+from .integration import optional_module
 
 admin_context = ContextVar("flaxon_admin_context", default=None)
 
@@ -610,7 +612,7 @@ def configure_admin(app):
     # separate; don't treat Database (the ORM lifecycle) as a raw SQL adapter.
     dashboard.database = None
     if settings.CMS_ENABLED:
-        from flaxon.admin.cms import CMS, ContentType, CMSField
+        from flaxon.admin.cms import CMS, CMSField, ContentType
 
         cms = CMS(app, auth=dashboard.auth)
         cms.database = None

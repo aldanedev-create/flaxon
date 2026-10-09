@@ -238,7 +238,6 @@ class AdminAuth:
 
     def issue_trusted_device(self, username: str, label: str = "Browser", expires_in: int = 30 * 24 * 3600) -> str:
         """Issue an opaque trusted-device token after a successful MFA check."""
-
         if username not in self.users or not self.users[username].get("mfa_secret"):
             raise ValueError("MFA must be enabled before issuing a trusted device")
         token = secrets.token_urlsafe(32)
@@ -306,7 +305,6 @@ class AdminAuth:
 
     def has_permission(self, user: User | None, permission: str, resource: Any = None) -> bool:
         """Return whether a user has a capability through the provider."""
-
         if not user:
             return False
         result = self.permission_provider.has_permission(user, permission, resource)
@@ -322,7 +320,6 @@ class AdminAuth:
 
     async def has_permission_async(self, user: User | None, permission: str, resource: Any = None) -> bool:
         """Evaluate sync or async authorization providers consistently."""
-
         if not user:
             return False
         result = self.permission_provider.has_permission(user, permission, resource)
@@ -330,14 +327,12 @@ class AdminAuth:
 
     def authorize(self, user: User, permission: str, resource: Any = None) -> None:
         """Require a capability without exposing storage or policy details."""
-
         if self.has_permission(user, permission, resource):
             return
         raise Forbidden("Insufficient admin permissions")
 
     async def authorize_async(self, user: User, permission: str, resource: Any = None) -> None:
         """Require a capability when the provider may perform I/O."""
-
         if await self.has_permission_async(user, permission, resource):
             return
         raise Forbidden("Insufficient admin permissions")
@@ -462,7 +457,6 @@ class AdminStore:
 
     def mutate(self, namespace: str, key: str, callback: Any, default: Any = None) -> Any:
         """Atomically read, transform, and persist one JSON value."""
-
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             row = db.execute("SELECT value FROM flaxon_admin_store WHERE namespace=? AND key=?", (namespace, key)).fetchone()
@@ -555,7 +549,6 @@ class PostgreSQLAdminStore:
 
     def mutate(self, namespace: str, key: str, callback: Any, default: Any = None) -> Any:
         """Atomically transform one JSON value in a PostgreSQL transaction."""
-
         with self._db.transaction():
             row = self._db.execute(
                 "SELECT value FROM flaxon_admin_store WHERE namespace=%s AND key=%s FOR UPDATE",

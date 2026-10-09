@@ -1,4 +1,5 @@
 """Immutable endpoint metadata prepared outside the request path."""
+
 from __future__ import annotations
 
 import inspect
@@ -18,9 +19,14 @@ class EndpointPlan:
     dependency_names: tuple[tuple[str, str | None], ...] = field(init=False)
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "dependency_names", tuple(
-            (name, annotation.__name__ if isinstance(annotation, type) else None)
-            for name, _, annotation in self.parameters))
+        object.__setattr__(
+            self,
+            "dependency_names",
+            tuple(
+                (name, annotation.__name__ if isinstance(annotation, type) else None)
+                for name, _, annotation in self.parameters
+            ),
+        )
 
     @classmethod
     def prepare(cls, endpoint: Callable[..., Any]) -> EndpointPlan:
@@ -30,8 +36,12 @@ class EndpointPlan:
             hints = typing.get_type_hints(endpoint)
         except (NameError, TypeError, AttributeError):
             hints = {}
-        return cls(tuple((name, parameter, hints.get(name, parameter.annotation))
-                         for name, parameter in signature.parameters.items()))
+        return cls(
+            tuple(
+                (name, parameter, hints.get(name, parameter.annotation))
+                for name, parameter in signature.parameters.items()
+            )
+        )
 
 
 def is_scalar_query(annotation: Any) -> bool:

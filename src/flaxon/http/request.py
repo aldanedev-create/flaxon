@@ -27,6 +27,7 @@ class Request:
         self.user = scope.get("user")
         self._body: bytes | None = None
         self._session = None if getattr(self.app, "sessions", None) is not None else scope.get("session")
+
     @property
     def headers(self) -> Headers:
         """Materialize a mutable header mapping once, when accessed."""
@@ -44,7 +45,9 @@ class Request:
         if self._cookies is None:
             data = {}
             if self._headers is None:
-                values = [v.decode("latin-1") for k, v in self.scope.get("headers", []) if k.lower() == b"cookie"]
+                values = [
+                    v.decode("latin-1") for k, v in self.scope.get("headers", []) if k.lower() == b"cookie"
+                ]
                 raw = "; ".join(values)
             else:
                 raw = self._headers.get("cookie", "")
@@ -87,6 +90,7 @@ class Request:
         """Create an unsaved session on first access; persist only mutations."""
         if self._session is None:
             from flaxon.sessions.session import Session
+
             manager = getattr(self.app, "sessions", None)
             self._session = Session(ttl=getattr(manager, "ttl", 86400))
         return self._session

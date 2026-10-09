@@ -11,7 +11,9 @@ from flaxon.http import Request
 
 
 class CSRF:
-    def __init__(self, secret_key: str, cookie_name: str = "_csrf", header_name: str = "x-csrf-token") -> None:
+    def __init__(
+        self, secret_key: str, cookie_name: str = "_csrf", header_name: str = "x-csrf-token"
+    ) -> None:
         self.secret_key = secret_key.encode()
         self.cookie_name = cookie_name
         self.header_name = header_name.lower()
@@ -58,7 +60,9 @@ class CSRF:
 
 
 class CSRFMiddleware:
-    def __init__(self, app: Any, secret_key: str, cookie_name: str = "_csrf", header_name: str = "x-csrf-token") -> None:
+    def __init__(
+        self, app: Any, secret_key: str, cookie_name: str = "_csrf", header_name: str = "x-csrf-token"
+    ) -> None:
         self.app = app
         self.csrf = CSRF(secret_key, cookie_name, header_name)
 
@@ -68,11 +72,13 @@ class CSRFMiddleware:
             return
 
         from flaxon.http import Request
+
         request = Request(scope, receive, None)
 
         try:
             self.csrf.validate_request(request)
         except Forbidden:
+
             async def send_error(message: dict[str, Any]) -> None:
                 await send(message)
 

@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 
 from .exceptions import GraphQLExecutionError
-from .types import List, NonNull, ObjectType
+from .types import List, NonNull
 
 
 async def execute(
@@ -180,7 +179,7 @@ async def coerce_value(value: Any, field_type: Any) -> Any:
 
 
 async def evaluate_value(value_node: Any, variables: dict[str, Any], context: Any) -> Any:
-    from .ast import IntValue, StringValue, FloatValue, BooleanValue, Variable, ListValue, ObjectValue
+    from .ast import BooleanValue, FloatValue, IntValue, ListValue, ObjectValue, StringValue, Variable
 
     if isinstance(value_node, IntValue):
         return int(value_node.value)

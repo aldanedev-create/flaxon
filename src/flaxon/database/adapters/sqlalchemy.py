@@ -15,8 +15,9 @@ class SQLAlchemyAdapter(BaseAdapter):
     @staticmethod
     def _prepare(query: str, args: tuple[Any, ...]) -> tuple[Any, dict[str, Any]]:
         """Use named binds so the adapter accepts the same positional style as SQL adapters."""
-        from sqlalchemy import text
         import re
+
+        from sqlalchemy import text
 
         names: list[str] = []
 
@@ -38,7 +39,9 @@ class SQLAlchemyAdapter(BaseAdapter):
             self._engine = create_async_engine(self.database_url, **self.kwargs)
             self._sessionmaker = sessionmaker(self._engine, class_=AsyncSession, expire_on_commit=False)
         except ImportError as exc:
-            raise RuntimeError("sqlalchemy is required. Install with: pip install sqlalchemy[asyncio]") from exc
+            raise RuntimeError(
+                "sqlalchemy is required. Install with: pip install sqlalchemy[asyncio]"
+            ) from exc
 
     async def disconnect(self) -> None:
         if self._engine:
@@ -93,6 +96,7 @@ class SQLAlchemyAdapter(BaseAdapter):
     async def ping(self) -> bool:
         try:
             from sqlalchemy import text
+
             async with self._engine.connect() as conn:
                 await conn.execute(text("SELECT 1"))
             return True

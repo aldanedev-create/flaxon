@@ -1,11 +1,14 @@
 from __future__ import annotations
+
 from typing import Any
 
 from flaxon.exceptions import FlaxonError
 
 
 class GraphQLError(FlaxonError):
-    def __init__(self, message: str, locations: list[dict[str, int]] | None = None, path: list[str | int] | None = None) -> None:
+    def __init__(
+        self, message: str, locations: list[dict[str, int]] | None = None, path: list[str | int] | None = None
+    ) -> None:
         super().__init__(message)
         self.message = message
         self.locations = locations or []

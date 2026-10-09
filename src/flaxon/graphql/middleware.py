@@ -24,6 +24,7 @@ class GraphQLMiddleware:
 
         request = None
         from flaxon.http import Request
+
         request = Request(scope, receive, None)
 
         if request.method == "GET":
@@ -38,6 +39,7 @@ class GraphQLMiddleware:
         variables = request.query.get("variables", "{}")
 
         import json
+
         try:
             variables = json.loads(variables)
         except json.JSONDecodeError:
@@ -52,7 +54,9 @@ class GraphQLMiddleware:
 
         await self._execute_query(query, variables, request, scope, send)
 
-    async def _execute_query(self, query: str, variables: dict[str, Any], request: Any, scope: dict[str, Any], send: Any) -> None:
+    async def _execute_query(
+        self, query: str, variables: dict[str, Any], request: Any, scope: dict[str, Any], send: Any
+    ) -> None:
         graphql_schema = getattr(scope.get("app"), "_graphql_schema", None)
 
         if graphql_schema is None:
@@ -96,9 +100,7 @@ class GraphQLMiddleware:
     async def _send_error(self, status: int, message: str, scope: dict[str, Any], send: Any) -> None:
         import json
 
-        body = json.dumps({
-            "errors": [{"message": message}]
-        }).encode("utf-8")
+        body = json.dumps({"errors": [{"message": message}]}).encode("utf-8")
 
         await send({
             "type": "http.response.start",

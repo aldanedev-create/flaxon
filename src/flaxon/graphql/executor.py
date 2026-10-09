@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any
-from .exceptions import GraphQLError, GraphQLValidationError
-from .types import ObjectType, InterfaceType, UnionType, NonNull, List, Scalar
+
+from .exceptions import GraphQLError
+from .types import InterfaceType, List, NonNull, ObjectType, Scalar
 
 
 async def execute(
@@ -14,7 +15,7 @@ async def execute(
     operation_name: str | None = None,
 ) -> dict[str, Any]:
     variables = variables or {}
-    
+
     # Locate target operation
     operation = None
     fragments = {}
@@ -26,7 +27,11 @@ async def execute(
             fragments[frag_name] = definition
         elif kind == "OperationDefinition" or hasattr(definition, "selection_set"):
             if operation_name:
-                op_name = definition.name.value if definition.name and hasattr(definition.name, "value") else str(definition.name or "")
+                op_name = (
+                    definition.name.value
+                    if definition.name and hasattr(definition.name, "value")
+                    else str(definition.name or "")
+                )
                 if op_name == operation_name:
                     operation = definition
             elif operation is None:
@@ -87,7 +92,11 @@ async def execute_selection_set(
                 result[response_key] = parent_type.name
                 continue
 
-            field_def = parent_type.fields.get(field_name) if isinstance(parent_type, (ObjectType, InterfaceType)) else None
+            field_def = (
+                parent_type.fields.get(field_name)
+                if isinstance(parent_type, (ObjectType, InterfaceType))
+                else None
+            )
             if not field_def:
                 continue
 
@@ -110,7 +119,11 @@ async def execute_selection_set(
 
         # Inline Fragment (... on Type)
         elif kind == "InlineFragment" or kind == "InlineFragmentNode" or hasattr(selection, "type_condition"):
-            type_condition = selection.type_condition.name.value if hasattr(selection.type_condition, "name") else str(selection.type_condition)
+            type_condition = (
+                selection.type_condition.name.value
+                if hasattr(selection.type_condition, "name")
+                else str(selection.type_condition)
+            )
             if type_condition == parent_type.name:
                 fragment_res = await execute_selection_set(
                     exec_context=exec_context,
@@ -136,7 +149,9 @@ async def execute_selection_set(
     return result
 
 
-async def resolve_field_value(field_def: Any, parent_value: Any, args: dict[str, Any], context: Any, info: Any) -> Any:
+async def resolve_field_value(
+    field_def: Any, parent_value: Any, args: dict[str, Any], context: Any, info: Any
+) -> Any:
     if field_def.resolver and callable(field_def.resolver):
         res = field_def.resolver(parent_value, args, context, info)
         if asyncio.iscoroutine(res) or hasattr(res, "__await__"):
@@ -186,7 +201,7 @@ def should_skip(selection: Any, variables: dict[str, Any]) -> bool:
     for directive in directives:
         name = directive.name.value if hasattr(directive.name, "value") else str(directive.name)
         args = resolve_arguments(directive, variables)
-        
+
         if name == "skip" and args.get("if") is True:
             return True
         if name == "include" and args.get("if") is False:
@@ -225,7 +240,10 @@ def coerce_argument_value(value: Any, type_def: Any) -> Any:
     if isinstance(type_def, NonNull):
         return coerce_argument_value(value, type_def.type)
     if isinstance(type_def, List):
-        return [coerce_argument_value(item, type_def.type) for item in (value if isinstance(value, list) else [value])]
+        return [
+            coerce_argument_value(item, type_def.type)
+            for item in (value if isinstance(value, list) else [value])
+        ]
     if isinstance(type_def, Scalar):
         return type_def.parse_value(value)
     if type_def is int:

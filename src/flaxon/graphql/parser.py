@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from typing import Any
 
 from .ast import (
@@ -109,6 +110,7 @@ class Parser:
         self.expect_token(TokenType.COLON)
 
         from .ast import VariableDefinition
+
         type_ = self.parse_type_reference()
 
         default_value = None
@@ -319,7 +321,11 @@ class Parser:
             self.expect_token(TokenType.RIGHT_BRACE)
             return ObjectValue(fields)
 
-        raise GraphQLSyntaxError(f"Unexpected token: {self.current_token.value}", self.current_token.line, self.current_token.column)
+        raise GraphQLSyntaxError(
+            f"Unexpected token: {self.current_token.value}",
+            self.current_token.line,
+            self.current_token.column,
+        )
 
     def parse_name(self) -> Name:
         token = self.current_token

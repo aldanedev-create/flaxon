@@ -66,7 +66,9 @@ class Migration:
             up=data["up"],
             down=data.get("down"),
             dependencies=data.get("dependencies", []),
-            created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.now(),
+            created_at=datetime.fromisoformat(data["created_at"])
+            if data.get("created_at")
+            else datetime.now(),
             applied_at=datetime.fromisoformat(data["applied_at"]) if data.get("applied_at") else None,
         )
 
@@ -212,6 +214,7 @@ class MigrationRunner:
 
     async def generate_migration(self, name: str, up: str, down: str | None = None) -> str:
         import time
+
         version = str(int(time.time() * 1000))
 
         migration = Migration(

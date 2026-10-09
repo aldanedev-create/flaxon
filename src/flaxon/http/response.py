@@ -41,7 +41,11 @@ class Response:
         return JSONResponse(value, legacy=json_mode == "legacy")
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
-        await send({"type": "http.response.start", "status": self.status_code, "headers": self.headers.to_asgi()})
+        await send({
+            "type": "http.response.start",
+            "status": self.status_code,
+            "headers": self.headers.to_asgi(),
+        })
         await send({"type": "http.response.body", "body": self.body, "more_body": False})
 
 
@@ -50,16 +54,21 @@ class JSONResponse(Response):
 
     media_type = "application/json; charset=utf-8"
 
-    def __init__(self, content: Any, status_code: int = 200,
-                 headers: dict[str, str] | None = None, *, legacy: bool = False) -> None:
+    def __init__(
+        self,
+        content: Any,
+        status_code: int = 200,
+        headers: dict[str, str] | None = None,
+        *,
+        legacy: bool = False,
+    ) -> None:
         super().__init__(dumps(content, legacy=legacy), status_code, headers, self.media_type)
 
 
 class LegacyJSONResponse(JSONResponse):
     """Explicit historical JSON encoding for migrating existing clients."""
 
-    def __init__(self, content: Any, status_code: int = 200,
-                 headers: dict[str, str] | None = None) -> None:
+    def __init__(self, content: Any, status_code: int = 200, headers: dict[str, str] | None = None) -> None:
         super().__init__(content, status_code, headers, legacy=True)
 
 
@@ -89,14 +98,23 @@ class RedirectResponse(Response):
 class StreamingResponse(Response):
     """A response that streams an iterable of byte chunks."""
 
-    def __init__(self, content: AsyncIterable[bytes] | Iterable[bytes], status_code: int = 200, headers: dict[str, str] | None = None) -> None:
+    def __init__(
+        self,
+        content: AsyncIterable[bytes] | Iterable[bytes],
+        status_code: int = 200,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         self.content = content
         self.status_code = status_code
         self.headers = Headers(headers or {})
         self.headers.setdefault("content-type", self.media_type)
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
-        await send({"type": "http.response.start", "status": self.status_code, "headers": self.headers.to_asgi()})
+        await send({
+            "type": "http.response.start",
+            "status": self.status_code,
+            "headers": self.headers.to_asgi(),
+        })
         if hasattr(self.content, "__aiter__"):
             async for chunk in self.content:  # type: ignore[union-attr]
                 await send({"type": "http.response.body", "body": chunk, "more_body": True})

@@ -20,9 +20,11 @@ class ReverseResolver:
         ```python
         resolver = ReverseResolver(router)
 
+
         @app.get("/users/<int:user_id>", name="users.detail")
         async def get_user(user_id: int):
             return {"id": user_id}
+
 
         url = resolver.reverse("users.detail", user_id=42)
         # url == "/users/42"
@@ -68,9 +70,7 @@ class ReverseResolver:
             # Check if all parameters are provided
             for param_name in param_names:
                 if param_name not in params:
-                    raise ValueError(
-                        f"Missing parameter '{param_name}' for route '{name}'"
-                    )
+                    raise ValueError(f"Missing parameter '{param_name}' for route '{name}'")
 
             # Replace parameters with values
             for key, value in params.items():
@@ -86,27 +86,19 @@ class ReverseResolver:
         params = []
 
         # Flask-style: <name> or <type:name>
-        for match in re.finditer(
-            r"<(?:[a-zA-Z_][a-zA-Z0-9_]*:)?([a-zA-Z_][a-zA-Z0-9_]*)>", path
-        ):
+        for match in re.finditer(r"<(?:[a-zA-Z_][a-zA-Z0-9_]*:)?([a-zA-Z_][a-zA-Z0-9_]*)>", path):
             params.append(match.group(1))
 
         # Brace-style: {name} or {name:type}
-        for match in re.finditer(
-            r"{([a-zA-Z_][a-zA-Z0-9_]*)(?::[a-zA-Z_][a-zA-Z0-9_]*)?}", path
-        ):
+        for match in re.finditer(r"{([a-zA-Z_][a-zA-Z0-9_]*)(?::[a-zA-Z_][a-zA-Z0-9_]*)?}", path):
             params.append(match.group(1))
 
         return params
 
     def _replace_param(self, path: str, name: str, value: str) -> str:
         """Replace a parameter in a path with its value."""
-        path = re.sub(
-            rf"<(?:[a-zA-Z_][a-zA-Z0-9_]*:)?{re.escape(name)}>", value, path
-        )
-        path = re.sub(
-            rf"{{{re.escape(name)}(?::[a-zA-Z_][a-zA-Z0-9_]*)?}}", value, path
-        )
+        path = re.sub(rf"<(?:[a-zA-Z_][a-zA-Z0-9_]*:)?{re.escape(name)}>", value, path)
+        path = re.sub(rf"{{{re.escape(name)}(?::[a-zA-Z_][a-zA-Z0-9_]*)?}}", value, path)
         return path
 
     def url_for(self, name: str, **params: Any) -> str:

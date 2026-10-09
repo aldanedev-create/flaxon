@@ -22,7 +22,6 @@ class TestResponse:
 
 
 class AsyncTestClient:
-
     def __init__(self, app: Any, base_url: str = "http://testserver") -> None:
         self.app = app
         self.base_url = base_url.rstrip("/")
@@ -43,8 +42,7 @@ class AsyncTestClient:
             query_string = urlencode(query, doseq=True)
 
         raw_headers = [
-            (key.lower().encode("latin-1"), value.encode("latin-1"))
-            for key, value in (headers or {}).items()
+            (key.lower().encode("latin-1"), value.encode("latin-1")) for key, value in (headers or {}).items()
         ]
         raw_headers.append((b"host", url.netloc.encode("latin-1")))
 
@@ -90,25 +88,14 @@ class AsyncTestClient:
 
         await self.app(scope, receive, send)
 
-        start = next(
-            message
-            for message in messages
-            if message["type"] == "http.response.start"
-        )
-        chunks = [
-            message.get("body", b"")
-            for message in messages
-            if message["type"] == "http.response.body"
-        ]
+        start = next(message for message in messages if message["type"] == "http.response.start")
+        chunks = [message.get("body", b"") for message in messages if message["type"] == "http.response.body"]
 
         response_headers = {
-            key.decode("latin-1").lower(): value.decode("latin-1")
-            for key, value in start.get("headers", [])
+            key.decode("latin-1").lower(): value.decode("latin-1") for key, value in start.get("headers", [])
         }
 
-        return TestResponse(
-            start["status"], response_headers, b"".join(chunks)
-        )
+        return TestResponse(start["status"], response_headers, b"".join(chunks))
 
     async def get(self, path: str, **kwargs: Any) -> TestResponse:
         return await self.request("GET", path, **kwargs)
@@ -149,7 +136,9 @@ class TestClient:
             return self._loop.run_until_complete(coroutine)
         # Preserve a useful error when the sync client is used inside async code.
         coroutine.close()
-        raise RuntimeError("TestClient cannot make sync requests from a running event loop; use AsyncTestClient")
+        raise RuntimeError(
+            "TestClient cannot make sync requests from a running event loop; use AsyncTestClient"
+        )
 
     def request(self, method: str, path: str, **kwargs: Any) -> TestResponse:
         return self._run(self.async_client.request(method, path, **kwargs))

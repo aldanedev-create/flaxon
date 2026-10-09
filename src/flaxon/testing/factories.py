@@ -22,29 +22,29 @@ class Factory:
     def random_string(self, length: int = 10) -> str:
         # FIX (S311): Standard pseudo-random generators are safe for test factories
         return "".join(
-            random.choices(  # noqa: S311
+            random.choices(
                 string.ascii_letters + string.digits, k=length
             )
         )
 
     def random_email(self) -> str:
-        domain = random.choice(  # noqa: S311
+        domain = random.choice(
             ["example.com", "test.com", "flaxon.dev"]
         )
         return f"{self.random_string(8)}@{domain}"
 
     def random_int(self, min_val: int = 0, max_val: int = 100) -> int:
         # FIX (A002): Renamed `min`/`max` parameters to avoid shadowing built-ins
-        return random.randint(min_val, max_val)  # noqa: S311
+        return random.randint(min_val, max_val)
 
     def random_float(
         self, min_val: float = 0.0, max_val: float = 100.0
     ) -> float:
         # FIX (A002): Renamed `min`/`max` parameters to avoid shadowing built-ins
-        return random.uniform(min_val, max_val)  # noqa: S311
+        return random.uniform(min_val, max_val)
 
     def random_bool(self) -> bool:
-        return random.choice([True, False])  # noqa: S311
+        return random.choice([True, False])
 
     def random_uuid(self) -> str:
         return str(uuid.uuid4())

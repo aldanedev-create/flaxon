@@ -59,7 +59,7 @@ class Flaxon:
         self.json_mode = self.config.get("JSON_SERIALIZER", "modern")
         if self.json_mode not in {"modern", "legacy"}:
             raise ValueError("JSON_SERIALIZER must be modern or legacy")
-        
+
         # Core Infrastructure
         self.router = Router()
         self.state = State()

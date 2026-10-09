@@ -30,6 +30,7 @@ class EnvironmentInfo:
         is_kubernetes: Whether running in Kubernetes.
         is_github_actions: Whether running in GitHub Actions.
     """
+
     env: str = "development"
     debug: bool = False
     python_version: str = ""

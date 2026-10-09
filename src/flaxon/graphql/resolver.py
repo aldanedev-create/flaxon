@@ -39,7 +39,9 @@ class Resolver:
 
         return None
 
-    async def resolve(self, type_name: str, field_name: str, parent: Any, args: dict[str, Any], context: Any, info: Any) -> Any:
+    async def resolve(
+        self, type_name: str, field_name: str, parent: Any, args: dict[str, Any], context: Any, info: Any
+    ) -> Any:
         resolver = self.get(type_name, field_name)
 
         if resolver is not None and resolver != self._default_resolver:
