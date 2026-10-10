@@ -95,3 +95,15 @@ def test_release_commit_stages_only_version_and_changelog(monkeypatch):
     script('release.py')['commit_release']('0.3.0')
     assert calls == [['git', 'add', 'src/flaxon/version.py', 'CHANGELOG.md'],
                      ['git', 'commit', '-m', 'Release 0.3.0']]
+
+
+def test_ci_compiler_constraint_is_shared_with_isolated_wheel_install():
+    import re
+
+    constraint = (ROOT / "requirements/ci.txt").read_text()
+    match = re.search(r"teloce-py @ git\+https://github.com/aldanedev-create/teloce-py.git@([0-9a-f]{40})", constraint)
+    assert match, "Pin compiler source to an immutable commit"
+    for filename in ("orm.yml", "fullstack.yml"):
+        workflow = (ROOT / ".github/workflows" / filename).read_text()
+        assert "PIP_CONSTRAINT: ${{ github.workspace }}/requirements/ci.txt" in workflow
+    assert match.group(1) in (ROOT / ".github/workflows/fullstack.yml").read_text()
