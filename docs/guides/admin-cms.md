@@ -18,9 +18,14 @@ JSON API, so a team can replace the SPA with React, Vue, mobile, or server-side
 clients without replacing the backend contracts.
 
 ## Quick Start
-first pip install flaxon[admin]
+Install the Admin extra:
+
+```bash
+pip install "flaxon[admin]"
+```
 
 ```python
+import os
 from flaxon import Flaxon
 from flaxon.admin import AdminConfig, AdminDashboard
 from flaxon.admin.cms import CMS
@@ -32,7 +37,7 @@ admin = AdminDashboard(
     config=AdminConfig(site_title="Acme Backoffice", timezone="UTC"),
     url_prefix="/admin",
     storage_path="admin.sqlite3",
-    users=[{"username": "admin", "password": "change-me"}],
+    users=[{"username": "admin", "password": os.environ["FLAXON_ADMIN_PASSWORD"]}],
 )
 
 cms = CMS(app, url_prefix="/admin/cms", title="Acme Content", auth=admin.auth)
@@ -44,8 +49,22 @@ Run locally:
 flaxon run app:app --reload --port 8000
 ```
 
-Use `/admin/login`, `/admin/`, and `/admin/cms/`. Development credentials
-should be replaced with environment-managed credentials before deployment.
+Set `FLAXON_ADMIN_PASSWORD` through your environment before starting this standalone example. Its programmatic `users` registration still enforces the Admin password validator. No default password is provided. Use `/admin/login`, `/admin/`, and `/admin/cms/`.
+
+### Generated-project Admin setup
+
+For the generated `settings.py`/`management.py` workflow, create staff credentials interactively instead of putting passwords in application code:
+
+```bash
+python management.py setup-admin
+# Equivalent alias:
+# python management.py createsuperuser
+python management.py runserver
+```
+
+Both setup commands accept a nonempty password up to 128 characters, with matching confirmation. `DEBUG=True` accepts weak passwords quietly. `DEBUG=False` recommends a long, unique production password when the chosen password fails the strength checks but still creates the account. Passwords are hidden during entry and securely hashed in storage. Existing usernames are never overwritten. Web Admin account creation, password changes and resets retain their existing validator. Restart an already running server after command-line account creation.
+
+See [project setup](../getting-started.md) and the [recording course](../fullstack/project-manager/12.md).
 
 ## Persistence and Migrations
 

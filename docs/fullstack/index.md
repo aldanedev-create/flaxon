@@ -68,3 +68,9 @@ starter app. Use the relevant guide when adding that capability.
 TypeScript support depends on the installed Teloce version. Its transpiler removes
 supported type syntax; it is not a full semantic type checker. Browser HMR,
 automatic SSR and automatic account/database setup are not implied by full-stack.
+
+## Project manager recording course
+
+For a complete backend-first project built from the CLI, follow the [15-chapter project manager ebook](project-manager/index.md). Each step identifies a file to create, a whole-file replacement, or an exact existing block to replace. It includes code, commands, what to say, expected results, troubleshooting and chapter recovery instructions.
+
+The planned recording target is Flaxon 3.0.0 after publication and a clean rehearsal. The ebook keeps that release installation separate from its verified preview wheels. It teaches the current ORM API, Python migrations and management.py workflow without claiming that 3.0.0 is already available.
