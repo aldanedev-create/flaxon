@@ -111,3 +111,31 @@ authorization and privileged operations on the server; components call those
 endpoints and present their results. Follow the [full-stack lessons](../fullstack/index.md)
 and [Teloce integration reference](../api/teloce.md) to connect this capability
 to pages, components and application modules.
+
+## Filter response data
+
+A resolved Pydantic return annotation validates and filters ordinary HTTP return
+values before JSON serialization. This also applies to containers such as
+`list[UserOut]` and nested output models.
+
+```python
+from pydantic import BaseModel
+
+class UserOut(BaseModel):
+    id: int
+    name: str
+
+@app.get("/me")
+async def me() -> UserOut:
+    return {"id": 1, "name": "Ada", "password_hash": "not public"}
+```
+
+The response contains only `id` and `name`. Subclass instances are revalidated
+rather than accepted unchanged. Invalid output is a server error (500), while
+invalid input remains a client validation error (422).
+
+Define output models with public fields only. Model configurations that allow
+extra fields and custom serializers explicitly control what can be emitted.
+Returning an explicit `Response` bypasses filtering; its contents are your
+responsibility. Unannotated routes and unresolved forward references do not
+filter output. Keep output model classes at module scope so annotations resolve.

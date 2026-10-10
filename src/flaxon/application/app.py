@@ -23,7 +23,7 @@ from flaxon.graphql import GraphQLSchema
 from flaxon.graphql.playground import AltairPlayground, GraphiQLPlayground
 from flaxon.health import HealthRegistry, LivenessProbe, ReadinessProbe, StartupProbe
 from flaxon.http import HTMLResponse, JSONResponse, Request, Response
-from flaxon.integrations.pydantic import is_pydantic_model_type, load_pydantic_model
+from flaxon.integrations.pydantic import filter_response, is_pydantic_model_type, load_pydantic_model
 from flaxon.metrics import MetricsCollector, PrometheusExporter
 from flaxon.middleware import RequestIDMiddleware, SecurityHeadersMiddleware
 from flaxon.plugins import PluginManager
@@ -588,6 +588,9 @@ class Flaxon:
             result = await self._invoke(
                 matched.route.endpoint, request, matched.params, matched.route.execution_plan
             )
+            adapter = matched.route.execution_plan.response_adapter
+            if adapter is not None and not isinstance(result, Response):
+                result = filter_response(adapter, result)
             response = Response.from_value(result, json_mode=self.json_mode)
         except HTTPException as exc:
             response = JSONResponse(exc.to_dict(), status_code=exc.status_code)

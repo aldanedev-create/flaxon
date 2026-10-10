@@ -9,12 +9,16 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from flaxon.integrations.pydantic import prepare_response_adapter
+
 
 @dataclass(frozen=True)
 class EndpointPlan:
     """Parameters and resolved annotations; dependency values remain request-local."""
 
     parameters: tuple[tuple[str, inspect.Parameter, Any], ...]
+
+    response_adapter: Any = None
 
     dependency_names: tuple[tuple[str, str | None], ...] = field(init=False)
 
@@ -40,7 +44,8 @@ class EndpointPlan:
             tuple(
                 (name, parameter, hints.get(name, parameter.annotation))
                 for name, parameter in signature.parameters.items()
-            )
+            ),
+            prepare_response_adapter(hints.get("return", signature.return_annotation)),
         )
 
 

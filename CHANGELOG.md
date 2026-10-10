@@ -1,5 +1,9 @@
 # Changelog
 
+### Security: declared Pydantic responses
+
+- Validate and filter annotated Pydantic HTTP responses, including returned dictionaries, subclass instances, nested models, and model containers. Explicit responses bypass filtering. Invalid output returns 500.
+
 ## Unreleased
 
 ### Added
