@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from importlib import import_module
 from types import ModuleType
-from typing import Any
+from typing import Any, get_args
 
 from flaxon.validation import ValidationError
 
@@ -66,3 +66,65 @@ __all__ = [
     "is_pydantic_model_type",
     "load_pydantic_model",
 ]
+
+
+def prepare_response_adapter(annotation: Any) -> Any:
+    """Prepare schema-bound output conversion only for Pydantic annotations."""
+    if not isinstance(annotation, type) and not get_args(annotation):
+        return None
+    if not is_pydantic_model_type(annotation) and not any(
+        prepare_response_adapter(arg) is not None for arg in get_args(annotation)
+    ):
+        return None
+    pydantic = _pydantic_module()
+    return pydantic.TypeAdapter(annotation) if pydantic is not None else None
+
+
+def filter_response(adapter: Any, value: Any) -> Any:
+    """Revalidate model instances and serialize using the declared output schema."""
+    base_model = _base_model_type()
+
+    def plain(item: Any) -> Any:
+        if base_model is not None and isinstance(item, base_model):
+            # Extract fields rather than invoke subclass serializers. Revalidation
+            # must not accept an existing subclass instance unchanged.
+            result = {}
+            for name, info in type(item).model_fields.items():
+                if hasattr(item, name):
+                    key = info.validation_alias or info.alias or name
+                    _set_validation_value(result, key, plain(getattr(item, name)))
+            result.update(item.model_extra or {})
+            return result
+        if isinstance(item, dict):
+            return {key: plain(child) for key, child in item.items()}
+        if isinstance(item, (list, tuple)):
+            return [plain(child) for child in item]
+        return item
+
+    validated = adapter.validate_python(plain(value), from_attributes=True)
+    return adapter.dump_python(validated, mode="python")
+
+
+def _set_validation_value(result: dict[str, Any], key: Any, value: Any) -> None:
+    """Populate the model's validation alias, including choices and nested paths."""
+    if hasattr(key, "choices"):
+        key = key.choices[0]
+    if not hasattr(key, "path"):
+        result[key] = value
+        return
+    target: Any = result
+    path = key.path
+    for index, part in enumerate(path[:-1]):
+        next_value: Any = [] if isinstance(path[index + 1], int) else {}
+        if isinstance(target, list):
+            while len(target) <= part:
+                target.append(None)
+            if target[part] is None:
+                target[part] = next_value
+        else:
+            target.setdefault(part, next_value)
+        target = target[part]
+    if isinstance(target, list):
+        while len(target) <= path[-1]:
+            target.append(None)
+    target[path[-1]] = value
