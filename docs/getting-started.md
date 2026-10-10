@@ -24,7 +24,7 @@ python management.py runserver
 
 Open **http://127.0.0.1:8000/**. The welcome page's **Try your Python API** button calls `/api/welcome/status` through a TypeScript helper. Open `/admin/login` to sign in with the account you created.
 
-There is no preset administrator or password. Use a password of at least eight characters with upper- and lowercase letters, a number, and a special character. Password entry is hidden; passwords are hashed before storage. Create accounts before starting the server, or restart it after adding an account from the command line.
+There is no preset administrator or password. `setup-admin` (also `createsuperuser`) accepts your chosen nonempty password, up to 128 characters. With `DEBUG=True`, no strength warning is shown. With `DEBUG=False`, a weak password produces a recommendation for a long, unique production password but is still accepted. Confirmation must match. Other Admin account creation, password changes, and resets retain their existing validation policy. Password entry is hidden; passwords are hashed before storage. Create accounts before starting the server, or restart it after adding an account from the command line.
 
 `flaxon new my-project --template basic` keeps the smaller Python API starter available. The default `fullstack` template includes the interface, module, database, and admin.
 

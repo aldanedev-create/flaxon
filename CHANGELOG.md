@@ -8,6 +8,7 @@
 - Scoped-CSS SSR example and documentation; production debugger absence and real-browser regression checks.
 
 ### Fixed
+- Let `setup-admin` and `createsuperuser` accept nonempty passwords up to 128 characters; recommend stronger passwords without blocking production setup and stay quiet in development.
 - Escape untrusted error fields in the dashboard and correlate validated request IDs without overwriting independent server errors.
 
 - Complete the configured Ruff cleanup and reduce the active lint baseline to zero. Keep all configured rules enabled, with documented local exceptions for established positional APIs and explicit trusted boundaries.
