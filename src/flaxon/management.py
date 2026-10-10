@@ -56,10 +56,23 @@ def setup_admin(settings, username=None):
     password = getpass.getpass("Password: ")
     if password != getpass.getpass("Confirm password: "):
         raise ValueError("Passwords do not match")
+    if not password:
+        raise ValueError("A password is required")
     auth = admin_auth_type(users=[], store=store, strict_permissions=True)
+    if len(password) > auth.password_validator.max_length:
+        maximum = auth.password_validator.max_length
+        raise ValueError(f"Password must be no more than {maximum} characters long.")
+    if not getattr(settings, "DEBUG", False) and auth.password_validator.validate(password):
+        print(
+            "Warning: this password does not meet the recommended strength policy. "
+            "Use a long, unique password for production. Your chosen password will still be accepted.",
+            file=sys.stderr,
+        )
+    # Interactive project setup permits the owner's choice. Other Admin account
+    # creation and password changes retain their configured validation policy.
     record = auth.add_user({
         "username": username,
-        "password": password,
+        "password_hash": auth.hasher.hash(password),
         "roles": ["administrator"],
         "permissions": ["admin.superuser"],
     })

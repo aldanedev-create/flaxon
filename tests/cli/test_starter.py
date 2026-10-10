@@ -106,7 +106,27 @@ def test_admin_setup_hashes_persists_and_authenticates(starter, monkeypatch):
     assert store.get("users", "owner") == record
 
 
-@pytest.mark.parametrize("passwords", [("weak", "weak"), ("Welcome123!", "different")])
+@pytest.mark.parametrize("debug", ["1", "0"])
+@pytest.mark.parametrize("command", ["setup-admin", "createsuperuser"])
+@pytest.mark.parametrize("password", ["a", "LongUniquePassword9!"])
+def test_admin_setup_accepts_chosen_password_with_production_advice(
+    starter, monkeypatch, capsys, debug, command, password
+):
+    monkeypatch.setenv("FLAXON_DEBUG", debug)
+    monkeypatch.setenv("FLAXON_SECRET_KEY", secrets.token_urlsafe(48))
+    management = importlib.import_module("management")
+    monkeypatch.setattr(__import__("flaxon.management", fromlist=["getpass"]).getpass, "getpass", lambda prompt: password)
+    assert management.main([command, "--username", "owner"]) == 0
+    app = importlib.import_module("app").app
+    assert app._flaxon_admin_dashboard.auth.verify("owner", password)
+    record = AdminStore(str(starter / "data/admin.sqlite3")).get("users", "owner")
+    assert "password" not in record
+    assert record["password_hash"] != password
+    error_output = capsys.readouterr().err
+    assert ("recommended strength" in error_output) == (debug == "0" and password == "a")
+
+
+@pytest.mark.parametrize("passwords", [("", ""), ("x" * 129, "x" * 129), ("Welcome123!", "different")])
 def test_invalid_admin_passwords_create_no_account(starter, monkeypatch, passwords):
     management = importlib.import_module("management")
     answers = iter(passwords)
