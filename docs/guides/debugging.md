@@ -341,3 +341,12 @@ authorization and privileged operations on the server; components call those
 endpoints and present their results. Follow the [full-stack lessons](../fullstack/index.md)
 and [Teloce integration reference](../api/teloce.md) to connect this capability
 to pages, components and application modules.
+
+
+## Teloce browser and SSR diagnostics
+
+Compiled Teloce pages receive a development-only overlay and bounded reporter
+when `debug=True`. Compiler, SSR, runtime, hydration and failed API diagnostics
+appear in the same dashboard; request IDs connect API reports to server errors.
+See [Teloce SSR and browser debugging](teloce-ssr-debugging.md) for setup, source
+mapping limits, reporting safeguards and production behavior.

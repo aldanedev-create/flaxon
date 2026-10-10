@@ -13,10 +13,10 @@ jobs:
           python-version: '3.12'
       - name: Install framework and current Teloce compiler
         run: |
-          python -m pip install "git+https://github.com/aldanedev-create/teloce-py.git" "minifyjs>=0.1.3,<0.2" pyyaml jinja2 uvicorn pytest pytest-asyncio pytest-timeout pytest-cov playwright aiosqlite
+          python -m pip install "git+https://github.com/aldanedev-create/teloce-py.git@2539720095d08a22ee2352f6410c4d61cfa45de6" "minifyjs>=0.1.3,<0.2" pyyaml jinja2 uvicorn pytest pytest-asyncio pytest-timeout pytest-cov playwright aiosqlite
           python -m pip install -e ".[standard,admin]" httpx
           python -m playwright install --with-deps chromium
       - name: Test project starter, Python integration, and browser behavior
         env:
           FLAXON_BROWSER_TESTS: '1'
-        run: python -m pytest -o addopts='' tests/cli tests/integration/test_teloce_integration.py tests/integration/test_teloce_head_browser.py tests/integration/test_documentation_examples.py tests/integration/test_http_lifecycle.py -q
+        run: python -m pytest -o addopts='' tests/cli tests/integration/test_teloce_integration.py tests/integration/test_teloce_head_browser.py tests/integration/test_documentation_examples.py tests/integration/test_http_lifecycle.py tests/integration/test_teloce_ssr_debugger.py tests/integration/test_teloce_ssr_debugger_browser.py -q

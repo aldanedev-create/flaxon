@@ -25,7 +25,14 @@ class RequestIDMiddleware(Middleware):
             ),
             secrets.token_hex(8),
         )
+        if (
+            not request_id
+            or len(request_id) > 128
+            or any(not (char.isalnum() or char in "-_.") for char in request_id)
+        ):
+            request_id = secrets.token_hex(8)
         scope["request_id"] = request_id
+        scope["flaxon.request_id"] = request_id
 
         async def send_wrapper(message: dict[str, Any]) -> None:
             if message.get("type") == "http.response.start":

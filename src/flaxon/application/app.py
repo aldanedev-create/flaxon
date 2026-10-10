@@ -595,7 +595,9 @@ class Flaxon:
             response = await self.debugger.response_for(exc, request, scope)
             if self.debug:
                 self.error_store.store({
-                    "error_id": str(scope.get("flaxon.request_id") or uuid.uuid4()),
+                    "error_id": str(uuid.uuid4()),
+                    "request_id": scope.get("flaxon.request_id", ""),
+                    "stack": self.debugger.redactor.redact("".join(traceback.format_exception(exc))),
                     "type": type(exc).__name__,
                     "message": str(exc),
                     "path": request.path,

@@ -101,6 +101,7 @@ Use the guides for explanations, the API pages for reference, and the examples f
 - [Growing a Flaxon application](guides/scaling.md)
 - [Tasks](guides/tasks.md)
 - [Teloce Spa](guides/Teloce-Spa.md)
+- [Teloce SSR and browser debugging](guides/teloce-ssr-debugging.md)
 - [Testing](guides/testing.md)
 - [Validation](guides/validation.md)
 - [WebSockets](guides/websockets.md)

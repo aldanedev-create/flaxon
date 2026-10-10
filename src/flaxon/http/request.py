@@ -145,8 +145,10 @@ class Request:
         context: dict[str, Any] | None = None,
         *,
         title: str | None = None,
+        meta: dict[str, str] | None = None,
+        ssr: bool | None = None,
     ) -> HTMLResponse:
         """Render a startup-compiled Teloce HTML component as an SPA shell."""
         if self.app is None or self.app.teloce is None:
             raise RuntimeError("Teloce is not configured; call app.use_teloce() first")
-        return self.app.teloce.render(entry, context, title=title)
+        return self.app.teloce.render(entry, context, title=title, meta=meta, ssr=ssr)

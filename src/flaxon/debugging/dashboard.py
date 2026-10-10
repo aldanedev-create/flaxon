@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import time
+from html import escape
 from typing import Any
 
 from flaxon.http import HTMLResponse
@@ -24,8 +25,11 @@ class Dashboard:
 
     def _build_html(self, stats: dict[str, Any], recent: list[dict[str, Any]]) -> str:
 
-        stats_json = json.dumps(stats, indent=2, default=str)
+        stats_json = escape(json.dumps(stats, indent=2, default=str))
 
+        error_types = escape(
+            ", ".join(list(stats.get("by_type", {}).keys())[:3]) if stats.get("by_type") else "None"
+        )
         total = stats.get("total", 0)
         status_color, status_label = (
             ("#6ee7b7", "Healthy")
@@ -85,7 +89,7 @@ class Dashboard:
             f"{len(stats.get('by_type', {}))}"
             '</div>\n            <div class="mt-2 text-muted" style="font-'
             'size:0.875rem;">\n                '
-            f"{(', '.join(list(stats.get('by_type', {}).keys())[:3]) if stats.get('by_type') else 'None')}"
+            f"{error_types}"
             '\n            </div>\n        </div>\n        <div class="card"'
             '>\n            <h2>Status</h2>\n            <div class="value"'
             ' style="color: '
@@ -108,13 +112,14 @@ class Dashboard:
 
         rows = ""
         for error in recent:
-            error_type = error.get("type", "Unknown")
-            path = error.get("path", "/")
+            error_type = escape(str(error.get("type", "Unknown")))
+            path = escape(str(error.get("path", "/")))
             timestamp = error.get("timestamp", time.time())
             dt = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))
 
             rows += (
-                '\n            <tr>\n                <td><span class="badge bad'
+                f'\n            <tr id="error-{escape(str(error.get("error_id", "")), quote=True)}">\n'
+                '                <td><span class="badge bad'
                 'ge-danger">'
                 f"{error_type}"
                 "</span></td>\n                <td>"
@@ -123,8 +128,15 @@ class Dashboard:
                 f"{dt}"
                 '</td>\n                <td><code style="font-size:0.75rem; co'
                 'lor:#94a3b8;">'
-                f"{error.get('error_id', '')[:8]}"
-                "</code></td>\n            </tr>\n            "
+                f"{escape(str(error.get('error_id', ''))[:8])}"
+                "</code><details><summary>"
+                f"{escape(str(error.get('message', 'Details')))}"
+                "</summary><pre>"
+                f"Related server error: {escape(str(error.get('related_error_id', '')))}\n"
+                f"{escape(str(error.get('location', '')))}\n"
+                f"{escape(str(error.get('source_excerpt', '')))}\n"
+                f"{escape(str(error.get('stack', '')))}"
+                "</pre></details></td>\n            </tr>\n            "
             )
 
         return f"""
