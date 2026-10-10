@@ -269,3 +269,42 @@ def test_custom_commands_are_discovered_in_fresh_python_processes(starter):
         expected = "Welcome to my-project" if command == "welcome" else "talking to a Flaxon module"
         assert expected in result.stdout
     assert not (starter / "data").exists()
+
+
+def test_management_build_produces_production_ui_without_storage(starter, monkeypatch):
+    monkeypatch.chdir(starter)
+    management = importlib.import_module("management")
+    assert management.main(["build"]) == 0
+    app = importlib.import_module("app").app
+    assert app.debug is False
+    assert app.teloce.options["minifier"] == "minifyjs"
+    assert app.teloce.options["production"] is True
+    assert (app.teloce.build_dir / "ui/app.js").is_file()
+    assert list(app.teloce.build_dir.rglob("*.css"))
+    assert list(app.teloce.build_dir.rglob("*.bundle-*.js"))
+    assert not (starter / "data").exists()
+    assert not list(starter.rglob("*.sqlite3"))
+    assert not (app.teloce.build_dir / "flaxon-debug.js").exists()
+
+
+def test_management_build_failure_stops_deployment(starter, monkeypatch):
+    monkeypatch.chdir(starter)
+    from flaxon.teloce import Teloce
+
+    monkeypatch.setattr(Teloce, "build", lambda self: {"failed": 1, "errors": []})
+    management = importlib.import_module("management")
+    with pytest.raises(SystemExit) as error:
+        management.main(["build"])
+    assert error.value.code == 1
+    assert not (starter / "data").exists()
+
+
+def test_management_build_reports_missing_ui(starter, monkeypatch):
+    monkeypatch.chdir(starter)
+    from flaxon import management as commands
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(commands, "load_application", lambda path: SimpleNamespace())
+    with pytest.raises(SystemExit) as error:
+        importlib.import_module("management").main(["build"])
+    assert error.value.code == 1

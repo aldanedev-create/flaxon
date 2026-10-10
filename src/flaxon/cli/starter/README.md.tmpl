@@ -24,7 +24,7 @@ Open http://127.0.0.1:8000 for the welcome SPA and http://127.0.0.1:8000/admin/l
 - `modules/welcome/ui/Welcome.html`: its component with scoped CSS and TypeScript.
 - `modules/welcome/ui/api.ts`: typed browser API helper.
 - `ui/app.html`: SPA entry that composes feature components.
-- `management.py`: `check`, `makemigrations`, `migrate`, migration status/plan, `setup-admin`, `shell`, and `runserver`.
+- `management.py`: `check`, `makemigrations`, `migrate`, migration status/plan, `setup-admin`, `shell`, `build`, and `runserver`.
 - `models.py`: ORM schema using `flaxon.db.Model` and `fields`.
 - `admin.py`: explicit model registrations.
 - `migrations/`: generated Python migrations; commit them with model changes.
@@ -59,3 +59,19 @@ The welcome page uses the logo and documentation links from Flaxon's website. Th
 [Documentation](https://flaxon-website.vercel.app/docs.html) · [Examples](https://flaxon-website.vercel.app/examples.html)
 
 Settings are shared with the server. Set a persistent FLAXON_SECRET_KEY before disabling debug. Services/Fleet menus appear only when ADMIN_SERVICES_ENABLED is true. The starter CMS is available through Admin. See the framework ORM guide for PostgreSQL and existing-database migration guidance.
+
+## Production UI build
+
+```bash
+python management.py build
+```
+
+Compiles application and mounted-module UI with MinifyJS production bundling,
+minification, scoped CSS extraction, and asset hashes. It does not start the
+server, open the database, run migrations, or initialize the Admin store.
+Configure `app.use_teloce()` before the `app.is_management` guard.
+
+On Render, use `pip install -r requirements.txt && python management.py build`
+as the build command. Apply committed migrations during deployment and start
+`python -m uvicorn app:app --host 0.0.0.0 --port $PORT`. Configure production
+secrets, allowed hosts, and persistent database/Admin/media storage separately.

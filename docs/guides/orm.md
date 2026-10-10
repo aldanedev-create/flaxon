@@ -20,6 +20,8 @@ python management.py migrate --plan
 python management.py migrate
 python management.py setup-admin
 python management.py runserver
+# Prepare the full-stack starter for deployment:
+python management.py build
 ```
 
 The CLI creates `.venv`; activate it before installing your generated project.
