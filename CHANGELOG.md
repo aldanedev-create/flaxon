@@ -1,5 +1,9 @@
 # Changelog
 
+### Production starter build
+
+- Add `python management.py build` for production Teloce/MinifyJS assets, including mounted module UI, without database or Admin initialization. Build failures stop deployment.
+
 ### Security: declared Pydantic responses
 
 - Validate and filter annotated Pydantic HTTP responses, including returned dictionaries, subclass instances, nested models, and model containers. Explicit responses bypass filtering. Invalid output returns 500.

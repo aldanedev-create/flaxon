@@ -93,6 +93,7 @@ def _project_command_parser():
         "migrate-admin-store", help="Copy a legacy SQLite Admin store into an empty migrated ORM store"
     )
     copy_store.add_argument("source")
+    commands.add_parser("build", help="Compile and optimize Teloce assets for production")
     commands.add_parser("check", help="Validate settings, model discovery, and Admin registration")
     make = commands.add_parser("makemigrations", help="Generate Python migrations from models")
     make.add_argument("labels", nargs="*")
@@ -152,6 +153,7 @@ def execute(argv=None, *, settings="settings", application="app:app", project_ro
     # Preserve existing module command parsing and argument handling.
     args_list = list(sys.argv[1:] if argv is None else argv)
     known = {
+        "build",
         "check",
         "makemigrations",
         "migrate",
@@ -192,26 +194,49 @@ def execute(argv=None, *, settings="settings", application="app:app", project_ro
             uvicorn.run(application, host=args.host, port=args.port, reload=not args.no_reload)
             return 0
         app = load_application(application)
-        TORTOISE_ORM.clear()
-        TORTOISE_ORM.update(app.db.configuration())
-        if args.command == "check":
-            tortoise_context_type = import_attribute("tortoise.context", "TortoiseContext")
-
-            async def check():
-                async with tortoise_context_type() as context:
-                    await context.init(config=TORTOISE_ORM, init_connections=False)
-
-            asyncio.run(check())
-            registry_type = import_attribute("flaxon.admin.registry", "Registry")
-            register_project_models = import_attribute("flaxon.db.admin", "register_project_models")
-
-            register_project_models(app, registry_type())
-            print("Settings, models, and Admin registrations passed. No database schema was changed.")
-            return 0
-        project_settings.prepare_database_directory()
-        run_cli_async = import_attribute("tortoise.cli.cli", "run_cli_async")
-
-        cli = _orm_command_arguments(args)
-        return asyncio.run(run_cli_async(cli))
+        return _run_application_command(app, args)
     except (ValueError, OSError, ImportError, RuntimeError) as error:
         parser.exit(1, f"Error: {error}\n")
+
+
+def _run_application_command(app, args):
+    """Dispatch asset and ORM commands without running application startup hooks."""
+    if args.command == "build":
+        integration = getattr(app, "teloce", None)
+        if integration is None:
+            raise ValueError(
+                "No Teloce UI is configured. Call app.use_teloce() before "
+                "the app.is_management guard; backend-only projects do not need build."
+            )
+        app.debug = False
+        integration.options.update({
+            "mode": "production", "production": True, "dev": False,
+            "minifier": "minifyjs", "bundler": "minifyjs", "minify": True, "bundle": True,
+            "source_maps": False, "hash_assets": True, "extract_css": True,
+        })
+        result = integration.build()
+        if result.get("failed") or result.get("errors"):
+            raise RuntimeError("Teloce production build failed; deployment must stop.")
+        print(f"Built {result.get('compiled', 0)} Teloce components: {integration.build_dir}")
+        return 0
+    TORTOISE_ORM.clear()
+    TORTOISE_ORM.update(app.db.configuration())
+    if args.command == "check":
+        tortoise_context_type = import_attribute("tortoise.context", "TortoiseContext")
+
+        async def check():
+            async with tortoise_context_type() as context:
+                await context.init(config=TORTOISE_ORM, init_connections=False)
+
+        asyncio.run(check())
+        registry_type = import_attribute("flaxon.admin.registry", "Registry")
+        register_project_models = import_attribute("flaxon.db.admin", "register_project_models")
+
+        register_project_models(app, registry_type())
+        print("Settings, models, and Admin registrations passed. No database schema was changed.")
+        return 0
+    app.settings.prepare_database_directory()
+    run_cli_async = import_attribute("tortoise.cli.cli", "run_cli_async")
+
+    cli = _orm_command_arguments(args)
+    return asyncio.run(run_cli_async(cli))

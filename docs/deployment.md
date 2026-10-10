@@ -342,3 +342,24 @@ After deploying your application, consider exploring:
 - Monitoring and Observability
 
 These topics are covered in the remaining Flaxon documentation.
+
+## Generated full-stack starter on Render
+
+Build command:
+
+```bash
+pip install -r requirements.txt && python management.py build
+```
+
+Start command for a single instance with SQLite on a persistent disk:
+
+```bash
+python management.py migrate && python -m uvicorn app:app --host 0.0.0.0 --port $PORT --workers 1
+```
+
+Keep committed migration files in the repository. Configure production secrets,
+debug off, allowed hosts and trusted origins. Set database, Admin storage and
+upload paths to durable storage; ordinary local files are ephemeral. The UI
+build needs no live database connection or access to the persistent disk.
+For PostgreSQL and multiple instances, run migrations once as a deployment
+step and use shared session, media and CMS storage.

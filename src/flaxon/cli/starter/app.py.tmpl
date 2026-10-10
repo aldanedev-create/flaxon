@@ -9,14 +9,7 @@ def create_app():
     app = Flaxon.from_settings()
     app.mount_module(welcome, prefix="/api/welcome")
 
-    # Management discovers the same mounts without compiling UI or opening AdminStore.
-    if app.is_management:
-        return app
-
     settings = app.settings
-    app.mount_static("/assets", str(settings.root / "public"))
-    app.use_templates(Jinax(str(settings.root / "templates"), auto_reload=settings.DEBUG))
-    configure_admin(app)
     app.use_teloce(
         project_root=settings.root,
         ui_dir="ui",
@@ -26,6 +19,14 @@ def create_app():
         stylesheets=["/assets/app.css"],
         options={"minifier": "minifyjs"},
     )
+
+    # Management discovers the same mounts without building UI or opening AdminStore.
+    if app.is_management:
+        return app
+
+    app.mount_static("/assets", str(settings.root / "public"))
+    app.use_templates(Jinax(str(settings.root / "templates"), auto_reload=settings.DEBUG))
+    configure_admin(app)
 
     @app.get("/")
     async def home(request: Request):

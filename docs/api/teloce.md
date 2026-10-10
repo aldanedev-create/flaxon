@@ -256,3 +256,19 @@ Use `options={"ssr": "opt-in", "ssr_entries": ["app.html"]}` for selected pages.
 fallback. `ssr_cache_size` enables bounded rendering cache; default is zero.
 Read [SSR and browser debugging](../guides/teloce-ssr-debugging.md) for the
 supported syntax, public-data rules, diagnostics, and production boundaries.
+
+## Build the generated starter for production
+
+```bash
+python management.py build
+```
+
+This command forces a production Teloce build with MinifyJS bundling and
+minification, extracted scoped CSS, hashed assets, and no development source
+maps or debugger client. It includes the UI contributed by mounted modules.
+Compilation errors exit unsuccessfully so deployment stops.
+
+In `app.py`, call `app.use_teloce(...)` after mounting modules and before the
+`if app.is_management: return app` guard. Keep database connections and Admin
+store initialization after that guard. `build` does not run startup hooks or
+apply migrations. Backend-only projects do not need this command.
