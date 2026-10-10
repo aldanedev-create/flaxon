@@ -3,6 +3,8 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+env:
+  PIP_CONSTRAINT: ${{ github.workspace }}/requirements/ci.txt
 jobs:
   sqlite-admin:
     runs-on: ubuntu-latest

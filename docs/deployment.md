@@ -363,3 +363,13 @@ upload paths to durable storage; ordinary local files are ephemeral. The UI
 build needs no live database connection or access to the persistent disk.
 For PostgreSQL and multiple instances, run migrations once as a deployment
 step and use shared session, media and CMS storage.
+
+### Compiler release and CI
+
+Flaxon's dependency minimum is the published `teloce-py>=0.2.6`. CI uses the
+exact compiler source revision in `requirements/ci.txt` to verify unreleased
+SSR, hydration and runtime fixes. This constraint also applies to the isolated
+wheel installation test. Publishing a new Flaxon release that depends on those
+fixes requires publishing the corresponding Teloce release first and then
+raising the dependency minimum. A passing source-integration job does not
+prove an unreleased compiler is available from PyPI.
