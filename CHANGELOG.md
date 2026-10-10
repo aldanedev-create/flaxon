@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+- Teloce AST SSR with explicit public props, hydration, metadata, asset preloads and configurable rendering fallback/cache.
+- Development browser overlay and dashboard reports for compiler, SSR, runtime, hydration and API failures, with bounded source mapping.
+- Scoped-CSS SSR example and documentation; production debugger absence and real-browser regression checks.
+
+### Fixed
+- Escape untrusted error fields in the dashboard and correlate validated request IDs without overwriting independent server errors.
+
 - Complete the configured Ruff cleanup and reduce the active lint baseline to zero. Keep all configured rules enabled, with documented local exceptions for established positional APIs and explicit trusted boundaries.
 - Split Admin, CMS, ORM adapters, GraphQL, OpenAPI, module mounting, and management commands into focused helpers; retain lazy optional imports.
 - Validate SQL identifiers before composing database statements; restrict task pickle loading by default. Application-defined pickle classes require `from_pickle(data, trusted=True)` and authenticated, trusted payloads.

@@ -1,0 +1,40 @@
+<template>
+  <main>
+    <h1>{{ title }}</h1>
+    <ul>
+      <li v-for="(project, i) in projects" :key="project.id">
+        {{ i + 1 }}. {{ project.name }}
+      </li>
+    </ul>
+    <p>Counter: {{ count.value }}</p>
+    <button @click="count.value++">Increase counter</button>
+    <button @click="exampleFailure">Try a browser error</button>
+    <button @click="apiFailure">Try an API error</button>
+  </main>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      title: '',
+      projects: [],
+      count: signal(0),
+    };
+  },
+  methods: {
+    exampleFailure() {
+      throw new Error('Example error from app.html');
+    },
+    async apiFailure() {
+      await fetch('/api/example-error');
+    },
+  },
+};
+</script>
+
+<style scoped>
+main { max-width: 48rem; margin: 2rem auto; padding: 1rem; font-family: sans-serif; }
+button { margin: 0.5rem 0.5rem 0.5rem 0; padding: 0.6rem 1rem; }
+li { margin-block: 0.5rem; }
+</style>

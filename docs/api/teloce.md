@@ -242,3 +242,17 @@ For TypeScript, use `<script lang="ts">` and import `.ts` helpers with a compati
 Teloce version. Output is JavaScript; transpilation does not replace type checking.
 See the [tested example](../../examples/teloce_head_ts/README.md) and
 [10 full-stack lessons](../fullstack/index.md).
+
+
+## SSR and metadata options
+
+`await request.compile(entry, public_props, ssr=True, meta={...})` renders a
+manifest-linked AST program and hydrates the same public snapshot. `meta`
+supports title, description, canonical, Open Graph title/description/image/url/type,
+and `twitter:card`; values are escaped and resource URLs are validated.
+
+Use `options={"ssr": "opt-in", "ssr_entries": ["app.html"]}` for selected pages.
+`ssr_fallback` defaults to `"error"`; `"client"` explicitly allows render-error
+fallback. `ssr_cache_size` enables bounded rendering cache; default is zero.
+Read [SSR and browser debugging](../guides/teloce-ssr-debugging.md) for the
+supported syntax, public-data rules, diagnostics, and production boundaries.
