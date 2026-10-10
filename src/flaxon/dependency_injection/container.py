@@ -37,7 +37,7 @@ class Container:
 
     def register_type(self, name: str, type_: type[T]) -> None:
         """Register a type whose instance is created lazily without arguments."""
-        self._providers[name] = SingletonProvider(lambda: type_())
+        self._providers[name] = SingletonProvider(type_)
 
     def get(self, name: str) -> Any:
         """Resolve a dependency, searching the parent container when necessary."""

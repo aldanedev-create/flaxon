@@ -11,6 +11,7 @@ import os
 import platform
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 
@@ -106,7 +107,7 @@ class Environment:
 
     def is_docker(self) -> bool:
         """Check if running in a Docker container."""
-        return os.path.exists("/.dockerenv") or os.path.exists("/run/.containerenv")
+        return Path("/.dockerenv").exists() or Path("/run/.containerenv").exists()
 
     def is_kubernetes(self) -> bool:
         """Check if running in Kubernetes."""
@@ -168,8 +169,9 @@ class Environment:
     def set_env_from_file(self, path: str) -> None:
         """Load environment variables from a .env file."""
         try:
-            with open(path, encoding="utf-8") as f:
-                for line in f:
+            with Path(path).open(encoding="utf-8") as f:
+                for raw_line in f:
+                    line = raw_line
                     line = line.strip()
                     if not line or line.startswith("#"):
                         continue

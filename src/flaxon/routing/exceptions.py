@@ -17,7 +17,7 @@ class RoutingError(FlaxonError):
         self.message = message
 
 
-class RouteNotFound(RoutingError):
+class RouteNotFoundError(RoutingError):
     """Raised when a route is not found."""
 
     def __init__(self, path: str, method: str | None = None) -> None:
@@ -28,16 +28,17 @@ class RouteNotFound(RoutingError):
             path: The path that was not found.
             method: The HTTP method that was used.
         """
-        if method:
-            message = f"Route not found: {method} {path}"
-        else:
-            message = f"Route not found: {path}"
+        message = f"Route not found: {method} {path}" if method else f"Route not found: {path}"
         super().__init__(message)
         self.path = path
         self.method = method
 
 
-class MethodNotAllowed(RoutingError):
+# Preserve the established public exception import.
+RouteNotFound = RouteNotFoundError
+
+
+class MethodNotAllowedError(RoutingError):
     """Raised when an HTTP method is not allowed for a route."""
 
     def __init__(self, path: str, method: str, allowed: list[str]) -> None:
@@ -56,7 +57,11 @@ class MethodNotAllowed(RoutingError):
         self.allowed = allowed
 
 
-class InvalidPathParameter(RoutingError):
+# Preserve the established public exception import.
+MethodNotAllowed = MethodNotAllowedError
+
+
+class InvalidPathParameterError(RoutingError):
     """Raised when a path parameter is invalid."""
 
     def __init__(self, name: str, value: str, expected_type: str) -> None:
@@ -75,7 +80,11 @@ class InvalidPathParameter(RoutingError):
         self.expected_type = expected_type
 
 
-class MissingPathParameter(RoutingError):
+# Preserve the established public exception import.
+InvalidPathParameter = InvalidPathParameterError
+
+
+class MissingPathParameterError(RoutingError):
     """Raised when a path parameter is missing."""
 
     def __init__(self, name: str) -> None:
@@ -90,7 +99,11 @@ class MissingPathParameter(RoutingError):
         self.name = name
 
 
-class DuplicateRoute(RoutingError):
+# Preserve the established public exception import.
+MissingPathParameter = MissingPathParameterError
+
+
+class DuplicateRouteError(RoutingError):
     """Raised when a duplicate route is registered."""
 
     def __init__(self, path: str, methods: list[str]) -> None:
@@ -107,7 +120,11 @@ class DuplicateRoute(RoutingError):
         self.methods = methods
 
 
-class InvalidRouteName(RoutingError):
+# Preserve the established public exception import.
+DuplicateRoute = DuplicateRouteError
+
+
+class InvalidRouteNameError(RoutingError):
     """Raised when a route name is invalid."""
 
     def __init__(self, name: str, reason: str) -> None:
@@ -124,7 +141,11 @@ class InvalidRouteName(RoutingError):
         self.reason = reason
 
 
-class RouteAlreadyExists(RoutingError):
+# Preserve the established public exception import.
+InvalidRouteName = InvalidRouteNameError
+
+
+class RouteAlreadyExistsError(RoutingError):
     """Raised when a route with the same name already exists."""
 
     def __init__(self, name: str) -> None:
@@ -137,3 +158,7 @@ class RouteAlreadyExists(RoutingError):
         message = f"Route with name '{name}' already exists"
         super().__init__(message)
         self.name = name
+
+
+# Preserve the established public exception import.
+RouteAlreadyExists = RouteAlreadyExistsError

@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any
 
+from flaxon._imports import import_attribute
+
 
 class Provider(ABC):
     """The interface for obtaining a dependency from a container."""
@@ -75,7 +77,7 @@ class LazyProvider(Provider):
         return self._instance
 
     def _import(self) -> Any:
-        from flaxon.utils.import_string import import_string
+        import_string = import_attribute("flaxon.utils.import_string", "import_string")
 
         return import_string(self.import_path)
 

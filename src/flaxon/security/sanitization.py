@@ -4,8 +4,12 @@ import html
 import re
 from typing import Any
 
+from flaxon._imports import import_module
+
 
 class Sanitizer:
+    """Sanitizer implementation for the security subsystem."""
+
     @staticmethod
     def allow_html(value: str, tags: set[str] | None = None, attributes: set[str] | None = None) -> str:
         """Keep a conservative formatting allowlist and remove active attributes.
@@ -18,7 +22,7 @@ class Sanitizer:
         tags = tags or {"p", "br", "strong", "em", "b", "i", "u", "ul", "ol", "li", "blockquote", "a"}
         attributes = attributes or {"href", "title"}
         try:
-            import nh3
+            nh3 = import_module("nh3")
         except ImportError:
             nh3 = None
         if nh3 is not None:
@@ -48,7 +52,7 @@ class Sanitizer:
             if closing:
                 return f"</{name}>"
             safe = []
-            for attr, quote, val in re.findall(r"([\w-]+)\s*=\s*(['\"])(.*?)\2", raw_attrs):
+            for attr, _quote, val in re.findall(r"([\w-]+)\s*=\s*(['\"])(.*?)\2", raw_attrs):
                 if attr.lower() in attributes and not re.match(r"(?i)\s*(javascript|data):", val):
                     safe.append(f'{attr.lower()}="{html.escape(val, quote=True)}"')
             return f"<{name}{(' ' + ' '.join(safe)) if safe else ''}>"
@@ -57,15 +61,18 @@ class Sanitizer:
 
     @staticmethod
     def html_escape(value: str) -> str:
+        """Perform the html escape operation for sanitizer."""
         return html.escape(value)
 
     @staticmethod
     def html_unescape(value: str) -> str:
+        """Perform the html unescape operation for sanitizer."""
         return html.unescape(value)
 
     @staticmethod
     def strip_tags(value: str) -> str:
         # Remove executable/active element contents before stripping markup.
+        """Perform the strip tags operation for sanitizer."""
         value = re.sub(
             r"<(script|style|iframe|object|embed)\b[^>]*>.*?</\1\s*>",
             "",
@@ -76,14 +83,17 @@ class Sanitizer:
 
     @staticmethod
     def strip_whitespace(value: str) -> str:
+        """Perform the strip whitespace operation for sanitizer."""
         return " ".join(value.split())
 
     @staticmethod
     def strip_control_chars(value: str) -> str:
+        """Perform the strip control chars operation for sanitizer."""
         return re.sub(r"[\x00-\x1f\x7f]", "", value)
 
     @staticmethod
     def strip_sql(value: str) -> str:
+        """Perform the strip sql operation for sanitizer."""
         sql_keywords = [
             "SELECT",
             "INSERT",
@@ -109,31 +119,39 @@ class Sanitizer:
 
     @staticmethod
     def strip_path_traversal(value: str) -> str:
+        """Perform the strip path traversal operation for sanitizer."""
         return re.sub(r"\.\./", "", value)
 
     @staticmethod
     def sanitize_filename(value: str) -> str:
+        """Sanitize the filename."""
         return re.sub(r"[^a-zA-Z0-9._-]", "_", value)
 
     @staticmethod
     def sanitize_email(value: str) -> str:
+        """Sanitize the email."""
         return re.sub(r"[^a-zA-Z0-9@._-]", "", value)
 
     @staticmethod
     def sanitize_phone(value: str) -> str:
+        """Sanitize the phone."""
         return re.sub(r"[^0-9+()-]", "", value)
 
     @staticmethod
     def sanitize_url(value: str) -> str:
+        """Sanitize the url."""
         return re.sub(r"[^\w\-.:/?%&=#]", "", value)
 
 
 class InputSanitizer:
+    """Input sanitizer implementation for the security subsystem."""
+
     def __init__(self, strip_tags: bool = False, html_escape: bool = True) -> None:
         self.strip_tags = strip_tags
         self.html_escape = html_escape
 
     def sanitize(self, value: Any) -> Any:
+        """Perform the sanitize operation for input sanitizer."""
         if value is None:
             return None
         if isinstance(value, str):

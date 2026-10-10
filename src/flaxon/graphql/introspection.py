@@ -4,8 +4,11 @@ from typing import Any
 
 
 class Introspection:
+    """Introspection implementation for the graphql subsystem."""
+
     @staticmethod
     def get_introspection_query(schema: Any) -> dict[str, Any]:
+        """Return the introspection query."""
         return {
             "__schema": {
                 "queryType": {"name": schema.query.name if schema.query else None},
@@ -19,13 +22,13 @@ class Introspection:
     @staticmethod
     def _get_types(schema: Any) -> list[dict[str, Any]]:
         types = []
-        for type_name, type_obj in schema.get_types().items():
+        for _type_name, type_obj in schema.get_types().items():
             types.append(Introspection._get_type_info(type_obj))
         return types
 
     @staticmethod
     def _get_type_info(type_obj: Any) -> dict[str, Any]:
-        type_info = {
+        return {
             "kind": "OBJECT",
             "name": type_obj.name,
             "description": getattr(type_obj, "description", None),
@@ -34,7 +37,6 @@ class Introspection:
             "enumValues": None,
             "possibleTypes": None,
         }
-        return type_info
 
     @staticmethod
     def _get_fields(type_obj: Any) -> list[dict[str, Any]]:

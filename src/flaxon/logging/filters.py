@@ -27,9 +27,7 @@ class LevelFilter(Filter):
         """Return whether this record satisfies the configured filter criteria."""
         if record.levelno < self.min_level:
             return False
-        if self.max_level is not None and record.levelno > self.max_level:
-            return False
-        return True
+        return not (self.max_level is not None and record.levelno > self.max_level)
 
 
 class RequestFilter(Filter):
@@ -45,15 +43,10 @@ class RequestFilter(Filter):
         path = getattr(record, "path", None)
         method = getattr(record, "method", None)
 
-        if self.path_pattern and path:
-            if not self.path_pattern.search(path):
-                return False
+        if self.path_pattern and path and not self.path_pattern.search(path):
+            return False
 
-        if self.method and method:
-            if method.upper() != self.method:
-                return False
-
-        return True
+        return not (self.method and method and method.upper() != self.method)
 
 
 class ModuleFilter(Filter):

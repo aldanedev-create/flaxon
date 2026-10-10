@@ -43,7 +43,7 @@ def group_by(items: list[T], key_func: Callable[[T], K]) -> dict[K, list[T]]:
 
 def chunk_list(items: list[T], size: int) -> list[list[T]]:
     """Split a list into chunks of a given size."""
-    return [items[i:i + size] for i in range(0, len(items), size)]
+    return [items[i : i + size] for i in range(0, len(items), size)]
 
 
 def merge_dicts(*dicts: dict[K, V]) -> dict[K, V]:

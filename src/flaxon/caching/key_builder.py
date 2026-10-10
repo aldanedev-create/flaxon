@@ -48,12 +48,12 @@ class KeyBuilder:
     def build_hash(self, *args: Any, **kwargs: Any) -> str:
         """Return the MD5 digest of the constructed cache key."""
         key = self.build(*args, **kwargs)
-        return hashlib.md5(key.encode()).hexdigest()
+        return hashlib.md5(key.encode(), usedforsecurity=False).hexdigest()
 
     def build_hash_from_func(self, func: Any, *args: Any, **kwargs: Any) -> str:
         """Return the MD5 digest of a callable-specific cache key."""
         key = self.build_from_func(func, *args, **kwargs)
-        return hashlib.md5(key.encode()).hexdigest()
+        return hashlib.md5(key.encode(), usedforsecurity=False).hexdigest()
 
     def with_prefix(self, prefix: str) -> KeyBuilder:
         """Create a key builder with an additional namespace component."""

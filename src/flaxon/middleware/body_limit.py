@@ -6,6 +6,7 @@ This module provides middleware for limiting request body sizes.
 
 from __future__ import annotations
 
+import contextlib
 from typing import Any
 
 from flaxon.exceptions import PayloadTooLarge
@@ -21,6 +22,7 @@ class BodyLimitMiddleware(Middleware):
         self.max_size = max_size
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        """Handle the supplied call using this object's configured behavior."""
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return
@@ -28,10 +30,8 @@ class BodyLimitMiddleware(Middleware):
         content_length = None
         for key, value in scope.get("headers", []):
             if key.lower() == b"content-length":
-                try:
+                with contextlib.suppress(ValueError):
                     content_length = int(value.decode("latin-1"))
-                except ValueError:
-                    pass
                 break
 
         if content_length is not None and content_length > self.max_size:

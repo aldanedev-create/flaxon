@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from datetime import datetime
 
 from flaxon.tasks.exceptions import TaskNotFoundError
@@ -28,10 +29,8 @@ class MemoryBackend:
         self._running = False
         if self._cleanup_task:
             self._cleanup_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._cleanup_task
-            except asyncio.CancelledError:
-                pass
             self._cleanup_task = None
 
     async def store_task(self, task: Task) -> None:

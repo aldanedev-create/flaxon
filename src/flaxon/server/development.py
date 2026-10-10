@@ -6,6 +6,8 @@ import asyncio
 import contextlib
 from typing import Any
 
+from flaxon._imports import import_module
+
 from .configuration import ServerConfig
 from .reload import Reloader
 
@@ -13,9 +15,8 @@ from .reload import Reloader
 def _get_uvicorn() -> Any:
     """Lazy import for optional uvicorn dependency."""
     try:
-        import uvicorn
+        return import_module("uvicorn")
 
-        return uvicorn
     except ImportError as exc:
         raise RuntimeError(
             "uvicorn is required to run the server. Install with: pip install uvicorn"

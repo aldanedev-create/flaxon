@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -8,6 +9,8 @@ from typing import Any
 
 @dataclass
 class HealthCheckResult:
+    """Health check result implementation for the health subsystem."""
+
     name: str
     status: str
     message: str | None = None
@@ -16,15 +19,19 @@ class HealthCheckResult:
     timestamp: float = field(default_factory=time.time)
 
     def is_healthy(self) -> bool:
+        """Return whether healthy holds for the current value."""
         return self.status == "healthy"
 
     def is_unhealthy(self) -> bool:
+        """Return whether unhealthy holds for the current value."""
         return self.status == "unhealthy"
 
     def is_degraded(self) -> bool:
+        """Return whether degraded holds for the current value."""
         return self.status == "degraded"
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a dictionary representation of the current value."""
         return {
             "name": self.name,
             "status": self.status,
@@ -36,14 +43,15 @@ class HealthCheckResult:
 
 
 class HealthCheck:
+    """Health check implementation for the health subsystem."""
+
     def __init__(self, name: str, check_func: Callable, timeout: float = 5.0) -> None:
         self.name = name
         self.check_func = check_func
         self.timeout = timeout
 
     async def run(self) -> HealthCheckResult:
-        import asyncio
-
+        """Run the configured operation."""
         start = time.perf_counter()
 
         try:
@@ -103,6 +111,8 @@ class HealthCheck:
 
 
 class DatabaseHealthCheck(HealthCheck):
+    """Database health check implementation for the health subsystem."""
+
     def __init__(self, db_manager: Any, name: str = "database") -> None:
         self.db_manager = db_manager
         super().__init__(name, self._check)
@@ -129,6 +139,8 @@ class DatabaseHealthCheck(HealthCheck):
 
 
 class RedisHealthCheck(HealthCheck):
+    """Redis health check implementation for the health subsystem."""
+
     def __init__(self, redis_client: Any, name: str = "redis") -> None:
         self.redis_client = redis_client
         super().__init__(name, self._check)
@@ -153,6 +165,8 @@ class RedisHealthCheck(HealthCheck):
 
 
 class CompositeHealthCheck(HealthCheck):
+    """Composite health check implementation for the health subsystem."""
+
     def __init__(self, name: str, checks: list[HealthCheck]) -> None:
         self.checks = checks
         super().__init__(name, self._check)

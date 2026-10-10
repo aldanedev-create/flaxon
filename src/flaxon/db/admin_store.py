@@ -10,8 +10,10 @@ import asyncio
 import hashlib
 import json
 import secrets
+import sqlite3
 import threading
 import time
+from pathlib import Path
 
 from tortoise.context import TortoiseContext, _current_context
 from tortoise.transactions import in_transaction
@@ -20,6 +22,8 @@ from .storemodels import AdminEntry, AdminOperation
 
 
 class ORMAdminStore:
+    """Ormadmin store implementation for the db subsystem."""
+
     def __init__(self, database_url):
         self.loop = asyncio.new_event_loop()
         self.context = TortoiseContext()
@@ -67,6 +71,8 @@ class ORMAdminStore:
         return hashlib.sha256(f"{namespace}\0{key}".encode()).hexdigest()
 
     def get(self, namespace, key, default=None):
+        """Retrieve the requested value using this object's configured behavior."""
+
         async def read():
             row = await AdminEntry.get_or_none(pk=self._id(namespace, key))
             return row.value if row else default
@@ -74,6 +80,8 @@ class ORMAdminStore:
         return self._run(read())
 
     def set(self, namespace, key, value):
+        """Store the supplied value under its key."""
+
         async def write():
             await AdminEntry.update_or_create(
                 id=self._id(namespace, key),
@@ -87,6 +95,8 @@ class ORMAdminStore:
         return self._run(write())
 
     def mutate(self, namespace, key, callback, default=None):
+        """Perform the mutate operation for ormadmin store."""
+
         async def change():
             async with in_transaction():
                 # Ensure even the first mutation has a row to lock.
@@ -107,15 +117,19 @@ class ORMAdminStore:
         return self._run(change())
 
     def delete(self, namespace, key):
+        """Delete the specified entry from the configured store."""
         return self._run(AdminEntry.filter(id=self._id(namespace, key)).delete())
 
     def list(self, namespace):
+        """Return the matching entries."""
+
         async def read():
             return {row.key: row.value for row in await AdminEntry.filter(namespace=namespace)}
 
         return self._run(read())
 
     def record_operation(self, kind, payload, operation_id=None):
+        """Record the operation."""
         identifier = operation_id or secrets.token_hex(8)
 
         async def write():
@@ -132,6 +146,8 @@ class ORMAdminStore:
         return self._run(write())
 
     def list_operations(self, limit=100):
+        """List the operations."""
+
         async def read():
             rows = await AdminOperation.all().order_by("-created_at").limit(max(1, min(limit, 5000)))
             return [
@@ -141,9 +157,11 @@ class ORMAdminStore:
         return self._run(read())
 
     def prune_operations(self, before):
+        """Perform the prune operations operation for ormadmin store."""
         return self._run(AdminOperation.filter(created_at__lt=before).delete())
 
     def close(self):
+        """Release the resources held by this object."""
         if not self.closed:
             try:
                 self._run(self.context.close_connections())
@@ -155,10 +173,6 @@ class ORMAdminStore:
 
     def import_sqlite(self, source_path):
         """Copy a legacy store atomically, refusing a nonempty destination."""
-        import json
-        import sqlite3
-        from pathlib import Path
-
         source = Path(source_path).resolve()
         if not source.is_file():
             raise ValueError("Legacy Admin store does not exist")

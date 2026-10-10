@@ -6,15 +6,20 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from flaxon._imports import import_attribute
+
 from .plugin import Plugin
 from .registry import PluginRegistry
 
 
 class PluginDiscovery:
+    """Plugin discovery implementation for the plugins subsystem."""
+
     def __init__(self, registry: PluginRegistry) -> None:
         self.registry = registry
 
     def discover_from_path(self, path: str) -> list[Plugin]:
+        """Perform the discover from path operation for plugin discovery."""
         plugins = []
         path_obj = Path(path)
 
@@ -46,6 +51,7 @@ class PluginDiscovery:
         return plugins
 
     def discover_from_module(self, module_name: str) -> list[Plugin]:
+        """Perform the discover from module operation for plugin discovery."""
         plugins = []
 
         try:
@@ -63,6 +69,7 @@ class PluginDiscovery:
         return plugins
 
     def discover_all(self, paths: list[str] | None = None) -> list[Plugin]:
+        """Perform the discover all operation for plugin discovery."""
         plugins = []
 
         if paths:
@@ -92,9 +99,9 @@ class PluginDiscovery:
         version = getattr(module, "__version__", "0.1.0")
         description = getattr(module, "__doc__", "").strip() or ""
 
-        from .plugin import SimplePlugin
+        simple_plugin_type = import_attribute("flaxon.plugins.plugin", "SimplePlugin")
 
-        return SimplePlugin(
+        return simple_plugin_type(
             name=name,
             setup_func=module.setup,
             version=version,

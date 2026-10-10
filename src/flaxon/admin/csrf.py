@@ -14,17 +14,22 @@ _binding: ContextVar[str | None] = ContextVar("flaxon_admin_csrf_binding", defau
 
 
 class AdminCSRF(CSRF):
+    """Admin csrf implementation for the admin subsystem."""
+
     def _sign(self, data: str) -> str:
         binding = _binding.get()
         return super()._sign(f"{binding}:{data}" if binding is not None else data)
 
     def verify_token(self, token: str) -> bool:
+        """Verify the token."""
         if _binding.get() is None:
             return False
         return super().verify_token(token)
 
 
 class AdminCSRFMiddleware:
+    """Admin csrfmiddleware implementation for the admin subsystem."""
+
     def __init__(self, app: Any, dashboard: Any) -> None:
         self.app = app
         self.dashboard = dashboard
@@ -33,6 +38,7 @@ class AdminCSRFMiddleware:
         )
 
     async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        """Handle the supplied call using this object's configured behavior."""
         prefix = self.dashboard.url_prefix
         path = scope.get("path", "")
         if scope.get("type") != "http" or not (path == prefix or path.startswith(prefix + "/")):

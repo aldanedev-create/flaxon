@@ -7,9 +7,10 @@ import re
 import time
 from typing import Any
 
+# Allow standard SQL table identifiers (letters, numbers, underscores)
+from flaxon.database.sql import statement
 from flaxon.sessions.session import Session
 
-# Allow standard SQL table identifiers (letters, numbers, underscores)
 _TABLE_NAME_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 
@@ -30,25 +31,29 @@ class DatabaseBackend:
     async def initialize(self) -> None:
         """Create the sessions table if it does not already exist."""
         await self.db.execute(
-            f"""
-            CREATE TABLE IF NOT EXISTS {self.table_name} (
-                id VARCHAR(64) PRIMARY KEY,
-                data TEXT NOT NULL,
-                ttl INTEGER NOT NULL,
-                created_at REAL NOT NULL,
-                expires_at REAL NOT NULL
+            statement(
+                (
+                    "\n            CREATE TABLE IF NOT EXISTS {name_0} (\n         "
+                    "       id VARCHAR(64) PRIMARY KEY,\n                data TEXT"
+                    " NOT NULL,\n                ttl INTEGER NOT NULL,\n           "
+                    "     created_at REAL NOT NULL,\n                expires_at RE"
+                    "AL NOT NULL\n            )\n            "
+                ),
+                name_0=self.table_name,
             )
-            """
         )
 
     async def save(self, session: Session) -> None:
         """Save or update a session in the database."""
         await self.db.execute(
-            f"""
-            INSERT OR REPLACE INTO {self.table_name}
-            (id, data, ttl, created_at, expires_at)
-            VALUES ($1, $2, $3, $4, $5)
-            """,
+            statement(
+                (
+                    "\n            INSERT OR REPLACE INTO {name_0}\n            (id"
+                    ", data, ttl, created_at, expires_at)\n            VALUES ($1,"
+                    " $2, $3, $4, $5)\n            "
+                ),
+                name_0=self.table_name,
+            ),
             session.id,
             json.dumps(session.to_dict(), default=str),
             session.ttl,
@@ -59,7 +64,7 @@ class DatabaseBackend:
     async def get(self, session_id: str) -> Session | None:
         """Fetch an active session by its ID."""
         row = await self.db.fetch_one(
-            f"SELECT * FROM {self.table_name} WHERE id = $1 AND expires_at > $2",
+            statement("SELECT * FROM {name_0} WHERE id = $1 AND expires_at > $2", name_0=self.table_name),
             session_id,
             time.time(),
         )
@@ -78,18 +83,18 @@ class DatabaseBackend:
     async def delete(self, session_id: str) -> None:
         """Delete a specific session by its ID."""
         await self.db.execute(
-            f"DELETE FROM {self.table_name} WHERE id = $1",
+            statement("DELETE FROM {name_0} WHERE id = $1", name_0=self.table_name),
             session_id,
         )
 
     async def clear(self) -> None:
         """Remove all sessions from the database table."""
-        await self.db.execute(f"DELETE FROM {self.table_name}")
+        await self.db.execute(statement("DELETE FROM {name_0}", name_0=self.table_name))
 
     async def exists(self, session_id: str) -> bool:
         """Check if an active session exists."""
         row = await self.db.fetch_one(
-            f"SELECT 1 FROM {self.table_name} WHERE id = $1 AND expires_at > $2",
+            statement("SELECT 1 FROM {name_0} WHERE id = $1 AND expires_at > $2", name_0=self.table_name),
             session_id,
             time.time(),
         )
@@ -98,7 +103,7 @@ class DatabaseBackend:
     async def cleanup(self) -> int:
         """Purge expired sessions from the database."""
         result = await self.db.execute(
-            f"DELETE FROM {self.table_name} WHERE expires_at <= $1",
+            statement("DELETE FROM {name_0} WHERE expires_at <= $1", name_0=self.table_name),
             time.time(),
         )
         return result if isinstance(result, int) else 0

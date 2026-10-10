@@ -4,10 +4,13 @@ import argparse
 import code
 from typing import Any
 
+from flaxon._imports import import_attribute
 from flaxon.cli.base import Command
 
 
 class ShellCommand(Command):
+    """Shell command implementation for the cli subsystem."""
+
     def __init__(self) -> None:
         super().__init__(
             name="shell",
@@ -25,7 +28,8 @@ class ShellCommand(Command):
 
         if args.application and not args.no_import:
             try:
-                from flaxon.utils.import_string import import_string
+                import_string = import_attribute("flaxon.utils.import_string", "import_string")
+
                 app = import_string(args.application)
                 context["app"] = app
                 context["Flaxon"] = app.__class__

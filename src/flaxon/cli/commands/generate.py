@@ -9,6 +9,8 @@ from flaxon.cli.generator import Generator
 
 
 class GenerateCommand(Command):
+    """Generate command implementation for the cli subsystem."""
+
     def __init__(self) -> None:
         super().__init__(
             name="generate",

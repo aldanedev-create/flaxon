@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import traceback
 from datetime import datetime
 
 
@@ -49,17 +50,14 @@ class JSONFormatter(logging.Formatter):
             log_data["session_id"] = record.session_id
 
         if record.exc_info:
-            import traceback
-
             log_data["exception"] = {
                 "type": record.exc_info[0].__name__ if record.exc_info[0] else None,
                 "message": str(record.exc_info[1]) if record.exc_info[1] else None,
                 "traceback": "".join(traceback.format_exception(*record.exc_info)),
             }
 
-        if hasattr(record, "extra"):
-            if isinstance(record.extra, dict):
-                log_data.update(record.extra)
+        if hasattr(record, "extra") and isinstance(record.extra, dict):
+            log_data.update(record.extra)
 
         return json.dumps(log_data, default=str, ensure_ascii=False)
 

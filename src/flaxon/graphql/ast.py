@@ -4,23 +4,29 @@ from typing import Any
 
 
 class Node:
+    """Node implementation for the graphql subsystem."""
+
     def __init__(self, kind: str) -> None:
         self.kind = kind
 
 
 class Document(Node):
+    """Document implementation for the graphql subsystem."""
+
     def __init__(self, definitions: list[Any]) -> None:
         super().__init__("Document")
         self.definitions = definitions
 
 
 class OperationDefinition(Node):
+    """Operation definition implementation for the graphql subsystem."""
+
     def __init__(
         self,
         operation: str,
         name: Any = None,
-        variable_definitions: list[Any] = None,
-        directives: list[Any] = None,
+        variable_definitions: list[Any] | None = None,
+        directives: list[Any] | None = None,
         selection_set: Any = None,
     ) -> None:
         super().__init__("OperationDefinition")
@@ -32,18 +38,22 @@ class OperationDefinition(Node):
 
 
 class SelectionSet(Node):
+    """Selection set implementation for the graphql subsystem."""
+
     def __init__(self, selections: list[Any]) -> None:
         super().__init__("SelectionSet")
         self.selections = selections
 
 
 class Field(Node):
+    """Validate and convert  field values."""
+
     def __init__(
         self,
         name: Any,
         alias: Any = None,
-        arguments: list[Any] = None,
-        directives: list[Any] = None,
+        arguments: list[Any] | None = None,
+        directives: list[Any] | None = None,
         selection_set: Any = None,
     ) -> None:
         super().__init__("Field")
@@ -55,17 +65,21 @@ class Field(Node):
 
 
 class FragmentSpread(Node):
-    def __init__(self, name: Any, directives: list[Any] = None) -> None:
+    """Fragment spread implementation for the graphql subsystem."""
+
+    def __init__(self, name: Any, directives: list[Any] | None = None) -> None:
         super().__init__("FragmentSpread")
         self.name = name
         self.directives = directives or []
 
 
 class InlineFragment(Node):
+    """Inline fragment implementation for the graphql subsystem."""
+
     def __init__(
         self,
         type_condition: Any = None,
-        directives: list[Any] = None,
+        directives: list[Any] | None = None,
         selection_set: Any = None,
     ) -> None:
         super().__init__("InlineFragment")
@@ -75,11 +89,13 @@ class InlineFragment(Node):
 
 
 class FragmentDefinition(Node):
+    """Fragment definition implementation for the graphql subsystem."""
+
     def __init__(
         self,
         name: Any,
         type_condition: Any,
-        directives: list[Any] = None,
+        directives: list[Any] | None = None,
         selection_set: Any = None,
     ) -> None:
         super().__init__("FragmentDefinition")
@@ -90,6 +106,8 @@ class FragmentDefinition(Node):
 
 
 class VariableDefinition(Node):
+    """Variable definition implementation for the graphql subsystem."""
+
     def __init__(self, name: Any, type: Any, default_value: Any = None) -> None:
         super().__init__("VariableDefinition")
         self.name = name
@@ -98,18 +116,24 @@ class VariableDefinition(Node):
 
 
 class Variable(Node):
+    """Variable implementation for the graphql subsystem."""
+
     def __init__(self, name: Any) -> None:
         super().__init__("Variable")
         self.name = name
 
 
 class Name(Node):
+    """Name implementation for the graphql subsystem."""
+
     def __init__(self, value: str) -> None:
         super().__init__("Name")
         self.value = value
 
 
 class Argument(Node):
+    """Argument implementation for the graphql subsystem."""
+
     def __init__(self, name: Any, value: Any) -> None:
         super().__init__("Argument")
         self.name = name
@@ -117,67 +141,89 @@ class Argument(Node):
 
 
 class Directive(Node):
-    def __init__(self, name: Any, arguments: list[Any] = None) -> None:
+    """Directive implementation for the graphql subsystem."""
+
+    def __init__(self, name: Any, arguments: list[Any] | None = None) -> None:
         super().__init__("Directive")
         self.name = name
         self.arguments = arguments or []
 
 
 class NamedType(Node):
+    """Named type implementation for the graphql subsystem."""
+
     def __init__(self, name: Any) -> None:
         super().__init__("NamedType")
         self.name = name
 
 
 class ListType(Node):
+    """List type implementation for the graphql subsystem."""
+
     def __init__(self, type: Any) -> None:
         super().__init__("ListType")
         self.type = type
 
 
 class NonNullType(Node):
+    """Non null type implementation for the graphql subsystem."""
+
     def __init__(self, type: Any) -> None:
         super().__init__("NonNullType")
         self.type = type
 
 
 class IntValue(Node):
+    """Int value implementation for the graphql subsystem."""
+
     def __init__(self, value: str) -> None:
         super().__init__("IntValue")
         self.value = value
 
 
 class FloatValue(Node):
+    """Float value implementation for the graphql subsystem."""
+
     def __init__(self, value: str) -> None:
         super().__init__("FloatValue")
         self.value = value
 
 
 class StringValue(Node):
+    """String value implementation for the graphql subsystem."""
+
     def __init__(self, value: str) -> None:
         super().__init__("StringValue")
         self.value = value
 
 
 class BooleanValue(Node):
+    """Boolean value implementation for the graphql subsystem."""
+
     def __init__(self, value: bool) -> None:
         super().__init__("BooleanValue")
         self.value = value
 
 
 class ListValue(Node):
+    """List value implementation for the graphql subsystem."""
+
     def __init__(self, values: list[Any]) -> None:
         super().__init__("ListValue")
         self.values = values
 
 
 class ObjectValue(Node):
+    """Object value implementation for the graphql subsystem."""
+
     def __init__(self, fields: list[Any]) -> None:
         super().__init__("ObjectValue")
         self.fields = fields
 
 
 class ObjectField(Node):
+    """Validate and convert object field values."""
+
     def __init__(self, name: Any, value: Any) -> None:
         super().__init__("ObjectField")
         self.name = name

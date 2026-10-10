@@ -9,6 +9,8 @@ from flaxon.cli.base import Command
 
 
 class BuildCommand(Command):
+    """Build command implementation for the cli subsystem."""
+
     def __init__(self) -> None:
         super().__init__(
             name="build",
@@ -35,7 +37,7 @@ class BuildCommand(Command):
         console.info(f"Building: {' '.join(cmd)}")
 
         try:
-            result = subprocess.run(cmd)
+            result = subprocess.run(cmd, check=False)  # noqa: S603 - local CLI argument list; no shell interpolation
             if result.returncode == 0:
                 console.success("Build completed successfully")
             return result.returncode

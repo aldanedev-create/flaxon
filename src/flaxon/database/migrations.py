@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
-import os
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import Any
+
+from flaxon.database.sql import statement as sql_statement
 
 from .manager import DatabaseManager
 
@@ -39,6 +42,8 @@ def _sql_statements(script: str) -> list[str]:
 
 @dataclass
 class Migration:
+    """Migration implementation for the database subsystem."""
+
     version: str
     name: str
     up: str
@@ -48,6 +53,7 @@ class Migration:
     applied_at: datetime | None = None
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a dictionary representation of the current value."""
         return {
             "version": self.version,
             "name": self.name,
@@ -60,6 +66,7 @@ class Migration:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Migration:
+        """Construct an instance from its dictionary representation."""
         return cls(
             version=data["version"],
             name=data["name"],
@@ -74,63 +81,77 @@ class Migration:
 
 
 class MigrationLoader:
+    """Migration loader implementation for the database subsystem."""
+
     def __init__(self, migration_dir: str) -> None:
         self.migration_dir = migration_dir
 
     def load_migrations(self) -> list[Migration]:
+        """Load the migrations."""
         migrations = []
 
-        if not os.path.exists(self.migration_dir):
-            os.makedirs(self.migration_dir, exist_ok=True)
+        if not Path(self.migration_dir).exists():
+            Path(self.migration_dir).mkdir(parents=True, exist_ok=True)
             return migrations
 
-        for filename in sorted(os.listdir(self.migration_dir)):
-            if not filename.endswith(".json"):
+        for path in sorted(Path(self.migration_dir).iterdir()):
+            if path.suffix != ".json":
                 continue
 
-            path = os.path.join(self.migration_dir, filename)
-            with open(path, encoding="utf-8") as f:
+            with path.open(encoding="utf-8") as f:
                 data = json.load(f)
                 migrations.append(Migration.from_dict(data))
 
         return migrations
 
     def save_migration(self, migration: Migration) -> None:
+        """Save the migration."""
         filename = f"{migration.version}_{migration.name}.json"
-        path = os.path.join(self.migration_dir, filename)
+        path = str(Path(self.migration_dir) / filename)
 
-        os.makedirs(self.migration_dir, exist_ok=True)
+        Path(self.migration_dir).mkdir(parents=True, exist_ok=True)
 
-        with open(path, "w", encoding="utf-8") as f:
+        with Path(path).open("w", encoding="utf-8") as f:
             json.dump(migration.to_dict(), f, indent=2)
 
 
 class MigrationRunner:
+    """Migration runner implementation for the database subsystem."""
+
     def __init__(self, db: DatabaseManager, migration_dir: str, table_name: str = "migrations") -> None:
         self.db = db
         self.loader = MigrationLoader(migration_dir)
         self.table_name = table_name
 
     async def initialize(self) -> None:
-        await self.db.execute(f"""
-            CREATE TABLE IF NOT EXISTS {self.table_name} (
-                version VARCHAR(64) PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                applied_at TIMESTAMP NOT NULL,
-                down TEXT
+        """Prepare the configured resources for use."""
+        await self.db.execute(
+            sql_statement(
+                (
+                    "\n            CREATE TABLE IF NOT EXISTS {name_0} (\n         "
+                    "       version VARCHAR(64) PRIMARY KEY,\n                name"
+                    " VARCHAR(255) NOT NULL,\n                applied_at TIMESTAMP"
+                    " NOT NULL,\n                down TEXT\n            )\n        "
+                ),
+                name_0=self.table_name,
             )
-        """)
+        )
 
     async def get_applied_versions(self) -> set[str]:
-        rows = await self.db.fetch_all(f"SELECT version FROM {self.table_name}")
+        """Return the applied versions."""
+        rows = await self.db.fetch_all(sql_statement("SELECT version FROM {name_0}", name_0=self.table_name))
         return {row["version"] for row in rows}
 
     async def apply_migration(self, migration: Migration) -> None:
+        """Apply the migration."""
         async with self.db.transaction() as tx:
             for statement in _sql_statements(migration.up):
                 await tx.execute(statement)
             await tx.execute(
-                f"INSERT INTO {self.table_name} (version, name, applied_at, down) VALUES ($1, $2, $3, $4)",
+                sql_statement(
+                    "INSERT INTO {name_0} (version, name, applied_at, down) VALUES ($1, $2, $3, $4)",
+                    name_0=self.table_name,
+                ),
                 migration.version,
                 migration.name,
                 datetime.now(),
@@ -138,6 +159,7 @@ class MigrationRunner:
             )
 
     async def rollback_migration(self, migration: Migration) -> None:
+        """Perform the rollback migration operation for migration runner."""
         if migration.down is None:
             raise ValueError(f"Migration {migration.version} has no down script")
 
@@ -145,11 +167,12 @@ class MigrationRunner:
             for statement in _sql_statements(migration.down):
                 await tx.execute(statement)
             await tx.execute(
-                f"DELETE FROM {self.table_name} WHERE version = $1",
+                sql_statement("DELETE FROM {name_0} WHERE version = $1", name_0=self.table_name),
                 migration.version,
             )
 
     async def migrate(self, target_version: str | None = None) -> list[str]:
+        """Perform the migrate operation for migration runner."""
         await self.initialize()
 
         applied = await self.get_applied_versions()
@@ -170,6 +193,7 @@ class MigrationRunner:
         return applied_versions
 
     async def rollback(self, steps: int = 1) -> list[str]:
+        """Perform the rollback operation for migration runner."""
         await self.initialize()
 
         applied = await self.get_applied_versions()
@@ -192,6 +216,7 @@ class MigrationRunner:
         return rolled_back
 
     async def status(self) -> dict[str, Any]:
+        """Return the current status."""
         await self.initialize()
 
         applied = await self.get_applied_versions()
@@ -213,8 +238,7 @@ class MigrationRunner:
         }
 
     async def generate_migration(self, name: str, up: str, down: str | None = None) -> str:
-        import time
-
+        """Generate the migration."""
         version = str(int(time.time() * 1000))
 
         migration = Migration(

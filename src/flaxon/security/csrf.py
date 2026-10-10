@@ -6,11 +6,14 @@ import secrets
 import time
 from typing import Any
 
+from flaxon._imports import import_attribute
 from flaxon.exceptions import Forbidden
 from flaxon.http import Request
 
 
 class CSRF:
+    """Csrf implementation for the security subsystem."""
+
     def __init__(
         self, secret_key: str, cookie_name: str = "_csrf", header_name: str = "x-csrf-token"
     ) -> None:
@@ -22,12 +25,14 @@ class CSRF:
         return hmac.new(self.secret_key, data.encode(), hashlib.sha256).hexdigest()
 
     def generate_token(self) -> str:
+        """Generate the token."""
         nonce = secrets.token_urlsafe(32)
         timestamp = str(int(time.time()))
         signature = self._sign(f"{nonce}.{timestamp}")
         return f"{nonce}.{timestamp}.{signature}"
 
     def verify_token(self, token: str) -> bool:
+        """Verify the token."""
         try:
             nonce, timestamp_str, signature = token.split(".", 2)
             timestamp = int(timestamp_str)
@@ -40,6 +45,7 @@ class CSRF:
             return False
 
     def get_token_from_request(self, request: Request) -> str | None:
+        """Return the token from request."""
         token = request.headers.get(self.header_name)
         if token:
             return token
@@ -48,6 +54,7 @@ class CSRF:
         return None
 
     def validate_request(self, request: Request) -> None:
+        """Validate the request."""
         if request.method in {"GET", "HEAD", "OPTIONS", "TRACE"}:
             return
 
@@ -60,6 +67,8 @@ class CSRF:
 
 
 class CSRFMiddleware:
+    """Csrfmiddleware implementation for the security subsystem."""
+
     def __init__(
         self, app: Any, secret_key: str, cookie_name: str = "_csrf", header_name: str = "x-csrf-token"
     ) -> None:
@@ -67,13 +76,14 @@ class CSRFMiddleware:
         self.csrf = CSRF(secret_key, cookie_name, header_name)
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        """Handle the supplied call using this object's configured behavior."""
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return
 
-        from flaxon.http import Request
+        request_type = import_attribute("flaxon.http", "Request")
 
-        request = Request(scope, receive, None)
+        request = request_type(scope, receive, None)
 
         try:
             self.csrf.validate_request(request)
@@ -92,7 +102,9 @@ class CSRFMiddleware:
             })
             await send({
                 "type": "http.response.body",
-                "body": b'{"success":false,"error":{"code":"FX-CSRF-001","message":"CSRF validation failed"}}',
+                (
+                    "body"
+                ): b'{"success":false,"error":{"code":"FX-CSRF-001","message":"CSRF validation failed"}}',
                 "more_body": False,
             })
             return

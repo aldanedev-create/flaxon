@@ -9,7 +9,7 @@ from typing import Any
 class RetryPolicy:
     """Select retryable errors and calculate backoff delays with optional jitter."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0917 - preserve existing positional API
         self,
         max_retries: int = 3,
         delay: float = 1.0,
@@ -30,11 +30,7 @@ class RetryPolicy:
         if retry_count >= self.max_retries:
             return False
 
-        for exc_type in self.retry_on:
-            if isinstance(error, exc_type):
-                return True
-
-        return False
+        return any(isinstance(error, exc_type) for exc_type in self.retry_on)
 
     def get_delay(self, retry_count: int) -> float:
         """Calculate a backoff delay with the configured cap and optional jitter."""
@@ -55,7 +51,7 @@ class RetryPolicy:
         return retry_count + 1
 
 
-def retry(
+def retry(  # noqa: PLR0917 - preserve existing positional API
     max_retries: int = 3,
     delay: float = 1.0,
     backoff: float = 2.0,

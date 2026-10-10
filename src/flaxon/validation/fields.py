@@ -4,7 +4,7 @@ import re
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from .errors import FieldError
 from .validators import Validator, required_validator
@@ -12,7 +12,9 @@ from .validators import Validator, required_validator
 if TYPE_CHECKING:
     from .schema import Schema
 
+
 class Field:
+    """Validate and convert  field values."""
 
     def __init__(
         self,
@@ -40,9 +42,11 @@ class Field:
             self._validators.extend(validators)
 
     def bind(self, name: str) -> None:
+        """Bind the supplied values to this object's context."""
         self.name = name
 
     def deserialize(self, value: Any) -> Any:
+        """Restore a value from its serialized representation."""
         if value is None:
             if self.nullable:
                 return None
@@ -52,10 +56,12 @@ class Field:
         return value
 
     def validate(self, value: Any) -> None:
+        """Check the supplied value against the configured constraints."""
         for validator in self._validators:
             validator(value, self)
 
     def serialize(self, value: Any) -> Any:
+        """Convert the supplied value into its serialized representation."""
         return value
 
     def __repr__(self) -> str:
@@ -63,12 +69,14 @@ class Field:
 
 
 class AnyField(Field):
+    """Validate and convert any field values."""
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
 
 
 class StrField(Field):
+    """Validate and convert str field values."""
 
     def __init__(
         self,
@@ -86,6 +94,7 @@ class StrField(Field):
         self.pattern = pattern
 
     def deserialize(self, value: Any) -> str | None:
+        """Restore a value from its serialized representation."""
         value = super().deserialize(value)
         if value is None:
             return None
@@ -93,19 +102,16 @@ class StrField(Field):
             raise FieldError("Expected a string.")
         value = value.strip() if self.strip else value
         if self.min_length is not None and len(value) < self.min_length:
-            raise FieldError(
-                f"Must contain at least {self.min_length} characters."
-            )
+            raise FieldError(f"Must contain at least {self.min_length} characters.")
         if self.max_length is not None and len(value) > self.max_length:
-            raise FieldError(
-                f"Must contain no more than {self.max_length} characters."
-            )
+            raise FieldError(f"Must contain no more than {self.max_length} characters.")
         if self.pattern and not re.match(self.pattern, value):
             raise FieldError(f"Must match pattern: {self.pattern}")
         return value
 
 
 class IntField(Field):
+    """Validate and convert int field values."""
 
     def __init__(
         self,
@@ -119,6 +125,7 @@ class IntField(Field):
         self.maximum = maximum
 
     def deserialize(self, value: Any) -> int | None:
+        """Restore a value from its serialized representation."""
         value = super().deserialize(value)
         if value is None:
             return None
@@ -134,6 +141,7 @@ class IntField(Field):
 
 
 class FloatField(Field):
+    """Validate and convert float field values."""
 
     def __init__(
         self,
@@ -147,6 +155,7 @@ class FloatField(Field):
         self.maximum = maximum
 
     def deserialize(self, value: Any) -> float | None:
+        """Restore a value from its serialized representation."""
         value = super().deserialize(value)
         if value is None:
             return None
@@ -162,10 +171,13 @@ class FloatField(Field):
 
 
 class BoolField(Field):
-    TRUE_VALUES = {True, "1", "true", "True", "yes", "on", "enabled"}
-    FALSE_VALUES = {False, "0", "false", "False", "no", "off", "disabled"}
+    """Validate and convert bool field values."""
+
+    TRUE_VALUES: ClassVar[Any] = {True, "1", "true", "True", "yes", "on", "enabled"}
+    FALSE_VALUES: ClassVar[Any] = {False, "0", "false", "False", "no", "off", "disabled"}
 
     def deserialize(self, value: Any) -> bool | None:
+        """Restore a value from its serialized representation."""
         value = super().deserialize(value)
         if value is None:
             return None
@@ -179,12 +191,11 @@ class BoolField(Field):
                 return True
             if normalized in self.FALSE_VALUES:
                 return False
-        raise FieldError(
-            "Expected a boolean value (true/false, yes/no, on/off, 1/0)."
-        )
+        raise FieldError("Expected a boolean value (true/false, yes/no, on/off, 1/0).")
 
 
 class ChoiceField(Field):
+    """Validate and convert choice field values."""
 
     def __init__(
         self,
@@ -195,6 +206,7 @@ class ChoiceField(Field):
         self.choices = list(choices)
 
     def deserialize(self, value: Any) -> Any:
+        """Restore a value from its serialized representation."""
         value = super().deserialize(value)
         if value is None:
             return None
@@ -205,12 +217,15 @@ class ChoiceField(Field):
 
 
 class EmailField(StrField):
+    """Validate and convert email field values."""
+
     EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
 
     def deserialize(self, value: Any) -> str | None:
+        """Restore a value from its serialized representation."""
         value = super().deserialize(value)
         if value is not None and not self.EMAIL_RE.match(value):
             raise FieldError("Enter a valid email address.")
@@ -218,12 +233,14 @@ class EmailField(StrField):
 
 
 class DateField(Field):
+    """Validate and convert date field values."""
 
     def __init__(self, format: str = "%Y-%m-%d", **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.format = format
 
     def deserialize(self, value: Any) -> date | None:
+        """Restore a value from its serialized representation."""
         value = super().deserialize(value)
         if value is None:
             return None
@@ -233,19 +250,19 @@ class DateField(Field):
             try:
                 return datetime.strptime(value, self.format).date()
             except ValueError as exc:
-                raise FieldError(
-                    f"Expected date in format {self.format}."
-                ) from exc
+                raise FieldError(f"Expected date in format {self.format}.") from exc
         raise FieldError("Expected a date string or date object.")
 
 
 class DateTimeField(Field):
+    """Validate and convert date time field values."""
 
     def __init__(self, format: str = "%Y-%m-%dT%H:%M:%S", **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.format = format
 
     def deserialize(self, value: Any) -> datetime | None:
+        """Restore a value from its serialized representation."""
         value = super().deserialize(value)
         if value is None:
             return None
@@ -255,13 +272,12 @@ class DateTimeField(Field):
             try:
                 return datetime.strptime(value, self.format)
             except ValueError as exc:
-                raise FieldError(
-                    f"Expected datetime in format {self.format}."
-                ) from exc
+                raise FieldError(f"Expected datetime in format {self.format}.") from exc
         raise FieldError("Expected a datetime string or datetime object.")
 
 
 class DecimalField(Field):
+    """Validate and convert decimal field values."""
 
     def __init__(
         self,
@@ -277,6 +293,7 @@ class DecimalField(Field):
         self.places = places
 
     def deserialize(self, value: Any) -> Decimal | None:
+        """Restore a value from its serialized representation."""
         value = super().deserialize(value)
         if value is None:
             return None
@@ -294,8 +311,10 @@ class DecimalField(Field):
 
 
 class UUIDField(Field):
+    """Validate and convert uuid field values."""
 
     def deserialize(self, value: Any) -> uuid.UUID | None:
+        """Restore a value from its serialized representation."""
         value = super().deserialize(value)
         if value is None:
             return None
@@ -310,6 +329,7 @@ class UUIDField(Field):
 
 
 class ListField(Field):
+    """Validate and convert list field values."""
 
     def __init__(
         self,
@@ -325,6 +345,7 @@ class ListField(Field):
         self.max_items = max_items
 
     def deserialize(self, value: Any) -> list | None:
+        """Restore a value from its serialized representation."""
         value = super().deserialize(value)
         if value is None:
             return None
@@ -333,9 +354,7 @@ class ListField(Field):
         if self.min_items is not None and len(value) < self.min_items:
             raise FieldError(f"Must contain at least {self.min_items} items.")
         if self.max_items is not None and len(value) > self.max_items:
-            raise FieldError(
-                f"Must contain no more than {self.max_items} items."
-            )
+            raise FieldError(f"Must contain no more than {self.max_items} items.")
         if self.item_field:
             result = []
             for idx, item in enumerate(value):
@@ -348,12 +367,14 @@ class ListField(Field):
 
 
 class NestedField(Field):
+    """Validate and convert nested field values."""
 
     def __init__(self, schema_class: type[Schema], **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.schema_class = schema_class
 
     def deserialize(self, value: Any) -> Schema | None:
+        """Restore a value from its serialized representation."""
         value = super().deserialize(value)
         if value is None:
             return None

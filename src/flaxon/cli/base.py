@@ -2,10 +2,15 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
+
+from flaxon._imports import import_attribute, import_module
 
 
 class Command:
+    """Command implementation for the cli subsystem."""
+
     def __init__(
         self,
         name: str,
@@ -19,32 +24,41 @@ class Command:
         self.description = description
 
     def add_parser(self, subparsers: Any) -> None:
+        """Add the parser."""
         parser = subparsers.add_parser(self.name, help=self.help_text, description=self.description)
         parser.set_defaults(func=self.handler)
         self._add_arguments(parser)
 
     def _add_arguments(self, parser: argparse.ArgumentParser) -> None:
+        """Perform the  add arguments operation for command."""
         pass
 
     def run(self, args: argparse.Namespace, console: Any) -> int:
+        """Run the configured operation."""
         return self.handler(args, console)
 
 
 class CommandGroup:
+    """Command group implementation for the cli subsystem."""
+
     def __init__(self, name: str, help_text: str = "") -> None:
         self.name = name
         self.help_text = help_text
         self.commands: list[Command] = []
 
     def add(self, command: Command) -> None:
+        """Add the supplied item to this collection."""
         self.commands.append(command)
 
     def add_parser(self, subparsers: Any) -> None:
+        """Add the parser."""
         for command in self.commands:
             command.add_parser(subparsers)
 
 
 class RunCommand(Command):
+    """Run command implementation for the cli subsystem."""
+
     def __init__(self) -> None:
         super().__init__(
             name="run",
@@ -62,7 +76,7 @@ class RunCommand(Command):
 
     def _run(self, args: argparse.Namespace, console: Any) -> int:
         try:
-            import uvicorn
+            uvicorn = import_module("uvicorn")
         except ImportError:
             console.error("Uvicorn is not installed. Run: pip install uvicorn")
             return 1
@@ -79,7 +93,8 @@ class RunCommand(Command):
                 workers=args.workers,
             )
         else:
-            from flaxon.utils.import_string import import_string
+            import_string = import_attribute("flaxon.utils.import_string", "import_string")
+
             app = import_string(args.application)
             uvicorn.run(app, host=args.host, port=args.port)
 
@@ -87,6 +102,8 @@ class RunCommand(Command):
 
 
 class RoutesCommand(Command):
+    """Routes command implementation for the cli subsystem."""
+
     def __init__(self) -> None:
         super().__init__(
             name="routes",
@@ -99,7 +116,7 @@ class RoutesCommand(Command):
         parser.add_argument("application", help="Application import string, e.g., app:app")
 
     def _routes(self, args: argparse.Namespace, console: Any) -> int:
-        from flaxon.utils.import_string import import_string
+        import_string = import_attribute("flaxon.utils.import_string", "import_string")
 
         try:
             app = import_string(args.application)
@@ -127,6 +144,8 @@ class RoutesCommand(Command):
 
 
 class DoctorCommand(Command):
+    """Doctor command implementation for the cli subsystem."""
+
     def __init__(self) -> None:
         super().__init__(
             name="doctor",
@@ -139,7 +158,7 @@ class DoctorCommand(Command):
         parser.add_argument("application", help="Application import string, e.g., app:app")
 
     def _doctor(self, args: argparse.Namespace, console: Any) -> int:
-        from flaxon.utils.import_string import import_string
+        import_string = import_attribute("flaxon.utils.import_string", "import_string")
 
         try:
             app = import_string(args.application)
@@ -181,6 +200,8 @@ class DoctorCommand(Command):
 
 
 class NewCommand(Command):
+    """New command implementation for the cli subsystem."""
+
     def __init__(self) -> None:
         super().__init__(
             name="new",
@@ -194,7 +215,6 @@ class NewCommand(Command):
         parser.add_argument("--template", default="basic", help="Project template to use")
 
     def _new(self, args: argparse.Namespace, console: Any) -> int:
-        from pathlib import Path
 
         directory = Path(args.directory)
         if directory.exists():
@@ -203,8 +223,9 @@ class NewCommand(Command):
 
         console.info(f"Creating Flaxon project: {args.directory}")
 
-        from .generator import Generator
-        generator = Generator()
+        generator_type = import_attribute("flaxon.cli.generator", "Generator")
+
+        generator = generator_type()
 
         try:
             generator.generate(directory, args.template)
@@ -220,6 +241,8 @@ class NewCommand(Command):
 
 
 class GenerateCommand(Command):
+    """Generate command implementation for the cli subsystem."""
+
     def __init__(self) -> None:
         super().__init__(
             name="generate",
@@ -229,13 +252,15 @@ class GenerateCommand(Command):
         )
 
     def _add_arguments(self, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("type", choices=["controller", "schema", "service", "middleware"],
-                            help="Type of code to generate")
+        parser.add_argument(
+            "type", choices=["controller", "schema", "service", "middleware"], help="Type of code to generate"
+        )
         parser.add_argument("name", help="Name of the generated component")
 
     def _generate(self, args: argparse.Namespace, console: Any) -> int:
-        from .generator import Generator
-        generator = Generator()
+        generator_type = import_attribute("flaxon.cli.generator", "Generator")
+
+        generator = generator_type()
 
         try:
             generator.generate_component(args.type, args.name)

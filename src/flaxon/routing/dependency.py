@@ -7,6 +7,7 @@ route parameters and dependencies.
 
 from __future__ import annotations
 
+import contextlib
 import inspect
 from collections.abc import Callable
 from typing import Any, TypeVar
@@ -276,10 +277,8 @@ def inject_dependencies(
         if container.has(name):
             params[name] = container.resolve(name)
         elif annotation is not inspect.Parameter.empty:
-            try:
+            with contextlib.suppress(DependencyError):
                 params[name] = container.resolve_type(annotation)
-            except DependencyError:
-                pass
 
     return params
 

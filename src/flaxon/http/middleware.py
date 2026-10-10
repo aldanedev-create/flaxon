@@ -30,6 +30,7 @@ class RequestIDMiddleware:
         self.header_name = header_name.lower()
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        """Handle the supplied call using this object's configured behavior."""
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return
@@ -55,6 +56,7 @@ class BodyLimitMiddleware:
         self.limiter = BodyLimiter(max_size)
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        """Handle the supplied call using this object's configured behavior."""
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return
@@ -77,6 +79,7 @@ class ResponseTimeMiddleware:
         self.header_name = header_name.lower()
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        """Handle the supplied call using this object's configured behavior."""
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return

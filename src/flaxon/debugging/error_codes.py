@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 
 class ErrorCodes:
-    CODES = {
+    """Error codes implementation for the debugging subsystem."""
+
+    CODES: ClassVar[Any] = {
         "FX-HTTP-400": {
             "status": 400,
             "message": "Bad Request",
@@ -88,22 +90,29 @@ class ErrorCodes:
     }
 
     def get(self, code: str) -> dict[str, Any] | None:
+        """Retrieve the requested value using this object's configured behavior."""
         return self.CODES.get(code)
 
     def get_message(self, code: str) -> str:
+        """Return the message."""
         return self.CODES.get(code, {}).get("message", "Unknown error")
 
     def get_status(self, code: str) -> int:
+        """Return the status."""
         return self.CODES.get(code, {}).get("status", 500)
 
     def get_suggestion(self, code: str) -> str | None:
+        """Return the suggestion."""
         return self.CODES.get(code, {}).get("suggestion")
 
     def get_by_status(self, status: int) -> list[str]:
+        """Return the by status."""
         return [code for code, info in self.CODES.items() if info.get("status") == status]
 
     def register(self, code: str, status: int, message: str, suggestion: str | None = None) -> None:
+        """Perform the register operation for error codes."""
         self.CODES[code] = {"status": status, "message": message, "suggestion": suggestion}
 
     def is_valid(self, code: str) -> bool:
+        """Return whether valid holds for the current value."""
         return code in self.CODES

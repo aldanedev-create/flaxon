@@ -19,6 +19,7 @@ def run(
     log_level: str = "info",
     **kwargs: Any,
 ) -> None:
+    """Run the configured operation."""
     config = ServerConfig(
         host=host,
         port=port,
@@ -29,10 +30,7 @@ def run(
         **kwargs,
     )
 
-    if env == "production":
-        server = ProductionServer(config)
-    else:
-        server = DevelopmentServer(config)
+    server = ProductionServer(config) if env == "production" else DevelopmentServer(config)
 
     server.run(app)
 
@@ -48,6 +46,7 @@ def run_async(
     log_level: str = "info",
     **kwargs: Any,
 ) -> asyncio.Task:
+    """Perform the run async operation for this subsystem."""
     config = ServerConfig(
         host=host,
         port=port,
@@ -58,9 +57,6 @@ def run_async(
         **kwargs,
     )
 
-    if env == "production":
-        server = ProductionServer(config)
-    else:
-        server = DevelopmentServer(config)
+    server = ProductionServer(config) if env == "production" else DevelopmentServer(config)
 
     return asyncio.create_task(server.run_async(app))

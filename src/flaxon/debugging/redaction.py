@@ -1,32 +1,58 @@
 from __future__ import annotations
 
-from typing import Any
+import re
+from typing import Any, ClassVar
 
 
 class Redactor:
-    SENSITIVE_KEYS = {
-        "password", "passwd", "pwd", "secret", "token", "authorization",
-        "auth", "api_key", "apikey", "private_key", "private", "credit_card",
-        "card_number", "cvv", "ssn", "social_security", "phone", "email",
-        "address", "cookie", "set_cookie", "x_api_key", "x_apikey",
-        "bearer", "jwt", "access_token", "refresh_token",
+    """Redactor implementation for the debugging subsystem."""
+
+    SENSITIVE_KEYS: ClassVar[Any] = {
+        "password",
+        "passwd",
+        "pwd",
+        "secret",
+        "token",
+        "authorization",
+        "auth",
+        "api_key",
+        "apikey",
+        "private_key",
+        "private",
+        "credit_card",
+        "card_number",
+        "cvv",
+        "ssn",
+        "social_security",
+        "phone",
+        "email",
+        "address",
+        "cookie",
+        "set_cookie",
+        "x_api_key",
+        "x_apikey",
+        "bearer",
+        "jwt",
+        "access_token",
+        "refresh_token",
     }
 
-    SENSITIVE_PATTERNS = [
-        (r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", "[EMAIL]"),
-        (r"\b\d{3}-\d{2}-\d{4}\b", "[SSN]"),
-        (r"\b\d{4}-\d{4}-\d{4}-\d{4}\b", "[CREDIT_CARD]"),
-        (r"\b[A-Za-z0-9+/]{40,}={0,2}\b", "[TOKEN]"),
-        (r"\beyJ[A-Za-z0-9_-]+\b", "[TOKEN]"),
-        (r"\b(?:secret|token)[A-Za-z0-9_-]+\b", "[REDACTED]"),
-        (r"\b[0-9a-f]{32,}\b", "[HASH]"),
-        (r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b", "[UUID]"),
+    SENSITIVE_PATTERNS: ClassVar[Any] = [
+        ("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", "[EMAIL]"),
+        ("\\b\\d{3}-\\d{2}-\\d{4}\\b", "[SSN]"),
+        ("\\b\\d{4}-\\d{4}-\\d{4}-\\d{4}\\b", "[CREDIT_CARD]"),
+        ("\\b[A-Za-z0-9+/]{40,}={0,2}\\b", "[TOKEN]"),
+        ("\\beyJ[A-Za-z0-9_-]+\\b", "[TOKEN]"),
+        ("\\b(?:secret|token)[A-Za-z0-9_-]+\\b", "[REDACTED]"),
+        ("\\b[0-9a-f]{32,}\\b", "[HASH]"),
+        ("\\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\b", "[UUID]"),
     ]
 
     def __init__(self, enabled: bool = True) -> None:
         self.enabled = enabled
 
     def redact(self, value: Any, depth: int = 0) -> Any:
+        """Perform the redact operation for redactor."""
         if not self.enabled:
             return value
 
@@ -56,7 +82,6 @@ class Redactor:
         result = value[:1000] if truncated else value
 
         for pattern, replacement in self.SENSITIVE_PATTERNS:
-            import re
             result = re.sub(pattern, replacement, result)
 
         if truncated:
@@ -65,6 +90,7 @@ class Redactor:
         return result
 
     def redact_headers(self, headers: dict[str, str]) -> dict[str, str]:
+        """Perform the redact headers operation for redactor."""
         result = {}
         for key, value in headers.items():
             if self._is_sensitive(key):
@@ -74,7 +100,7 @@ class Redactor:
         return result
 
     def redact_url(self, url: str) -> str:
-        import re
+        """Perform the redact url operation for redactor."""
         return re.sub(r"([?&][^=]+=)[^&]+", r"\1[REDACTED]", url)
 
 
@@ -82,14 +108,17 @@ _default_redactor = Redactor()
 
 
 def redact(value: Any, enabled: bool = True) -> Any:
+    """Perform the redact operation for this subsystem."""
     if enabled:
         return _default_redactor.redact(value)
     return value
 
 
 def redact_headers(headers: dict[str, str]) -> dict[str, str]:
+    """Perform the redact headers operation for this subsystem."""
     return _default_redactor.redact_headers(headers)
 
 
 def redact_url(url: str) -> str:
+    """Perform the redact url operation for this subsystem."""
     return _default_redactor.redact_url(url)

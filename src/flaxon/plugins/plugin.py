@@ -1,17 +1,19 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, ClassVar
 
 
 class Plugin(ABC):
+    """Plugin implementation for the plugins subsystem."""
+
     __test__ = False
     name: str = ""
     version: str = "0.1.0"
     description: str = ""
     author: str = ""
-    requires: list[str] = []
-    provides: list[str] = []
+    requires: ClassVar[list[str]] = []
+    provides: ClassVar[list[str]] = []
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
@@ -24,21 +26,27 @@ class Plugin(ABC):
 
     @abstractmethod
     def setup(self, app: Any) -> None:
-        pass
+        """Configure the supplied application or resource."""
+        return
 
     def on_load(self) -> None:
-        pass
+        """Run the optional plugin load hook."""
+        return
 
     def on_unload(self) -> None:
-        pass
+        """Run the optional plugin unload hook."""
+        return
 
     def on_startup(self) -> None:
-        pass
+        """Run the optional plugin startup hook."""
+        return
 
     def on_shutdown(self) -> None:
-        pass
+        """Run the optional plugin shutdown hook."""
+        return
 
     def get_metadata(self) -> dict[str, Any]:
+        """Return the configured metadata."""
         return {
             "name": self.name,
             "version": self.version,
@@ -50,15 +58,17 @@ class Plugin(ABC):
 
 
 class SimplePlugin(Plugin):
-    def __init__(
+    """Simple plugin implementation for the plugins subsystem."""
+
+    def __init__(  # noqa: PLR0917 - preserve existing positional API
         self,
         name: str,
         setup_func: Any,
         version: str = "0.1.0",
         description: str = "",
         author: str = "",
-        requires: list[str] = None,
-        provides: list[str] = None,
+        requires: list[str] | None = None,
+        provides: list[str] | None = None,
     ) -> None:
         self.name = name
         self._setup_func = setup_func
@@ -69,4 +79,5 @@ class SimplePlugin(Plugin):
         self.provides = provides or []
 
     def setup(self, app: Any) -> None:
+        """Configure the supplied application or resource."""
         self._setup_func(app)

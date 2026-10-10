@@ -55,6 +55,7 @@ class Transaction:
             await self.close()
 
     async def begin(self) -> None:
+        """Perform the begin operation for transaction."""
         await self._prepare()
         self.depth = self.manager._transaction_depth.get()
         self._depth_token = self.manager._transaction_depth.set(self.depth + 1)
@@ -74,6 +75,7 @@ class Transaction:
         self._active = True
 
     async def commit(self) -> None:
+        """Perform the commit operation for transaction."""
         if not self._active:
             return
         if self.depth == 0:
@@ -88,6 +90,7 @@ class Transaction:
         self._active = False
 
     async def rollback(self) -> None:
+        """Perform the rollback operation for transaction."""
         if not self._active:
             return
         if self.depth == 0:
@@ -102,6 +105,7 @@ class Transaction:
         self._active = False
 
     async def close(self) -> None:
+        """Release the resources held by this object."""
         if self._owns_connection and self._connection is not None:
             await self.manager.pool.release(self._connection)
         if self._connection_token is not None:
@@ -117,10 +121,12 @@ class Transaction:
             self._depth_token = None
 
     async def _execute_raw(self, query: str, *args: Any) -> Any:
+        """Perform the  execute raw operation for transaction."""
         target = self.manager.pool if self.manager._direct else self._connection
         return await target.execute(query, *args)
 
     async def execute(self, query: str, *args: Any) -> Any:
+        """Execute the supplied operation with its parameters."""
         if not self._active:
             raise RuntimeError("Transaction not active")
         return await self._execute_raw(query, *args)
@@ -128,8 +134,10 @@ class Transaction:
 
 def transaction(func: Any) -> Any:
     """Inject a transaction into an async instance method."""
+
     async def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
         async with self._db.transaction() as current:
             kwargs["transaction"] = current
             return await func(self, *args, **kwargs)
+
     return wrapper

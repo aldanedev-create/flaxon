@@ -6,7 +6,9 @@ from flaxon.mail.message import Email
 
 
 class SMTPAdapter:
-    def __init__(
+    """Smtpadapter implementation for the mail subsystem."""
+
+    def __init__(  # noqa: PLR0917 - preserve existing positional API
         self,
         host: str = "localhost",
         port: int = 587,
@@ -25,6 +27,7 @@ class SMTPAdapter:
         self.timeout = timeout
 
     async def send(self, email: Email) -> None:
+        """Perform the send operation for smtpadapter."""
         msg = email.to_mime()
 
         if self.use_ssl:

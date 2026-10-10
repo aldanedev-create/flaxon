@@ -25,12 +25,14 @@ class DatabaseManager:
         return not hasattr(self.pool, "acquire")
 
     async def initialize(self) -> None:
+        """Prepare the configured resources for use."""
         if self._direct:
             await self.pool.connect()
         else:
             await self.pool.initialize()
 
     async def close(self) -> None:
+        """Release the resources held by this object."""
         if self._direct:
             await self.pool.disconnect()
         else:
@@ -53,15 +55,19 @@ class DatabaseManager:
             await self.pool.release(connection)
 
     async def execute(self, query: str, *args: Any) -> Any:
+        """Execute the supplied operation with its parameters."""
         return await self._call("execute", query, *args)
 
     async def fetch_one(self, query: str, *args: Any) -> dict[str, Any] | None:
+        """Fetch the one."""
         return await self._call("fetch_one", query, *args)
 
     async def fetch_all(self, query: str, *args: Any) -> list[dict[str, Any]]:
+        """Fetch the all."""
         return await self._call("fetch_all", query, *args)
 
     async def fetch_val(self, query: str, *args: Any) -> Any:
+        """Fetch the val."""
         return await self._call("fetch_val", query, *args)
 
     def transaction(self) -> Transaction:

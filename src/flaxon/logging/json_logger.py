@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
+import traceback
 from datetime import datetime
 from typing import Any
 
@@ -36,8 +37,6 @@ class JSONLogger:
         }
 
         if kwargs.get("exc_info"):
-            import traceback
-
             log_data["exception"] = traceback.format_exc()
 
         self._logger.log(level, json.dumps(log_data, default=str, ensure_ascii=False))

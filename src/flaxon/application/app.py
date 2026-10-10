@@ -14,6 +14,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from flaxon._imports import import_attribute
 from flaxon.admin import AdminConfig, AdminDashboard
 from flaxon.debugging import Dashboard, Debugger, ErrorStore
 from flaxon.dependency_injection import Container
@@ -38,6 +39,18 @@ from .lifecycle import Lifecycle
 from .state import State
 
 _UNRESOLVED = object()
+
+
+async def _documentation_response(request: Request, guard: Callable | None, build: Callable) -> Any:
+    if guard is not None:
+        result = guard(request)
+        if inspect.isawaitable(result):
+            result = await result
+        if isinstance(result, Response):
+            return result
+        if not result:
+            raise HTTPException(403, "API documentation is protected.")
+    return build()
 
 
 class Flaxon:
@@ -100,7 +113,9 @@ class Flaxon:
         self.router.route("/metrics", methods=("GET",), name="flaxon_metrics")(self._metrics_endpoint)
 
         if self.debug:
-            self.router.route("/__debug__", methods=("GET",), name="flaxon_debug_dashboard")(self._debug_dashboard)
+            self.router.route("/__debug__", methods=("GET",), name="flaxon_debug_dashboard")(
+                self._debug_dashboard
+            )
 
         # Admin & GraphQL Properties Initialization
         self._admin: AdminDashboard | None = None
@@ -115,20 +130,24 @@ class Flaxon:
     @classmethod
     def from_settings(cls, source="settings", *, openapi=True):
         """Create an ORM application from shared project settings."""
-        from flaxon.config import Settings, management_mode
-        from flaxon.db.integration import Database, DatabaseMiddleware
-        settings = Settings(source)
+        settings_type = import_attribute("flaxon.config", "Settings")
+        management_mode = import_attribute("flaxon.config", "management_mode")
+        database_type = import_attribute("flaxon.db.integration", "Database")
+        database_middleware_type = import_attribute("flaxon.db.integration", "DatabaseMiddleware")
+
+        settings = settings_type(source)
         app = cls(settings.PROJECT_NAME, debug=settings.DEBUG, config=settings.values, openapi=openapi)
         app.config.update(settings.values)
         app.settings = settings
         app.is_management = management_mode.get()
-        app.db = Database(app, settings)
+        app.db = database_type(app, settings)
         app.container.register_instance("db", app.db)
         app.on_startup(app.db.initialize)
         app.on_shutdown(app.db.close)
-        app.add_middleware(DatabaseMiddleware, database=app.db)
-        from flaxon.middleware import TrustedHostsMiddleware
-        app.add_middleware(TrustedHostsMiddleware, allowed_hosts=settings.ALLOWED_HOSTS)
+        app.add_middleware(database_middleware_type, database=app.db)
+        trusted_hosts_middleware_type = import_attribute("flaxon.middleware", "TrustedHostsMiddleware")
+
+        app.add_middleware(trusted_hosts_middleware_type, allowed_hosts=settings.ALLOWED_HOSTS)
         return app
 
     # ============================================================
@@ -160,8 +179,8 @@ class Flaxon:
     # ============================================================
 
     def mount_asgi(self, path: str, app: Any) -> None:
-        """
-        Mount a foreign ASGI application (FastAPI, Django's get_asgi_application(),
+        """Mount a foreign ASGI application (FastAPI, Django's get_asgi_application().
+
         a WSGI app wrapped with a2wsgi, etc.) at a path prefix.
 
         Unlike include_router()/Mount, which copies Flaxon-shaped routes, this
@@ -175,9 +194,11 @@ class Flaxon:
 
             fastapi_app = FastAPI()
 
+
             @fastapi_app.get("/hello")
             def hello():
                 return {"hello": "from fastapi"}
+
 
             app.mount_asgi("/fastapi", fastapi_app)
             ```
@@ -214,27 +235,39 @@ class Flaxon:
             security=security,
         )
 
-    def get(self, path: str, *, name: str | None = None, **metadata: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def get(
+        self, path: str, *, name: str | None = None, **metadata: Any
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Register a GET route."""
         return self.router.get(path, name=name, **metadata)
 
-    def post(self, path: str, *, name: str | None = None, **metadata: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def post(
+        self, path: str, *, name: str | None = None, **metadata: Any
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Register a POST route."""
         return self.router.post(path, name=name, **metadata)
 
-    def put(self, path: str, *, name: str | None = None, **metadata: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def put(
+        self, path: str, *, name: str | None = None, **metadata: Any
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Register a PUT route."""
         return self.router.put(path, name=name, **metadata)
 
-    def patch(self, path: str, *, name: str | None = None, **metadata: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def patch(
+        self, path: str, *, name: str | None = None, **metadata: Any
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Register a PATCH route."""
         return self.router.patch(path, name=name, **metadata)
 
-    def delete(self, path: str, *, name: str | None = None, **metadata: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def delete(
+        self, path: str, *, name: str | None = None, **metadata: Any
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Register a DELETE route."""
         return self.router.delete(path, name=name, **metadata)
 
-    def websocket(self, path: str, *, name: str | None = None) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def websocket(
+        self, path: str, *, name: str | None = None
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Register a WebSocket route."""
         return self.router.websocket(path, name=name)
 
@@ -257,7 +290,7 @@ class Flaxon:
 
     def use_teloce(self, **options: Any) -> Any:
         """Enable optional Teloce HTML SPA compilation and asset serving."""
-        from flaxon.teloce import install_teloce
+        install_teloce = import_attribute("flaxon.teloce", "install_teloce")
 
         return install_teloce(self, **options)
 
@@ -265,7 +298,7 @@ class Flaxon:
     # ADMIN METHODS
     # ============================================================
 
-    def enable_openapi(
+    def enable_openapi(  # noqa: PLR0917 - preserve existing positional API
         self,
         title: str = "Flaxon API",
         version: str = "1.0.0",
@@ -281,12 +314,14 @@ class Flaxon:
         swagger_asset_url: str = "https://unpkg.com/swagger-ui-dist@5",
         redoc_asset_url: str = "https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js",
     ) -> Any:
+        """Enable OpenAPI documentation derived from routes, docstrings, and schemas.
+
+        Customize the returned generator when the inferred descriptions need
+        additional application-specific details.
         """
-        Enable auto-generated OpenAPI docs, derived from your routes, endpoint
-        docstrings, and Schema-typed parameters -- no hand-written descriptions
-        required, though you can still customize the returned generator further.
-        """
-        from flaxon.openapi import OpenAPIGenerator, ReDoc, SwaggerUI
+        open_apigenerator_type = import_attribute("flaxon.openapi", "OpenAPIGenerator")
+        re_doc_type = import_attribute("flaxon.openapi", "ReDoc")
+        swagger_ui_type = import_attribute("flaxon.openapi", "SwaggerUI")
 
         if self._openapi_generator is not None:
             return self._openapi_generator
@@ -295,52 +330,50 @@ class Flaxon:
         if protect_docs and docs_guard is None:
             raise ConfigurationError("protect_docs=True requires a docs_guard callback.")
 
-        self._openapi_generator = OpenAPIGenerator(
+        self._openapi_generator = open_apigenerator_type(
             title=title,
             version=version,
             description=description,
         )
 
-        async def guarded(request: Request) -> Response | None:
-            if docs_guard is None:
-                return None
-            result = docs_guard(request)
-            if inspect.isawaitable(result):
-                result = await result
-            if isinstance(result, Response):
-                return result
-            if not result:
-                raise HTTPException(403, "API documentation is protected.")
-            return None
-
         @self.router.get(openapi_url, name="flaxon_openapi_spec")
         async def openapi_spec(request: Request) -> Any:
-            from flaxon.http import JSONResponse
-            denied = await guarded(request)
-            if denied is not None:
-                return denied
-            return JSONResponse(self._openapi_generator.generate_from_app(self, include_internal=include_internal))
+            jsonresponse_type = import_attribute("flaxon.http", "JSONResponse")
+
+            return await _documentation_response(
+                request,
+                docs_guard,
+                lambda: jsonresponse_type(
+                    self._openapi_generator.generate_from_app(self, include_internal=include_internal)
+                ),
+            )
 
         if docs_url:
+
             @self.router.get(docs_url, name="flaxon_swagger_docs")
             async def swagger_docs(request: Request) -> Any:
-                denied = await guarded(request)
-                if denied is not None:
-                    return denied
-                return SwaggerUI(
-                    openapi_url=openapi_url,
-                    title=title,
-                    asset_url=swagger_asset_url,
-                    persist_authorization=persist_authorization,
-                ).render()
+                return await _documentation_response(
+                    request,
+                    docs_guard,
+                    lambda: swagger_ui_type(
+                        openapi_url=openapi_url,
+                        title=title,
+                        asset_url=swagger_asset_url,
+                        persist_authorization=persist_authorization,
+                    ).render(),
+                )
 
         if redoc_url:
+
             @self.router.get(redoc_url, name="flaxon_redoc_docs")
             async def redoc_docs(request: Request) -> Any:
-                denied = await guarded(request)
-                if denied is not None:
-                    return denied
-                return ReDoc(openapi_url=openapi_url, title=title, asset_url=redoc_asset_url).render()
+                return await _documentation_response(
+                    request,
+                    docs_guard,
+                    lambda: re_doc_type(
+                        openapi_url=openapi_url, title=title, asset_url=redoc_asset_url
+                    ).render(),
+                )
 
         return self._openapi_generator
 
@@ -376,7 +409,7 @@ class Flaxon:
         AdminDashboard and CMS try to mount the shared admin static
         folder) only registers the route once.
         """
-        from flaxon.static import StaticFiles
+        static_files_type = import_attribute("flaxon.static", "StaticFiles")
 
         prefix = url_prefix.rstrip("/")
         route_path = f"{prefix}/<path:filepath>"
@@ -384,13 +417,14 @@ class Flaxon:
         if any(getattr(route, "path", None) == route_path for route in self.router.routes):
             return
 
-        handler = StaticFiles(directory, cache_control=cache_control)
+        handler = static_files_type(directory, cache_control=cache_control)
 
         @self.router.get(route_path)
         async def static_handler(request: Request, filepath: str) -> Response:
             return await handler(request, filepath)
 
-    def enable_graphql(        self,
+    def enable_graphql(
+        self,
         schema: GraphQLSchema | None = None,
         url: str = "/graphql",
         enable_playground: bool = True,
@@ -502,15 +536,13 @@ class Flaxon:
             request = Request(scope, receive, self)
             response = await self.debugger.response_for(exc, request, scope)
             if self.debug:
-                self.error_store.store(
-                    {
-                        "error_id": str(uuid.uuid4()),
-                        "type": type(exc).__name__,
-                        "message": str(exc),
-                        "path": str(scope.get("path", "")),
-                        "timestamp": time.time(),
-                    }
-                )
+                self.error_store.store({
+                    "error_id": str(uuid.uuid4()),
+                    "type": type(exc).__name__,
+                    "message": str(exc),
+                    "path": str(scope.get("path", "")),
+                    "timestamp": time.time(),
+                })
             await response(scope, receive, send)
 
     async def _dispatch(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
@@ -521,7 +553,7 @@ class Flaxon:
             for prefix, mounted_app in self._asgi_mounts:
                 if path == prefix or path.startswith(f"{prefix}/"):
                     sub_scope = dict(scope)
-                    sub_scope["path"] = path[len(prefix):] or "/"
+                    sub_scope["path"] = path[len(prefix) :] or "/"
                     sub_scope["root_path"] = scope.get("root_path", "") + prefix
                     await mounted_app(sub_scope, receive, send)
                     return
@@ -553,22 +585,22 @@ class Flaxon:
         try:
             matched = self.router.match(request.path, request.method)
             request.path_params = matched.params
-            result = await self._invoke(matched.route.endpoint, request, matched.params, matched.route.execution_plan)
+            result = await self._invoke(
+                matched.route.endpoint, request, matched.params, matched.route.execution_plan
+            )
             response = Response.from_value(result, json_mode=self.json_mode)
         except HTTPException as exc:
             response = JSONResponse(exc.to_dict(), status_code=exc.status_code)
         except Exception as exc:
             response = await self.debugger.response_for(exc, request, scope)
             if self.debug:
-                self.error_store.store(
-                    {
-                        "error_id": str(scope.get("flaxon.request_id") or uuid.uuid4()),
-                        "type": type(exc).__name__,
-                        "message": str(exc),
-                        "path": request.path,
-                        "timestamp": time.time(),
-                    }
-                )
+                self.error_store.store({
+                    "error_id": str(scope.get("flaxon.request_id") or uuid.uuid4()),
+                    "type": type(exc).__name__,
+                    "message": str(exc),
+                    "path": request.path,
+                    "timestamp": time.time(),
+                })
 
         # Save session header updates
         session = request._session
@@ -583,8 +615,13 @@ class Flaxon:
 
         await response(scope, receive, send)
 
-    async def _invoke(self, endpoint: Callable[..., Any], request: Request | WebSocket,
-                      params: dict[str, Any], plan: EndpointPlan | None = None) -> Any:
+    async def _invoke(
+        self,
+        endpoint: Callable[..., Any],
+        request: Request | WebSocket,
+        params: dict[str, Any],
+        plan: EndpointPlan | None = None,
+    ) -> Any:
         plan = plan or EndpointPlan.prepare(endpoint)
         container_kwargs = self.container._resolver.resolve_plan(plan)
         kwargs: dict[str, Any] = {}
@@ -599,7 +636,9 @@ class Flaxon:
                 kwargs[name] = self._resolve_query_parameter(request, name, annotation, parameter.default)
             elif isinstance(request, Request) and is_scalar_query(annotation):
                 default = MISSING if parameter.default is inspect.Parameter.empty else parameter.default
-                kwargs[name] = self._resolve_query_parameter(request, name, annotation, Query(default=default))
+                kwargs[name] = self._resolve_query_parameter(
+                    request, name, annotation, Query(default=default)
+                )
             else:
                 body_value = await self._resolve_body_parameter(request, annotation)
                 if body_value is not _UNRESOLVED:
@@ -612,7 +651,9 @@ class Flaxon:
         return await result if inspect.isawaitable(result) else result
 
     @staticmethod
-    def _resolve_query_parameter(request: Request | WebSocket, name: str, annotation: Any, declaration: Query) -> Any:
+    def _resolve_query_parameter(
+        request: Request | WebSocket, name: str, annotation: Any, declaration: Query
+    ) -> Any:
         """Read and coerce a declared query parameter without extra dependencies."""
         if not isinstance(request, Request):
             if declaration.default is MISSING:
@@ -632,33 +673,42 @@ class Flaxon:
             target = next((item for item in typing.get_args(target) if item is not type(None)), str)
         converted: Any
         try:
-            if target is bool:
-                normalized = str(value).strip().lower()
-                if normalized in {"1", "true", "yes", "on"}:
-                    converted = True
-                elif normalized in {"0", "false", "no", "off"}:
-                    converted = False
-                else:
-                    raise ValueError("expected a boolean")
-            elif target is int:
-                converted = int(value)
-            elif target is float:
-                converted = float(value)
-            elif target is str or target is inspect.Parameter.empty or target is Any:
-                converted = value
-            else:
-                converted = target(value)
-            if declaration.ge is not None and converted < declaration.ge:
-                raise ValueError(f"must be greater than or equal to {declaration.ge}")
-            if declaration.le is not None and converted > declaration.le:
-                raise ValueError(f"must be less than or equal to {declaration.le}")
-            if declaration.min_length is not None and len(converted) < declaration.min_length:
-                raise ValueError(f"must contain at least {declaration.min_length} characters")
-            if declaration.max_length is not None and len(converted) > declaration.max_length:
-                raise ValueError(f"must contain no more than {declaration.max_length} characters")
+            converted = Flaxon._coerce_query_value(value, target)
+            Flaxon._validate_query_constraints(converted, declaration)
             return converted
         except (TypeError, ValueError) as exc:
             raise ValidationError({name: [f"Invalid value for query parameter '{key}'."]}) from exc
+
+    @staticmethod
+    def _coerce_query_value(value: Any, target: Any) -> Any:
+        if target is bool:
+            normalized = str(value).strip().lower()
+            if normalized in {"1", "true", "yes", "on"}:
+                converted = True
+            elif normalized in {"0", "false", "no", "off"}:
+                converted = False
+            else:
+                raise ValueError("expected a boolean")
+        elif target is int:
+            converted = int(value)
+        elif target is float:
+            converted = float(value)
+        elif target is str or target is inspect.Parameter.empty or target is Any:
+            converted = value
+        else:
+            converted = target(value)
+        return converted
+
+    @staticmethod
+    def _validate_query_constraints(converted: Any, declaration: Query) -> None:
+        if declaration.ge is not None and converted < declaration.ge:
+            raise ValueError(f"must be greater than or equal to {declaration.ge}")
+        if declaration.le is not None and converted > declaration.le:
+            raise ValueError(f"must be less than or equal to {declaration.le}")
+        if declaration.min_length is not None and len(converted) < declaration.min_length:
+            raise ValueError(f"must contain at least {declaration.min_length} characters")
+        if declaration.max_length is not None and len(converted) > declaration.max_length:
+            raise ValueError(f"must contain no more than {declaration.max_length} characters")
 
     async def _resolve_body_parameter(self, request: Request | WebSocket, annotation: Any) -> Any:
         """Resolve an optional Pydantic or native Flaxon body schema."""
@@ -685,15 +735,13 @@ class Flaxon:
             if self.debug:
                 print(f"\n--- Unhandled WebSocket error on {scope.get('path')} ---")
                 traceback.print_exc()
-                self.error_store.store(
-                    {
-                        "error_id": str(uuid.uuid4()),
-                        "type": type(exc).__name__,
-                        "message": str(exc),
-                        "path": str(scope.get("path", "")),
-                        "timestamp": time.time(),
-                    }
-                )
+                self.error_store.store({
+                    "error_id": str(uuid.uuid4()),
+                    "type": type(exc).__name__,
+                    "message": str(exc),
+                    "path": str(scope.get("path", "")),
+                    "timestamp": time.time(),
+                })
             await socket.close(code=1011, reason="Internal server error")
 
     async def _handle_lifespan(self, receive: Any, send: Any) -> None:

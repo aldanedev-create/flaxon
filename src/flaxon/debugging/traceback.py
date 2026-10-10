@@ -6,13 +6,17 @@ from typing import Any
 
 
 class TracebackFormatter:
+    """Traceback formatter implementation for the debugging subsystem."""
+
     def __init__(self) -> None:
         self._max_frames = 20
 
     def format(self, exc: Exception) -> str:
+        """Perform the format operation for traceback formatter."""
         return "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
 
     def format_frames(self, exc: Exception) -> list[dict[str, Any]]:
+        """Format the frames."""
         frames = []
         tb = exc.__traceback__
 
@@ -58,9 +62,11 @@ class TracebackFormatter:
         return locals_dict
 
     def format_simple(self, exc: Exception) -> str:
+        """Format the simple."""
         return f"{type(exc).__name__}: {exc!s}"
 
     def get_summary(self, exc: Exception) -> dict[str, Any]:
+        """Return the summary."""
         tb = exc.__traceback__
         last_frame = None
 

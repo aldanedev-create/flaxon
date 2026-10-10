@@ -16,6 +16,7 @@ class RequestIDMiddleware(Middleware):
         self.header_name = header_name.lower().encode("latin-1")
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        """Handle the supplied call using this object's configured behavior."""
         request_id = next(
             (
                 value.decode("latin-1")

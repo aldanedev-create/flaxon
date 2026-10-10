@@ -9,6 +9,8 @@ from flaxon.sessions.session import Session
 
 
 class SignedCookieBackend:
+    """Provide signed cookie storage for sessions operations."""
+
     def __init__(self, secret_key: str, ttl: int = 86400) -> None:
         self.secret_key = secret_key.encode()
         self.ttl = ttl
@@ -21,16 +23,22 @@ class SignedCookieBackend:
         return hmac.compare_digest(expected, signature)
 
     def encode_session(self, session: Session) -> str:
-        data = json.dumps({
-            "id": session.id,
-            "data": session.to_dict(),
-            "ttl": session.ttl,
-            "created_at": session.created_at,
-        }, default=str, ensure_ascii=False)
+        """Encode the session."""
+        data = json.dumps(
+            {
+                "id": session.id,
+                "data": session.to_dict(),
+                "ttl": session.ttl,
+                "created_at": session.created_at,
+            },
+            default=str,
+            ensure_ascii=False,
+        )
         signature = self._sign(data)
         return f"{data}.{signature}"
 
     def decode_session(self, cookie_value: str) -> Session | None:
+        """Decode the session."""
         try:
             parts = cookie_value.rsplit(".", 1)
             if len(parts) != 2:
@@ -57,16 +65,21 @@ class SignedCookieBackend:
             return None
 
     async def save(self, session: Session) -> None:
+        """Persist the supplied value using the configured storage."""
         pass
 
     async def get(self, session_id: str) -> Session | None:
+        """Retrieve the requested value using this object's configured behavior."""
         return None
 
     async def delete(self, session_id: str) -> None:
+        """Delete the specified entry from the configured store."""
         pass
 
     async def clear(self) -> None:
+        """Remove the stored entries."""
         pass
 
     async def exists(self, session_id: str) -> bool:
+        """Return whether the requested entry exists."""
         return False

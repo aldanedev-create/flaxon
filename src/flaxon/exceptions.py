@@ -9,7 +9,7 @@ class FlaxonError(Exception):
     """Base class for framework errors."""
 
 
-class HTTPException(FlaxonError):
+class HTTPExceptionError(FlaxonError):
     """An exception that can be rendered as an HTTP response."""
 
     def __init__(
@@ -31,6 +31,10 @@ class HTTPException(FlaxonError):
         payload: dict[str, Any] = {"code": self.code, "message": self.detail}
         payload.update(self.extra)
         return {"error": payload}
+
+
+# Preserve the established public exception import.
+HTTPException = HTTPExceptionError
 
 
 class NotFound(HTTPException):

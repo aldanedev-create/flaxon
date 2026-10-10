@@ -6,6 +6,8 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
+from flaxon._imports import import_module
+
 from .decoder import Decoder
 from .encoder import Encoder
 from .types import SerializationError
@@ -14,13 +16,10 @@ from .types import SerializationError
 def _get_msgpack():
     """Lazy import for optional msgpack dependency."""
     try:
-        import msgpack
+        return import_module("msgpack")
 
-        return msgpack
     except ImportError as exc:
-        raise RuntimeError(
-            "msgpack is required. Install with: pip install msgpack"
-        ) from exc
+        raise RuntimeError("msgpack is required. Install with: pip install msgpack") from exc
 
 
 class MsgPackEncoder(Encoder):
@@ -47,9 +46,7 @@ class MsgPackEncoder(Encoder):
             return value.to_dict()
         if hasattr(value, "__dataclass_fields__"):
             return {k: getattr(value, k) for k in value.__dataclass_fields__}
-        raise TypeError(
-            f"Object of type {type(value).__name__} is not MessagePack serializable"
-        )
+        raise TypeError(f"Object of type {type(value).__name__} is not MessagePack serializable")
 
 
 class MsgPackDecoder(Decoder):

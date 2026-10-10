@@ -241,39 +241,31 @@ class WebSocketEvents:
         self._leave_handlers.append(func)
         return func
 
-    async def run(self) -> None:
-        """Run the event loop for the WebSocket connection."""
-        try:
-            await self.socket.accept()
+    async def _call_handlers(self, handlers, value):
+        for handler in handlers:
+            result = handler(value)
+            if asyncio.iscoroutine(result):
+                await result
 
-            for handler in self._connect_handlers:
-                result = handler(self.socket)
+    async def _handle_message(self, data):
+        for handler in self._message_handlers:
+            try:
+                result = handler(data)
                 if asyncio.iscoroutine(result):
                     await result
+            except Exception as exc:
+                await self._call_handlers(self._error_handlers, exc)
 
+    async def run(self) -> None:
+        """Run connection handlers, deliver messages, and always report disconnection."""
+        try:
+            await self.socket.accept()
+            await self._call_handlers(self._connect_handlers, self.socket)
             async for raw in self.socket:
                 data = raw.get("text") if isinstance(raw, dict) else getattr(raw, "text", raw)
                 if data is not None:
-                    for handler in self._message_handlers:
-                        try:
-                            result = handler(data)
-                            if asyncio.iscoroutine(result):
-                                await result
-                        except Exception as exc:
-                            for error_handler in self._error_handlers:
-                                result = error_handler(exc)
-                                if asyncio.iscoroutine(result):
-                                    await result
-
+                    await self._handle_message(data)
         except Exception as exc:
-            for handler in self._error_handlers:
-                result = handler(exc)
-                if asyncio.iscoroutine(result):
-                    await result
-
+            await self._call_handlers(self._error_handlers, exc)
         finally:
-            close_code = getattr(self.socket, "_close_code", 1000)
-            for handler in self._disconnect_handlers:
-                result = handler(close_code)
-                if asyncio.iscoroutine(result):
-                    await result
+            await self._call_handlers(self._disconnect_handlers, getattr(self.socket, "_close_code", 1000))

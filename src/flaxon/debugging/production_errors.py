@@ -8,10 +8,13 @@ from flaxon.http import JSONResponse, Response
 
 
 class ProductionErrorHandler:
+    """Production error handler implementation for the debugging subsystem."""
+
     def __init__(self, error_store: Any) -> None:
         self.error_store = error_store
 
     async def handle(self, exc: Exception, request: Any | None, scope: dict[str, Any]) -> Response:
+        """Process the supplied request or event."""
         error_id = f"fx_{uuid.uuid4().hex[:12]}"
         request_id = scope.get("flaxon.request_id", error_id)
 
@@ -39,7 +42,9 @@ class ProductionErrorHandler:
         )
 
     def get_error_report(self, error_id: str) -> dict[str, Any] | None:
+        """Return the error report."""
         return self.error_store.get(error_id)
 
     def get_recent_errors(self, limit: int = 50) -> list[dict[str, Any]]:
+        """Return the recent errors."""
         return self.error_store.get_recent(limit)

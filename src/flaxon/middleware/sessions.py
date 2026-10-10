@@ -10,6 +10,7 @@ import hashlib
 import hmac
 import json
 import time
+import uuid
 from typing import Any
 
 from .base import Middleware
@@ -52,53 +53,65 @@ class Session:
         return key in self._data
 
     def get(self, key: str, default: Any = None) -> Any:
+        """Retrieve the requested value using this object's configured behavior."""
         return self._data.get(key, default)
 
     def setdefault(self, key: str, default: Any) -> Any:
+        """Perform the setdefault operation for session."""
         if key not in self._data:
             self._data[key] = default
             self._dirty = True
         return self._data[key]
 
     def update(self, data: dict[str, Any]) -> None:
+        """Apply the supplied changes to the requested entry."""
         self._data.update(data)
         self._dirty = True
 
     def clear(self) -> None:
+        """Remove the stored entries."""
         self._data.clear()
         self._dirty = True
 
     def pop(self, key: str, default: Any = None) -> Any:
+        """Perform the pop operation for session."""
         value = self._data.pop(key, default)
         self._dirty = True
         return value
 
     def keys(self) -> list[str]:
+        """Return the available keys."""
         return list(self._data.keys())
 
     def values(self) -> list[Any]:
+        """Return the stored values."""
         return list(self._data.values())
 
     def items(self) -> list[tuple[str, Any]]:
+        """Return the available key/value pairs."""
         return list(self._data.items())
 
     def is_expired(self) -> bool:
+        """Return whether expired holds for the current value."""
         return time.time() - self._created > self.ttl
 
     def is_dirty(self) -> bool:
+        """Return whether dirty holds for the current value."""
         return self._dirty
 
     def mark_clean(self) -> None:
+        """Mark the clean."""
         self._dirty = False
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a dictionary representation of the current value."""
         return dict(self._data)
 
 
 class SessionMiddleware(Middleware):
     """Session middleware."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0917 - preserve existing positional API
         self,
         app: Any,
         secret_key: str,
@@ -146,10 +159,11 @@ class SessionMiddleware(Middleware):
             return None
 
     def _get_session_id(self) -> str:
-        import uuid
+
         return uuid.uuid4().hex[:32]
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        """Handle the supplied call using this object's configured behavior."""
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return
@@ -184,21 +198,20 @@ class SessionMiddleware(Middleware):
         scope["session"] = session
 
         async def send_wrapper(message: dict[str, Any]) -> None:
-            if message["type"] == "http.response.start":
-                if session.is_dirty():
-                    cookie_value = self._encode_session(session)
-                    headers = list(message.get("headers", []))
-                    cookie_header = (
-                        f"{self.cookie_name}={cookie_value}; "
-                        f"Path=/; Max-Age={session.ttl}; "
-                        f"SameSite={session.samesite.capitalize()}"
-                    )
-                    if session.secure:
-                        cookie_header += "; Secure"
-                    if session.httponly:
-                        cookie_header += "; HttpOnly"
-                    headers.append((b"set-cookie", cookie_header.encode("latin-1")))
-                    message["headers"] = headers
+            if message["type"] == "http.response.start" and session.is_dirty():
+                cookie_value = self._encode_session(session)
+                headers = list(message.get("headers", []))
+                cookie_header = (
+                    f"{self.cookie_name}={cookie_value}; "
+                    f"Path=/; Max-Age={session.ttl}; "
+                    f"SameSite={session.samesite.capitalize()}"
+                )
+                if session.secure:
+                    cookie_header += "; Secure"
+                if session.httponly:
+                    cookie_header += "; HttpOnly"
+                headers.append((b"set-cookie", cookie_header.encode("latin-1")))
+                message["headers"] = headers
             await send(message)
 
         await self.app(scope, receive, send_wrapper)
@@ -207,7 +220,8 @@ class SessionMiddleware(Middleware):
         cookies: dict[str, str] = {}
         for key, value in scope.get("headers", []):
             if key.lower() == b"cookie":
-                for cookie in value.decode("latin-1").split(";"):
+                for raw_cookie in value.decode("latin-1").split(";"):
+                    cookie = raw_cookie
                     cookie = cookie.strip()
                     if "=" in cookie:
                         k, v = cookie.split("=", 1)

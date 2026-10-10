@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import os
 
+from flaxon._imports import import_attribute, import_module
+
 
 class S3StorageAdapter:
-    def __init__(
+    """S3 storage adapter implementation for the files subsystem."""
+
+    def __init__(  # noqa: PLR0917 - preserve existing positional API
         self,
         bucket: str,
         access_key: str | None = None,
@@ -22,14 +26,16 @@ class S3StorageAdapter:
         self._client = None
 
     async def connect(self) -> None:
+        """Open the configured connection."""
         try:
-            import aioboto3
+            aioboto3 = import_module("aioboto3")
 
             self._client = aioboto3.Session()
         except ImportError as exc:
             raise RuntimeError("aioboto3 is required. Install with: pip install aioboto3") from exc
 
     async def disconnect(self) -> None:
+        """Close the configured connection."""
         self._client = None
 
     async def _get_client(self):
@@ -38,6 +44,7 @@ class S3StorageAdapter:
         return self._client
 
     async def write(self, path: str, data: bytes, content_type: str | None = None) -> None:
+        """Perform the write operation for s3 storage adapter."""
         session = await self._get_client()
         async with session.client(
             "s3",
@@ -58,6 +65,7 @@ class S3StorageAdapter:
             )
 
     async def read(self, path: str) -> bytes:
+        """Perform the read operation for s3 storage adapter."""
         session = await self._get_client()
         async with session.client(
             "s3",
@@ -70,6 +78,7 @@ class S3StorageAdapter:
             return await response["Body"].read()
 
     async def delete(self, path: str) -> bool:
+        """Delete the specified entry from the configured store."""
         session = await self._get_client()
         async with session.client(
             "s3",
@@ -83,7 +92,7 @@ class S3StorageAdapter:
 
     async def exists(self, path: str) -> bool:
         """Check existence, propagating permission and backend failures."""
-        from botocore.exceptions import ClientError
+        client_error_type = import_attribute("botocore.exceptions", "ClientError")
 
         session = await self._get_client()
         async with session.client(
@@ -96,13 +105,14 @@ class S3StorageAdapter:
             try:
                 await s3.head_object(Bucket=self.bucket, Key=path)
                 return True
-            except ClientError as exc:
+            except client_error_type as exc:
                 code = str(exc.response.get("Error", {}).get("Code", ""))
                 if code in {"404", "NoSuchKey", "NotFound"}:
                     return False
                 raise
 
     async def size(self, path: str) -> int:
+        """Perform the size operation for s3 storage adapter."""
         session = await self._get_client()
         async with session.client(
             "s3",
@@ -115,6 +125,7 @@ class S3StorageAdapter:
             return response.get("ContentLength", 0)
 
     async def list(self, prefix: str = "") -> list[str]:
+        """Return the matching entries."""
         session = await self._get_client()
         async with session.client(
             "s3",
@@ -136,6 +147,7 @@ class S3StorageAdapter:
                 request["ContinuationToken"] = token
 
     def get_url(self, path: str) -> str:
+        """Return the url."""
         if self.public_url:
             return f"{self.public_url}/{path}"
         return f"https://{self.bucket}.s3.{self.region}.amazonaws.com/{path}"

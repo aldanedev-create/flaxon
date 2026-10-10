@@ -4,20 +4,28 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class WebSocketState(str, Enum):
+class WebSocketState(StrEnum):
     """Connection lifecycle state."""
 
     CONNECTING = "connecting"
     CONNECTED = "connected"
     DISCONNECTED = "disconnected"
 
+    def __str__(self) -> str:
+        """Preserve the established Enum string representation."""
+        return f"{type(self).__name__}.{self.name}"
 
-class WebSocketDisconnect(Exception):
+
+class WebSocketDisconnectError(Exception):
     """Raised when a peer disconnects."""
+
+
+# Preserve the established public exception import.
+WebSocketDisconnect = WebSocketDisconnectError
 
 
 class WebSocket:

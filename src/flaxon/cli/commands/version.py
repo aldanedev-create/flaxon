@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import argparse
+import platform
+import sys
 from typing import Any
 
+from flaxon._imports import import_attribute
 from flaxon.cli.base import Command
 
 
 class VersionCommand(Command):
+    """Version command implementation for the cli subsystem."""
+
     def __init__(self) -> None:
         super().__init__(
             name="version",
@@ -19,7 +24,7 @@ class VersionCommand(Command):
         parser.add_argument("--short", action="store_true", help="Show only version number")
 
     def _run(self, args: argparse.Namespace, console: Any) -> int:
-        from flaxon import __version__
+        __version__ = import_attribute("flaxon", "__version__")
 
         if args.short:
             print(__version__)
@@ -27,8 +32,6 @@ class VersionCommand(Command):
             console.info(f"Flaxon version: {__version__}")
 
             try:
-                import platform
-                import sys
                 console.info(f"Python: {sys.version}")
                 console.info(f"Platform: {platform.platform()}")
             except OSError:

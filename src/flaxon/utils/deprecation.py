@@ -14,6 +14,7 @@ def deprecated(
     removal_version: str | None = None,
 ) -> Callable[[T], T]:
     """Mark a function as deprecated."""
+
     def decorator(func: T) -> T:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -24,7 +25,9 @@ def deprecated(
                 msg += f" and will be removed in version {removal_version}"
             warnings.warn(msg, DeprecationWarning, stacklevel=2)
             return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -35,6 +38,7 @@ def deprecated_parameter(
     removal_version: str | None = None,
 ) -> Callable[[T], T]:
     """Mark a function parameter as deprecated."""
+
     def decorator(func: T) -> T:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -46,7 +50,9 @@ def deprecated_parameter(
                     msg += f" and will be removed in version {removal_version}"
                 warnings.warn(msg, DeprecationWarning, stacklevel=2)
             return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -59,6 +65,7 @@ class DeprecatedMeta(type):
     """Metaclass that warns when a deprecated class is instantiated."""
 
     def __call__(cls, *args: Any, **kwargs: Any) -> Any:
+        """Handle the supplied call using this object's configured behavior."""
         warnings.warn(
             f"{cls.__name__} is deprecated",
             DeprecationWarning,

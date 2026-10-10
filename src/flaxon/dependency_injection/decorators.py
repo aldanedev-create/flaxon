@@ -26,9 +26,8 @@ def inject(container: Container | None = None) -> Callable[[F], F]:
 
                 if hasattr(param.annotation, "__name__"):
                     dep_name = param.annotation.__name__
-                    if container and container.has(dep_name):
-                        if name not in kwargs:
-                            kwargs[name] = container.get(dep_name)
+                    if container and container.has(dep_name) and name not in kwargs:
+                        kwargs[name] = container.get(dep_name)
 
             return func(*args, **kwargs)
 
@@ -68,11 +67,10 @@ def autowire(container: Container) -> Callable[[F], F]:
                 if name not in kwargs and name not in bound_args.arguments:
                     annotation = param.annotation
 
-                    if annotation is not inspect.Parameter.empty:
-                        if hasattr(annotation, "__name__"):
-                            dep_name = annotation.__name__
-                            if container.has(dep_name):
-                                kwargs[name] = container.get(dep_name)
+                    if annotation is not inspect.Parameter.empty and hasattr(annotation, "__name__"):
+                        dep_name = annotation.__name__
+                        if container.has(dep_name):
+                            kwargs[name] = container.get(dep_name)
 
             return func(*args, **kwargs)
 

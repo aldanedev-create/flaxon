@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, ClassVar
 
 
 def _coerce(value: str) -> Any:
@@ -43,7 +43,7 @@ class Config(dict[str, Any]):
         3. Environment variables (prefixed with FLAXON_)
     """
 
-    DEFAULTS: dict[str, Any] = {
+    DEFAULTS: ClassVar[dict[str, Any]] = {
         "ENV": "development",
         "DEBUG": False,
         "SECRET_KEY": None,
@@ -67,7 +67,7 @@ class Config(dict[str, Any]):
 
         for key, value in os.environ.items():
             if key.startswith(prefix):
-                config_key = key[len(prefix):]
+                config_key = key[len(prefix) :]
                 self[config_key] = value if config_key == "SECRET_KEY" else _coerce(value)
 
     def __getattr__(self, name: str) -> Any:
@@ -76,8 +76,7 @@ class Config(dict[str, Any]):
             return self[name]
         except KeyError as exc:
             raise AttributeError(
-                f"Configuration has no attribute '{name}'. "
-                f"Available keys: {', '.join(self.keys())}"
+                f"Configuration has no attribute '{name}'. Available keys: {', '.join(self.keys())}"
             ) from exc
 
     def __setattr__(self, name: str, value: Any) -> None:

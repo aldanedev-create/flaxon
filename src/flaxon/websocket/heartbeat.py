@@ -8,6 +8,7 @@ to detect and handle dead connections.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import time
 from typing import Any
@@ -79,10 +80,8 @@ class Heartbeat:
             task = self._tasks.pop(socket, None)
             if task:
                 task.cancel()
-                try:
+                with contextlib.suppress(asyncio.CancelledError):
                     await task
-                except asyncio.CancelledError:
-                    pass
 
             self._last_pong.pop(socket, None)
 
@@ -162,10 +161,11 @@ class HeartbeatMiddleware:
             while True:
                 try:
                     message = await receive()
-                    if message.get("type") == "websocket.receive":
-                        if "text" in message and message["text"] == "pong":
-                            self.heartbeat.pong_received(socket)
-                            continue
+                    if message.get("type") == "websocket.receive" and (
+                        "text" in message and message["text"] == "pong"
+                    ):
+                        self.heartbeat.pong_received(socket)
+                        continue
                     return message
                 except WebSocketDisconnect:
                     await self.heartbeat.stop(socket)

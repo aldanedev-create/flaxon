@@ -31,6 +31,7 @@ class LoggingMiddleware(Middleware):
         self.log_level = log_level
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        """Handle the supplied call using this object's configured behavior."""
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return

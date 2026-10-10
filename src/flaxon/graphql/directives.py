@@ -4,6 +4,8 @@ from typing import Any
 
 
 class Directive:
+    """Directive implementation for the graphql subsystem."""
+
     def __init__(
         self,
         name: str,
@@ -17,10 +19,13 @@ class Directive:
         self.args = args or {}
 
     def apply(self, context: Any, args: dict[str, Any]) -> bool:
+        """Perform the apply operation for directive."""
         return True
 
 
 class SkipDirective(Directive):
+    """Skip directive implementation for the graphql subsystem."""
+
     def __init__(self) -> None:
         super().__init__(
             name="skip",
@@ -30,11 +35,15 @@ class SkipDirective(Directive):
         )
 
     def apply(self, context: Any, args: dict[str, Any]) -> bool:
+        """Perform the apply operation for skip directive."""
         return not args.get("if", False)
 
 
 class IncludeDirective(Directive):
+    """Include directive implementation for the graphql subsystem."""
+
     def __init__(self) -> None:
+        """Perform the   init   operation for include directive."""
         super().__init__(
             name="include",
             description="Include this field if `if` is true.",
@@ -43,10 +52,13 @@ class IncludeDirective(Directive):
         )
 
     def apply(self, context: Any, args: dict[str, Any]) -> bool:
+        """Perform the apply operation for include directive."""
         return args.get("if", False)
 
 
 class DeprecatedDirective(Directive):
+    """Deprecated directive implementation for the graphql subsystem."""
+
     def __init__(self) -> None:
         super().__init__(
             name="deprecated",
@@ -63,6 +75,8 @@ class DeprecatedDirective(Directive):
 
 
 class DeferDirective(Directive):
+    """Defer directive implementation for the graphql subsystem."""
+
     def __init__(self) -> None:
         super().__init__(
             name="defer",

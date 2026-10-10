@@ -58,4 +58,3 @@ class State(SimpleNamespace):
     def __contains__(self, name: str) -> bool:
         """Check if a state attribute exists."""
         return hasattr(self, name)
-

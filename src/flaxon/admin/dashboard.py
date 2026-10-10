@@ -15,6 +15,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any
 
+from flaxon._imports import import_attribute, import_module
 from flaxon.exceptions import BadRequest, Forbidden, NotFound
 from flaxon.files import FileStorage
 from flaxon.http import JSONResponse, RedirectResponse, Request, Response
@@ -49,11 +50,13 @@ from .services import (
 )
 from .views import ChangeListView, CreateView, DeleteView, DetailView, UpdateView
 
-_PACKAGE_TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
+_PACKAGE_TEMPLATE_DIR = str(Path(__file__).parent / "templates")
 
 
 class AdminDashboard:
-    def __init__(
+    """Admin dashboard implementation for the admin subsystem."""
+
+    def __init__(  # noqa: PLR0917 - preserve existing positional API
         self,
         app: Any,
         config: AdminConfig | None = None,
@@ -104,18 +107,27 @@ class AdminDashboard:
         # The ORM lifecycle object is not the legacy SQL adapter. Metadata uses
         # the dashboard's AdminStore unless a compatible SQL adapter is supplied.
         candidate = database or getattr(app, "database", None) or getattr(app, "db", None)
-        self.database = candidate if all(callable(getattr(candidate, method, None)) for method in ("execute", "fetch_all")) else None
+        self.database = (
+            candidate
+            if all(callable(getattr(candidate, method, None)) for method in ("execute", "fetch_all"))
+            else None
+        )
         if database is not None and self.database is None:
-            raise TypeError("database must implement execute() and fetch_all(); use AdminStore for ORM metadata")
+            raise TypeError(
+                "database must implement execute() and fetch_all(); use AdminStore for ORM metadata"
+            )
         self._database_loaded = False
-        setattr(self.app, "_flaxon_admin_store", self.store)
+        self.app._flaxon_admin_store = self.store
         persisted_users = list((self.store.list("users") if self.store else {}).values())
         session_backend = auth_backend
         if session_backend is None:
-            if redis_url:
-                session_backend = RedisAdminSessionBackend(redis_url, protocol=redis_protocol, max_connections=redis_max_connections, idle_timeout=session_idle_timeout)
-            elif self.store is not None:
-                session_backend = AdminStoreSessionBackend(self.store, idle_timeout=session_idle_timeout)
+            session_backend = self._init_condition(
+                redis_max_connections=redis_max_connections,
+                redis_protocol=redis_protocol,
+                redis_url=redis_url,
+                session_backend=session_backend,
+                session_idle_timeout=session_idle_timeout,
+            )
         self.auth = AdminAuth(
             persisted_users or users,
             session_backend,
@@ -129,77 +141,32 @@ class AdminDashboard:
         self.password_reset_sender = password_reset_sender
         self.email_verification_sender = email_verification_sender
         self.require_email_verification = require_email_verification
-        self.max_upload_size = max_upload_size
-        self.allowed_upload_types = allowed_upload_types or {"image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf", "text/plain"}
-        self.media_storage = media_storage
-        self.thumbnail_sync_limit = thumbnail_sync_limit
-        self.media_scanner = media_scanner
-        self.media_retention_days = max(1, media_retention_days)
-        self.max_image_dimensions = (max(1, int(max_image_dimensions[0])), max(1, int(max_image_dimensions[1])))
-        self._thumbnail_tasks: set[asyncio.Task[Any]] = set()
-        self._job_worker_task: asyncio.Task[Any] | None = None
-        self._auth_rate_redis: Any = None
-        self._auth_rate_limiter: DistributedRateLimiter | None = None
-        self._redis_url = redis_url
-        self._redis_protocol = redis_protocol
-        self._redis_max_connections = redis_max_connections
-        self.session_bound_csrf = session_bound_csrf
-        secret = self.app.config.get("SECRET_KEY") or secrets.token_urlsafe(32)
-        if session_bound_csrf:
-            from .csrf import AdminCSRF, AdminCSRFMiddleware
-            self.csrf = AdminCSRF(secret)
-            self.app.add_middleware(AdminCSRFMiddleware, dashboard=self)
-        else:
-            self.csrf = CSRF(secret)
-        self._csrf_token = self.csrf.generate_token()
-        setattr(self.app, "_flaxon_admin_auth", self.auth)
-        setattr(self.app, "_flaxon_admin_dashboard", self)
-        self.activities: list[AdminActivity] = [AdminActivity(**item) for item in (self.store.get("meta", "activities", []) if self.store else [])]
-        self.notifications: list[dict[str, Any]] = (self.store.get("meta", "notifications", []) if self.store else []) or []
-        self.operations: list[dict[str, Any]] = (self.store.get("operations", "records", []) if self.store else []) or []
-        if self.store and hasattr(self.store, "list_operations"):
-            self.operations = self.store.list_operations(1000)
-        default_roles, default_descriptions = default_group_definitions(strict_permissions)
-        stored_roles = self.store.get("meta", "roles", {}) if self.store else {}
-        self.roles: dict[str, list[str]] = stored_roles or default_roles
-        self.auth.role_permissions = self.roles
-        stored_descriptions = self.store.get("meta", "role_descriptions", {}) if self.store else {}
-        self.role_descriptions: dict[str, str] = {**default_descriptions, **(stored_descriptions or {})}
-        self.protected_roles = set(default_descriptions)
-        for registered in self.registry.get_all():
-            self.permission_catalog.register_model(registered.get_name(), registered.get_verbose_name_plural())
-        # Resolve legacy aliases once at startup so new role assignments are
-        # stored in the readable catalog format while existing users continue
-        # to authenticate without a manual data migration.
-        self.roles = {
-            role: sorted({self.permission_catalog.resolve(permission) for permission in permissions})
-            for role, permissions in self.roles.items()
-        }
-        self.auth.role_permissions = self.roles
-        self.job_store = DurableJobStore(self.store) if self.store else None
-        self.job_worker = DurableJobWorker(self.job_store) if self.job_store else None
-        self.audit_log = ImmutableAuditLog(self.store) if self.store else None
-        self.notification_service = NotificationService(self.store) if self.store else None
-        self.resumable_uploads = ResumableUploadStore(self.store) if self.store else None
-        self.webauthn = WebAuthnService(self.store, webauthn_provider) if self.store else None
-        if self.job_worker:
-            self.job_worker.register("media.thumbnail", lambda payload: self._generate_thumbnail(payload["relative"], None))
-        if self.store:
-            saved_config = self.store.get("meta", "config")
-            if saved_config:
-                self.config.site_title = saved_config.get("site_title", self.config.site_title)
-                self.config.site_header = saved_config.get("site_header", self.config.site_header)
-                self.config.timezone = saved_config.get("timezone", self.config.timezone)
-            for record in self.auth.users.values():
-                self.store.set("users", record["username"], record)
-        self.media = FileStorage(upload_dir)
-        self.media_metadata: dict[str, dict[str, Any]] = (self.store.get("media", "metadata", {}) if self.store else {}) or {}
-        self.media_folders: list[str] = (self.store.get("media", "folders", []) if self.store else []) or []
-        if redis_url and hasattr(self.app, "websocket_manager"):
-            from flaxon.websocket.redis_backend import RedisBroadcaster
-            self._redis_broadcaster = RedisBroadcaster(redis_url, protocol=redis_protocol, max_connections=redis_max_connections)
-            self.app.on_startup(lambda: self.app.websocket_manager.configure_broadcaster(self._redis_broadcaster))
-            self.app.on_shutdown(self.app.websocket_manager.close_broadcaster)
+        self._configure_media(
+            max_upload_size=max_upload_size,
+            allowed_upload_types=allowed_upload_types,
+            media_storage=media_storage,
+            thumbnail_sync_limit=thumbnail_sync_limit,
+            media_scanner=media_scanner,
+            media_retention_days=media_retention_days,
+            max_image_dimensions=max_image_dimensions,
+        )
+        self._initialize_background_state(
+            redis_url=redis_url,
+            redis_protocol=redis_protocol,
+            redis_max_connections=redis_max_connections,
+        )
+        self._initialize_csrf(session_bound_csrf)
+        self.app._flaxon_admin_auth = self.auth
+        self.app._flaxon_admin_dashboard = self
+        self._initialize_persistent_services(
+            strict_permissions=strict_permissions, webauthn_provider=webauthn_provider
+        )
+        self._initialize_media_records(upload_dir)
+        self._configure_broadcaster(
+            redis_url=redis_url,
+            redis_protocol=redis_protocol,
+            redis_max_connections=redis_max_connections,
+        )
         if hasattr(self.app, "mount_static"):
             self.app.mount_static("/uploads", upload_dir)
         self._mount_static()
@@ -221,9 +188,148 @@ class AdminDashboard:
         # microservice pages reserve their own named Admin resources.
         self.control_plane = None
         if microservices is not False:
-            from .microservices import AdminControlPlane
+            admin_control_plane_type = import_attribute("flaxon.admin.microservices", "AdminControlPlane")
 
-            self.control_plane = AdminControlPlane(self)
+            self.control_plane = admin_control_plane_type(self)
+
+    def _configure_broadcaster(self, *, redis_url, redis_protocol, redis_max_connections):
+        if redis_url and hasattr(self.app, "websocket_manager"):
+            redis_broadcaster_type = import_attribute("flaxon.websocket.redis_backend", "RedisBroadcaster")
+
+            self._redis_broadcaster = redis_broadcaster_type(
+                redis_url, protocol=redis_protocol, max_connections=redis_max_connections
+            )
+            self.app.on_startup(
+                lambda: self.app.websocket_manager.configure_broadcaster(self._redis_broadcaster)
+            )
+            self.app.on_shutdown(self.app.websocket_manager.close_broadcaster)
+
+    def _initialize_media_records(self, upload_dir):
+        self.media = FileStorage(upload_dir)
+        self.media_metadata: dict[str, dict[str, Any]] = (
+            self.store.get("media", "metadata", {}) if self.store else {}
+        ) or {}
+        self.media_folders: list[str] = (self.store.get("media", "folders", []) if self.store else []) or []
+
+    def _initialize_background_state(self, *, redis_url, redis_protocol, redis_max_connections):
+        self._thumbnail_tasks: set[asyncio.Task[Any]] = set()
+        self._job_worker_task: asyncio.Task[Any] | None = None
+        self._auth_rate_redis: Any = None
+        self._auth_rate_limiter: DistributedRateLimiter | None = None
+        self._redis_url = redis_url
+        self._redis_protocol = redis_protocol
+        self._redis_max_connections = redis_max_connections
+
+    def _configure_media(
+        self,
+        *,
+        max_upload_size,
+        allowed_upload_types,
+        media_storage,
+        thumbnail_sync_limit,
+        media_scanner,
+        media_retention_days,
+        max_image_dimensions,
+    ):
+        self.max_upload_size = max_upload_size
+        self.allowed_upload_types = allowed_upload_types or {
+            "image/jpeg",
+            "image/png",
+            "image/gif",
+            "image/webp",
+            "application/pdf",
+            "text/plain",
+        }
+        self.media_storage = media_storage
+        self.thumbnail_sync_limit = thumbnail_sync_limit
+        self.media_scanner = media_scanner
+        self.media_retention_days = max(1, media_retention_days)
+        self.max_image_dimensions = (
+            max(1, int(max_image_dimensions[0])),
+            max(1, int(max_image_dimensions[1])),
+        )
+
+    def _initialize_csrf(self, session_bound_csrf):
+        self.session_bound_csrf = session_bound_csrf
+        secret = self.app.config.get("SECRET_KEY") or secrets.token_urlsafe(32)
+        if session_bound_csrf:
+            admin_csrf_type = import_attribute("flaxon.admin.csrf", "AdminCSRF")
+            admin_csrfmiddleware_type = import_attribute("flaxon.admin.csrf", "AdminCSRFMiddleware")
+
+            self.csrf = admin_csrf_type(secret)
+            self.app.add_middleware(admin_csrfmiddleware_type, dashboard=self)
+        else:
+            self.csrf = CSRF(secret)
+        self._csrf_token = self.csrf.generate_token()
+
+    def _initialize_persistent_services(self, *, strict_permissions, webauthn_provider):
+        self.activities: list[AdminActivity] = [
+            AdminActivity(**item) for item in (self.store.get("meta", "activities", []) if self.store else [])
+        ]
+        self.notifications: list[dict[str, Any]] = (
+            self.store.get("meta", "notifications", []) if self.store else []
+        ) or []
+        self.operations: list[dict[str, Any]] = (
+            self.store.get("operations", "records", []) if self.store else []
+        ) or []
+        if self.store and hasattr(self.store, "list_operations"):
+            self.operations = self.store.list_operations(1000)
+        default_roles, default_descriptions = default_group_definitions(strict_permissions)
+        stored_roles = self.store.get("meta", "roles", {}) if self.store else {}
+        self.roles: dict[str, list[str]] = stored_roles or default_roles
+        self.auth.role_permissions = self.roles
+        stored_descriptions = self.store.get("meta", "role_descriptions", {}) if self.store else {}
+        self.role_descriptions: dict[str, str] = {**default_descriptions, **(stored_descriptions or {})}
+        self.protected_roles = set(default_descriptions)
+        for registered in self.registry.get_all():
+            self.permission_catalog.register_model(
+                registered.get_name(), registered.get_verbose_name_plural()
+            )
+        # Resolve legacy aliases once at startup so new role assignments are
+        # stored in the readable catalog format while existing users continue
+        # to authenticate without a manual data migration.
+        self.roles = {
+            role: sorted({self.permission_catalog.resolve(permission) for permission in permissions})
+            for role, permissions in self.roles.items()
+        }
+        self.auth.role_permissions = self.roles
+        self.job_store = DurableJobStore(self.store) if self.store else None
+        self.job_worker = DurableJobWorker(self.job_store) if self.job_store else None
+        self.audit_log = ImmutableAuditLog(self.store) if self.store else None
+        self.notification_service = NotificationService(self.store) if self.store else None
+        self.resumable_uploads = ResumableUploadStore(self.store) if self.store else None
+        self.webauthn = WebAuthnService(self.store, webauthn_provider) if self.store else None
+        if self.job_worker:
+            self.job_worker.register(
+                "media.thumbnail", lambda payload: self._generate_thumbnail(payload["relative"], None)
+            )
+        if self.store:
+            self._init_store()
+
+    def _init_condition(
+        self, *, redis_max_connections, redis_protocol, redis_url, session_backend, session_idle_timeout
+    ):
+        """Apply condition changes for init."""
+        if redis_url:
+            session_backend = RedisAdminSessionBackend(
+                redis_url,
+                protocol=redis_protocol,
+                max_connections=redis_max_connections,
+                idle_timeout=session_idle_timeout,
+            )
+        elif self.store is not None:
+            session_backend = AdminStoreSessionBackend(self.store, idle_timeout=session_idle_timeout)
+        return session_backend
+
+    def _init_store(self):
+        """Apply store changes for init."""
+        saved_config = self.store.get("meta", "config")
+        if saved_config:
+            self.config.site_title = saved_config.get("site_title", self.config.site_title)
+            self.config.site_header = saved_config.get("site_header", self.config.site_header)
+            self.config.timezone = saved_config.get("timezone", self.config.timezone)
+        for record in self.auth.users.values():
+            self.store.set("users", record["username"], record)
 
     async def _stop_thumbnail_tasks(self) -> None:
         if self._job_worker_task is not None:
@@ -253,9 +359,17 @@ class AdminDashboard:
         if not self._redis_url:
             return True
         if self._auth_rate_redis is None:
-            import redis.asyncio as redis
-            self._auth_rate_redis = redis.from_url(self._redis_url, decode_responses=True, protocol=self._redis_protocol, max_connections=self._redis_max_connections)
-            self._auth_rate_limiter = DistributedRateLimiter(self._auth_rate_redis, prefix="flaxon:admin:auth")
+            redis = import_module("redis.asyncio")
+
+            self._auth_rate_redis = redis.from_url(
+                self._redis_url,
+                decode_responses=True,
+                protocol=self._redis_protocol,
+                max_connections=self._redis_max_connections,
+            )
+            self._auth_rate_limiter = DistributedRateLimiter(
+                self._auth_rate_redis, prefix="flaxon:admin:auth"
+            )
         client = request.scope.get("client") if hasattr(request, "scope") else None
         ip = str(client[0]) if isinstance(client, (tuple, list)) and client else "unknown"
         key = f"{action}:{account.strip().lower()}:{ip}"
@@ -263,7 +377,7 @@ class AdminDashboard:
 
     def _mount_static(self) -> None:
         if hasattr(self.app, "mount_static"):
-            static_dir = os.path.join(os.path.dirname(__file__), "static")
+            static_dir = str(Path(__file__).parent / "static")
             self.app.mount_static("/static", static_dir)
 
     def _register_routes(self) -> None:
@@ -285,19 +399,7 @@ class AdminDashboard:
         router.post(f"{self.url_prefix}/roles")(self.roles_view)
         router.patch(f"{self.url_prefix}/users/<username>")(self.user_api)
         router.delete(f"{self.url_prefix}/users/<username>")(self.user_api)
-        router.get(f"{self.url_prefix}/media")(self.media_view)
-        router.post(f"{self.url_prefix}/media")(self.media_view)
-        router.post(f"{self.url_prefix}/media/resumable")(self.resumable_media)
-        router.get(f"{self.url_prefix}/media/resumable/<upload_id>")(self.resumable_media)
-        router.patch(f"{self.url_prefix}/media/resumable/<upload_id>")(self.resumable_media)
-        router.post(f"{self.url_prefix}/media/resumable/<upload_id>/complete")(self.resumable_media)
-        router.get(f"{self.url_prefix}/media/folders")(self.media_folders_api)
-        router.post(f"{self.url_prefix}/media/folders")(self.media_folders_api)
-        router.delete(f"{self.url_prefix}/media/folders/<path:folder>")(self.media_folders_api)
-        router.post(f"{self.url_prefix}/media/bulk")(self.media_bulk_api)
-        router.get(f"{self.url_prefix}/media/<path:filename>/signed-url")(self.media_signed_url)
-        router.patch(f"{self.url_prefix}/media/<path:filename>")(self.media_api)
-        router.delete(f"{self.url_prefix}/media/<path:filename>")(self.media_api)
+        self._mount_media_routes(router)
         router.get(f"{self.url_prefix}/search")(self.search)
         router.get(f"{self.url_prefix}/<model_name>/relationships/<field_name>")(self.relationship_choices)
         router.get(f"{self.url_prefix}/<model_name>/export")(self.model_export)
@@ -307,14 +409,22 @@ class AdminDashboard:
         router.post(f"{self.url_prefix}/settings")(self.settings_view)
         router.get(f"{self.url_prefix}/activity")(self.activity_view)
         router.get(f"{self.url_prefix}/activity/export")(self.activity_export)
-        router.route(f"{self.url_prefix}/notifications", methods={"GET", "POST"}, name="notifications_api")(self.notifications_api)
-        router.route(f"{self.url_prefix}/notifications/preferences", methods={"GET", "POST"}, name="notification_preferences")(self.notification_preferences)
+        router.route(f"{self.url_prefix}/notifications", methods={"GET", "POST"}, name="notifications_api")(
+            self.notifications_api
+        )
+        router.route(
+            f"{self.url_prefix}/notifications/preferences",
+            methods={"GET", "POST"},
+            name="notification_preferences",
+        )(self.notification_preferences)
         router.get(f"{self.url_prefix}/audit/verify")(self.audit_verify)
         router.post(f"{self.url_prefix}/profile/webauthn/register/begin")(self.webauthn_api)
         router.post(f"{self.url_prefix}/profile/webauthn/register/finish")(self.webauthn_api)
         router.post(f"{self.url_prefix}/profile/webauthn/authenticate/begin")(self.webauthn_api)
         router.post(f"{self.url_prefix}/profile/webauthn/authenticate/finish")(self.webauthn_api)
-        router.route(f"{self.url_prefix}/profile/trusted-devices", methods={"GET", "POST"}, name="trusted_devices")(self.trusted_devices_api)
+        router.route(
+            f"{self.url_prefix}/profile/trusted-devices", methods={"GET", "POST"}, name="trusted_devices"
+        )(self.trusted_devices_api)
         router.delete(f"{self.url_prefix}/profile/trusted-devices/<device_id>")(self.trusted_devices_api)
         router.post(f"{self.url_prefix}/profile/mfa/recovery-codes")(self.mfa_recovery_api)
         router.get(f"{self.url_prefix}/operations")(self.operations_view)
@@ -331,14 +441,32 @@ class AdminDashboard:
         router.post(f"{self.url_prefix}/<model_name>/<object_id>/delete")(self.delete_view)
         router.post(f"{self.url_prefix}/<model_name>/actions/<action_name>")(self.model_action)
 
+    def _mount_media_routes(self, router):
+        router.get(f"{self.url_prefix}/media")(self.media_view)
+        router.post(f"{self.url_prefix}/media")(self.media_view)
+        router.post(f"{self.url_prefix}/media/resumable")(self.resumable_media)
+        router.get(f"{self.url_prefix}/media/resumable/<upload_id>")(self.resumable_media)
+        router.patch(f"{self.url_prefix}/media/resumable/<upload_id>")(self.resumable_media)
+        router.post(f"{self.url_prefix}/media/resumable/<upload_id>/complete")(self.resumable_media)
+        router.get(f"{self.url_prefix}/media/folders")(self.media_folders_api)
+        router.post(f"{self.url_prefix}/media/folders")(self.media_folders_api)
+        router.delete(f"{self.url_prefix}/media/folders/<path:folder>")(self.media_folders_api)
+        router.post(f"{self.url_prefix}/media/bulk")(self.media_bulk_api)
+        router.get(f"{self.url_prefix}/media/<path:filename>/signed-url")(self.media_signed_url)
+        router.patch(f"{self.url_prefix}/media/<path:filename>")(self.media_api)
+        router.delete(f"{self.url_prefix}/media/<path:filename>")(self.media_api)
+
     def register(self, model: Any, **options: Any) -> None:
         """Register a model with the dashboard's registry."""
         self.registry.register(model, **options)
         registered = self.registry.get_by_model(model)
         if registered:
-            self.permission_catalog.register_model(registered.get_name(), registered.get_verbose_name_plural())
+            self.permission_catalog.register_model(
+                registered.get_name(), registered.get_verbose_name_plural()
+            )
 
     def register_widget(self, widget: Any) -> Any:
+        """Register the widget."""
         self.widgets.append(widget)
         return widget
 
@@ -401,14 +529,19 @@ class AdminDashboard:
         """
         route_name = url or name.lower().replace(" ", "-")
         route_path = f"{self.url_prefix}/{route_name.strip('/')}"
+
         async def protected_view(request: Request) -> Response:
             await self._require_user(request, permission)
-            if request.method not in {"GET", "HEAD", "OPTIONS"} and not self.csrf.verify_token(request.headers.get("x-csrf-token", "")):
+            if request.method not in {"GET", "HEAD", "OPTIONS"} and not self.csrf.verify_token(
+                request.headers.get("x-csrf-token", "")
+            ):
                 raise Forbidden("CSRF token missing or invalid")
             result = view(request)
             return await result if hasattr(result, "__await__") else result
 
-        self.app.router.route(route_path, methods=methods or {"GET"}, name=f"admin_custom_{route_name}")(protected_view)
+        self.app.router.route(route_path, methods=methods or {"GET"}, name=f"admin_custom_{route_name}")(
+            protected_view
+        )
         self.custom_views.append({"name": name, "url": route_path, "category": category, "icon": icon})
         return view
 
@@ -427,7 +560,8 @@ class AdminDashboard:
         navigation metadata, so extension code does not need to reach into
         Admin internals or query another service's database.
         """
-        import flaxon.modules  # noqa: F401 - installs Flaxon.mount_module
+        import_module("flaxon.modules")
+        import_module("flaxon")
 
         mount_prefix = prefix or f"{self.url_prefix}/extensions/{getattr(module, 'name', 'module')}"
         mount_name = name or f"admin.{getattr(module, 'name', 'module')}"
@@ -452,10 +586,12 @@ class AdminDashboard:
         }
 
     def add_hook(self, name: str, callback: Any) -> Any:
+        """Add the hook."""
         self.hooks.setdefault(name, []).append(callback)
         return callback
 
     def run_hook(self, name: str, value: Any) -> Any:
+        """Perform the run hook operation for admin dashboard."""
         for callback in self.hooks.get(name, []):
             value = callback(value)
         return value
@@ -473,12 +609,15 @@ class AdminDashboard:
         return self.auth.has_permission(user, canonical_model_permission(model_name, action))
 
     async def index(self, request: Request) -> Response:
+        """Perform the index operation for admin dashboard."""
         user = await self._require_user(request, "admin.view_dashboard")
         counts = {}
         total = 0
         models = []
         for model in self.registry.get_all():
-            if await self.auth.has_permission_async(user, self.permission_for_action(model.get_name(), "read")):
+            if await self.auth.has_permission_async(
+                user, self.permission_for_action(model.get_name(), "read")
+            ):
                 models.append(model)
         for model in models:
             if hasattr(model.model, "count") and model.get_permission_hook("read") is None:
@@ -498,8 +637,7 @@ class AdminDashboard:
             "user_count": len(self.auth.users),
             "activities": [a.to_dict() for a in self.activities[-10:][::-1]],
             "unread_notifications": sum(
-                1 for item in self.notifications
-                if user.username not in item.get("read_by", [])
+                1 for item in self.notifications if user.username not in item.get("read_by", [])
             ),
             "custom_views": self.custom_views,
             "widgets": await self._widget_context(user),
@@ -507,6 +645,7 @@ class AdminDashboard:
         return await self.jinax.render_response("admin/index.html", context)
 
     async def list_view(self, request: Request, model_name: str) -> Response:
+        """Render the list page for the current request."""
         await self._require_model_user(request, model_name, "read")
         admin_model = self.registry.get(model_name)
         if not admin_model:
@@ -515,6 +654,7 @@ class AdminDashboard:
         return await view.render()
 
     async def model_add_view(self, request: Request, model_name: str) -> Response:
+        """Render the model add page for the current request."""
         await self._require_model_user(request, model_name, "create")
         admin_model = self.registry.get(model_name)
         if not admin_model:
@@ -523,6 +663,7 @@ class AdminDashboard:
         return await view.render()
 
     async def detail_view(self, request: Request, model_name: str, object_id: str) -> Response:
+        """Render the detail page for the current request."""
         await self._require_model_user(request, model_name, "read", object_id)
         admin_model = self.registry.get(model_name)
         if not admin_model:
@@ -531,6 +672,7 @@ class AdminDashboard:
         return await view.render()
 
     async def edit_view(self, request: Request, model_name: str, object_id: str) -> Response:
+        """Render the edit page for the current request."""
         await self._require_model_user(request, model_name, "update", object_id)
         admin_model = self.registry.get(model_name)
         if not admin_model:
@@ -539,6 +681,7 @@ class AdminDashboard:
         return await view.render()
 
     async def delete_view(self, request: Request, model_name: str, object_id: str) -> Response:
+        """Render the delete page for the current request."""
         await self._require_model_user(request, model_name, "delete", object_id)
         admin_model = self.registry.get(model_name)
         if not admin_model:
@@ -547,6 +690,7 @@ class AdminDashboard:
         return await view.render()
 
     async def model_action(self, request: Request, model_name: str, action_name: str) -> Response:
+        """Perform the model action operation for admin dashboard."""
         user = await self._require_user(request)
         permission_action = "delete" if action_name == "delete" else action_name
         await self.auth.authorize_async(user, self.permission_for_action(model_name, permission_action))
@@ -567,11 +711,15 @@ class AdminDashboard:
             raise BadRequest("Select at most 1000 records per action")
         ids = list(dict.fromkeys(str(value) for value in ids))
         for object_id in ids:
-            await self._require_model_user(request, model_name, "delete" if action_name == "delete" else "update", object_id)
+            await self._require_model_user(
+                request, model_name, "delete" if action_name == "delete" else "update", object_id
+            )
         result = action(ids) if callable(action) else None
         if hasattr(result, "__await__"):
             await result
-        self.record_activity("action", model_name, request, details={"action": action_name, "count": len(ids)})
+        self.record_activity(
+            "action", model_name, request, details={"action": action_name, "count": len(ids)}
+        )
         return RedirectResponse(f"{self.url_prefix}/{model_name}", status_code=302)
 
     async def _not_found(self) -> Response:
@@ -581,7 +729,8 @@ class AdminDashboard:
         await self._load_database()
         user = await self.auth.current_user(request)
         self._navigation_user.set(user)
-        from flaxon.db.admin import admin_context
+        admin_context = import_attribute("flaxon.db.admin", "admin_context")
+
         admin_context.set((self, user))
         if permission:
             await self.auth.authorize_async(user, permission)
@@ -591,7 +740,9 @@ class AdminDashboard:
         if self._database_loaded or self.database is None:
             return
         await self.database.execute(
-            "CREATE TABLE IF NOT EXISTS flaxon_admin_store (namespace VARCHAR(255) NOT NULL, key VARCHAR(255) NOT NULL, value TEXT NOT NULL, PRIMARY KEY(namespace, key))"
+            "CREATE TABLE IF NOT EXISTS flaxon_admin_store (namespace VAR"
+            "CHAR(255) NOT NULL, key VARCHAR(255) NOT NULL, value TEXT NO"
+            "T NULL, PRIMARY KEY(namespace, key))"
         )
         rows = await self.database.fetch_all("SELECT namespace, key, value FROM flaxon_admin_store")
         for row in rows:
@@ -599,55 +750,66 @@ class AdminDashboard:
                 value = __import__("json").loads(row["value"])
             except (TypeError, ValueError):
                 continue
-            if row["namespace"] == "users":
-                self.auth.add_user(value)
-            elif row["namespace"] == "meta" and row["key"] == "activities":
-                self.activities = [AdminActivity(**item) for item in value or []]
-            elif row["namespace"] == "meta" and row["key"] == "config":
-                self.config.site_title = value.get("site_title", self.config.site_title)
-                self.config.site_header = value.get("site_header", self.config.site_header)
-                self.config.timezone = value.get("timezone", self.config.timezone)
-            elif row["namespace"] == "meta" and row["key"] == "roles":
-                self.roles = value or self.roles
-                self.auth.role_permissions = self.roles
-            elif row["namespace"] == "meta" and row["key"] == "role_descriptions":
-                self.role_descriptions = value or {}
-            elif row["namespace"] == "meta" and row["key"] == "notifications":
-                self.notifications = value or []
-            elif row["namespace"] == "operations" and row["key"] == "records":
-                self.operations = value or []
-            elif row["namespace"] == "auth" and row["key"] == "reset_tokens":
-                self.auth._reset_tokens = value or {}
-            elif row["namespace"] == "auth" and row["key"] == "verification_tokens":
-                self.auth._verification_tokens = value or {}
-            elif row["namespace"] == "auth" and row["key"] == "trusted_devices":
-                self.auth._trusted_devices = value or {}
-            elif row["namespace"] == "media" and row["key"] == "metadata":
-                self.media_metadata = value or {}
-            elif row["namespace"] == "media" and row["key"] == "folders":
-                self.media_folders = value or []
+            self._restore_database_entry(row["namespace"], row["key"], value)
         self._database_loaded = True
+
+    def _restore_database_entry(self, namespace, key, value):
+        if namespace == "users":
+            self.auth.add_user(value)
+        elif namespace == "meta" and key == "activities":
+            self.activities = [AdminActivity(**item) for item in value or []]
+        elif namespace == "meta" and key == "config":
+            self.config.site_title = value.get("site_title", self.config.site_title)
+            self.config.site_header = value.get("site_header", self.config.site_header)
+            self.config.timezone = value.get("timezone", self.config.timezone)
+        elif namespace == "meta" and key == "roles":
+            self.roles = value or self.roles
+            self.auth.role_permissions = self.roles
+        elif namespace == "meta" and key == "role_descriptions":
+            self.role_descriptions = value or {}
+        elif namespace == "meta" and key == "notifications":
+            self.notifications = value or []
+        elif namespace == "operations" and key == "records":
+            self.operations = value or []
+        else:
+            self._restore_database_auth_and_media(namespace, key, value)
+
+    def _restore_database_auth_and_media(self, namespace, key, value):
+        if namespace == "auth" and key == "reset_tokens":
+            self.auth._reset_tokens = value or {}
+        elif namespace == "auth" and key == "verification_tokens":
+            self.auth._verification_tokens = value or {}
+        elif namespace == "auth" and key == "trusted_devices":
+            self.auth._trusted_devices = value or {}
+        elif namespace == "media" and key == "metadata":
+            self.media_metadata = value or {}
+        elif namespace == "media" and key == "folders":
+            self.media_folders = value or []
 
     async def _persist_database(self) -> None:
         if self.database is None:
             return
-        values = {"users": {key: record for key, record in self.auth.users.items()}, "meta": {
-            "activities": [item.to_dict() for item in self.activities[-500:]],
-            "notifications": self.notifications[-1000:],
-            "config": self.config.to_dict(),
-            "roles": self.roles,
-            "role_descriptions": self.role_descriptions,
-        }, "auth": {
-            "reset_tokens": self.auth._reset_tokens,
-            "verification_tokens": self.auth._verification_tokens,
-            "trusted_devices": self.auth._trusted_devices,
-        }, "media": {
-            "metadata": self.media_metadata,
-            "folders": self.media_folders,
-        }}
+        values = {
+            "users": dict(self.auth.users.items()),
+            "meta": {
+                "activities": [item.to_dict() for item in self.activities[-500:]],
+                "notifications": self.notifications[-1000:],
+                "config": self.config.to_dict(),
+                "roles": self.roles,
+                "role_descriptions": self.role_descriptions,
+            },
+            "auth": {
+                "reset_tokens": self.auth._reset_tokens,
+                "verification_tokens": self.auth._verification_tokens,
+                "trusted_devices": self.auth._trusted_devices,
+            },
+            "media": {
+                "metadata": self.media_metadata,
+                "folders": self.media_folders,
+            },
+        }
 
         async def write() -> None:
-            import json
 
             existing_users = await self.database.fetch_all(
                 "SELECT key FROM flaxon_admin_store WHERE namespace = $1",
@@ -659,13 +821,20 @@ class AdminDashboard:
                 if key not in current_user_keys:
                     await self.database.execute(
                         "DELETE FROM flaxon_admin_store WHERE namespace = $1 AND key = $2",
-                        "users", key,
+                        "users",
+                        key,
                     )
             for namespace, entries in values.items():
                 for key, value in entries.items():
                     await self.database.execute(
-                        "INSERT INTO flaxon_admin_store(namespace, key, value) VALUES ($1, $2, $3) ON CONFLICT(namespace, key) DO UPDATE SET value = excluded.value",
-                        namespace, key, json.dumps(value, default=str),
+                        (
+                            "INSERT INTO flaxon_admin_store(namespace, key, value) VALUES"
+                            " ($1, $2, $3) ON CONFLICT(namespace, key) DO UPDATE SET valu"
+                            "e = excluded.value"
+                        ),
+                        namespace,
+                        key,
+                        json.dumps(value, default=str),
                     )
 
         if hasattr(self.database, "transaction"):
@@ -674,7 +843,9 @@ class AdminDashboard:
         else:
             await write()
 
-    async def _require_model_user(self, request: Request, model_name: str, action: str, object_id: str | None = None) -> Any:
+    async def _require_model_user(
+        self, request: Request, model_name: str, action: str, object_id: str | None = None
+    ) -> Any:
         user = await self._require_user(request)
         admin_model = self.registry.get(model_name)
         if admin_model is None:
@@ -703,7 +874,14 @@ class AdminDashboard:
         """Exclude credentials from search, exports, notifications and audit snapshots."""
         if isinstance(value, dict):
             return {
-                key: ("[redacted]" if any(part in key.lower() for part in ("password", "secret", "token", "api_key", "recovery_code")) else AdminDashboard._safe_record(item))
+                key: (
+                    "[redacted]"
+                    if any(
+                        part in key.lower()
+                        for part in ("password", "secret", "token", "api_key", "recovery_code")
+                    )
+                    else AdminDashboard._safe_record(item)
+                )
                 for key, item in value.items()
             }
         if isinstance(value, (list, tuple)):
@@ -711,7 +889,9 @@ class AdminDashboard:
         return value
 
     async def _visible_instances(self, admin_model: Any, user: Any) -> list[Any]:
-        if not await self.auth.has_permission_async(user, self.permission_for_action(admin_model.get_name(), "read")):
+        if not await self.auth.has_permission_async(
+            user, self.permission_for_action(admin_model.get_name(), "read")
+        ):
             return []
         values = await self._instances(admin_model.model)
         hook = admin_model.get_permission_hook("read")
@@ -724,7 +904,10 @@ class AdminDashboard:
                 visible.append(value)
         return visible
 
-    def record_activity(self, action: str, resource: str, request: Request, record_id: str | None = None, **details: Any) -> None:
+    def record_activity(
+        self, action: str, resource: str, request: Request, record_id: str | None = None, **details: Any
+    ) -> None:
+        """Record the activity."""
         details = self._safe_record(details)
         user = getattr(request, "user", None)
         username = getattr(user, "username", "system")
@@ -735,7 +918,13 @@ class AdminDashboard:
             ip = str(client[0]) if isinstance(client, (tuple, list)) and client else None
             headers = getattr(request, "headers", {})
             user_agent = headers.get("user-agent") if hasattr(headers, "get") else None
-            self.audit_log.append(action, username, {"resource": resource, "record_id": record_id, **details}, ip=ip, user_agent=user_agent)
+            self.audit_log.append(
+                action,
+                username,
+                {"resource": resource, "record_id": record_id, **details},
+                ip=ip,
+                user_agent=user_agent,
+            )
         self.notifications.append({
             "id": secrets.token_urlsafe(12),
             "action": action,
@@ -757,6 +946,7 @@ class AdminDashboard:
             self.store.set("meta", "notifications", self.notifications[-1000:])
 
     def csrf_token(self) -> str:
+        """Perform the csrf token operation for admin dashboard."""
         return self.csrf.generate_token()
 
     @staticmethod
@@ -769,12 +959,14 @@ class AdminDashboard:
         return dict(form or {})
 
     def validate_csrf(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Validate the csrf."""
         token = data.pop("_csrf", None)
         if not token or not self.csrf.verify_token(str(token)):
             raise Forbidden("CSRF token missing or invalid")
         return data
 
     async def login(self, request: Request) -> Response:
+        """Establish an authenticated session for the supplied credentials."""
         if request.method == "GET":
             # Keep an active admin session when a user returns from the public
             # site through the login link. The login page should not obscure a
@@ -784,13 +976,26 @@ class AdminDashboard:
                 if current is not None:
                     request.user = current
                     return RedirectResponse(f"{self.url_prefix}/", status_code=302)
-            return await self.jinax.render_response("admin/login.html", {"title": self.config.site_title, "error": None, "csrf_token": self.csrf_token(), "reset_url": f"{self.url_prefix}/password-reset", "remember": True})
+            return await self.jinax.render_response(
+                "admin/login.html",
+                {
+                    "title": self.config.site_title,
+                    "error": None,
+                    "csrf_token": self.csrf_token(),
+                    "reset_url": f"{self.url_prefix}/password-reset",
+                    "remember": True,
+                },
+            )
         form = await request.form()
         data = self.validate_csrf(form.to_dict() if hasattr(form, "to_dict") else form)
         username = str(data.get("username", ""))
         remember = str(data.get("remember", "")).lower() in {"1", "true", "yes", "on"}
         session_age = 30 * 86400 if remember else 86400
-        if self.require_email_verification and self.auth.users.get(username, {}).get("email") and not self.auth.users.get(username, {}).get("email_verified"):
+        if (
+            self.require_email_verification
+            and self.auth.users.get(username, {}).get("email")
+            and not self.auth.users.get(username, {}).get("email_verified")
+        ):
             token = None
         else:
             client = request.scope.get("client") if hasattr(request, "scope") else None
@@ -804,19 +1009,39 @@ class AdminDashboard:
                 session_age,
             )
         if token is None:
-            return await self.jinax.render_response("admin/login.html", {"title": self.config.site_title, "error": "Invalid username or password.", "csrf_token": self.csrf_token(), "reset_url": f"{self.url_prefix}/password-reset", "remember": remember}, status_code=401)
+            return await self.jinax.render_response(
+                "admin/login.html",
+                {
+                    "title": self.config.site_title,
+                    "error": "Invalid username or password.",
+                    "csrf_token": self.csrf_token(),
+                    "reset_url": f"{self.url_prefix}/password-reset",
+                    "remember": remember,
+                },
+                status_code=401,
+            )
         response = RedirectResponse(f"{self.url_prefix}/", status_code=302)
         self.auth.attach_cookie(response, token, max_age=session_age)
         return response
 
     async def logout(self, request: Request) -> Response:
+        """End the current authenticated session."""
         await self.auth.logout(request)
         response = RedirectResponse(f"{self.url_prefix}/login", status_code=302)
         self.auth.clear_cookie(response)
         return response
 
     async def password_reset(self, request: Request) -> Response:
-        context = {"title": self.config.site_title, "csrf_token": self.csrf_token(), "message": None, "error": None, "reset_token": request.query.get("token", ""), "reset_url": f"{self.url_prefix}/password-reset", "login_url": f"{self.url_prefix}/login"}
+        """Perform the password reset operation for admin dashboard."""
+        context = {
+            "title": self.config.site_title,
+            "csrf_token": self.csrf_token(),
+            "message": None,
+            "error": None,
+            "reset_token": request.query.get("token", ""),
+            "reset_url": f"{self.url_prefix}/password-reset",
+            "login_url": f"{self.url_prefix}/login",
+        }
         if request.method == "POST":
             form = await request.form()
             data = self.validate_csrf(form.to_dict() if hasattr(form, "to_dict") else form)
@@ -844,7 +1069,14 @@ class AdminDashboard:
         return await self.jinax.render_response("admin/password_reset.html", context)
 
     async def verify_email(self, request: Request) -> Response:
-        context = {"title": self.config.site_title, "csrf_token": self.csrf_token(), "message": None, "error": None, "login_url": f"{self.url_prefix}/login"}
+        """Verify the email."""
+        context = {
+            "title": self.config.site_title,
+            "csrf_token": self.csrf_token(),
+            "message": None,
+            "error": None,
+            "login_url": f"{self.url_prefix}/login",
+        }
         if request.method == "POST":
             form = await request.form()
             data = self.validate_csrf(form.to_dict() if hasattr(form, "to_dict") else form)
@@ -862,6 +1094,7 @@ class AdminDashboard:
         return await self.jinax.render_response("admin/verify_email.html", context)
 
     async def profile(self, request: Request) -> Response:
+        """Perform the profile operation for admin dashboard."""
         user = await self._require_user(request, "admin.manage_profile")
         error = None
         mfa_uri = None
@@ -880,25 +1113,9 @@ class AdminDashboard:
                     else:
                         record["password_hash"] = self.auth.hasher.hash(str(form["password"]))
                         self.auth.invalidate_user_sessions(user.username)
-                if form.get("mfa_action") == "enable":
-                    if await self._allow_auth_action(request, "mfa-enroll", user.username):
-                        mfa_uri, recovery_codes = self.auth.begin_mfa_setup(user.username, self.config.site_title)
-                    else:
-                        error = "Too many MFA enrollment attempts. Try again later."
-                elif form.get("mfa_action") == "confirm":
-                    allowed = await self._allow_auth_action(request, "mfa-confirm", user.username)
-                    if not allowed or not self.auth.confirm_mfa_setup(user.username, str(form.get("otp", ""))):
-                        error = "Enter the current six-digit code to confirm MFA."
-                elif form.get("mfa_action") == "disable":
-                    allowed = await self._allow_auth_action(request, "mfa-disable", user.username)
-                    code = str(form.get("otp", ""))
-                    valid = self.auth.verify_otp(record.get("mfa_secret", ""), code)
-                    valid = valid or self.auth.consume_recovery_code(user.username, code)
-                    if not allowed or not valid:
-                        error = "Enter a valid authenticator or recovery code to disable MFA."
-                    else:
-                        record.pop("mfa_secret", None)
-                        record.pop("mfa_recovery_codes", None)
+                error, mfa_uri, recovery_codes = await self._update_profile_mfa(
+                    request, user, record=record, form=form, error=error
+                )
                 if form.get("email_action") == "send_verification":
                     verification_token = self.auth.request_email_verification(user.username)
                     if verification_token and self.email_verification_sender:
@@ -911,16 +1128,70 @@ class AdminDashboard:
                 await self._persist_database()
         record = self.auth.users.get(user.username, {})
         mfa_qr = self._mfa_qr_data(mfa_uri)
-        role_details = [{"name": role, "description": self.role_descriptions.get(role, ""), "permissions": self.roles.get(role, [])} for role in user.roles]
-        effective_permissions = sorted(set(record.get("permissions", [])) | {permission for role in user.roles for permission in self.roles.get(role, [])})
-        return await self.jinax.render_response("admin/profile.html", {"user": user, "models": self.registry.get_all(), "error": error, "role_details": role_details, "direct_permissions": sorted(record.get("permissions", [])), "effective_permissions": effective_permissions, "trusted_devices": self.auth.list_trusted_devices(user.username), "session_backend": type(self.auth.backend).__name__, "mfa_enabled": bool(record.get("mfa_secret")), "mfa_secret": record.get("mfa_pending_secret") if mfa_uri else None, "mfa_uri": mfa_uri, "mfa_qr": mfa_qr, "mfa_recovery_codes": recovery_codes, "mfa_pending": bool(record.get("mfa_pending_secret")), "email_verified": bool(record.get("email_verified"))})
+        role_details = [
+            {
+                "name": role,
+                "description": self.role_descriptions.get(role, ""),
+                "permissions": self.roles.get(role, []),
+            }
+            for role in user.roles
+        ]
+        effective_permissions = sorted(
+            set(record.get("permissions", []))
+            | {permission for role in user.roles for permission in self.roles.get(role, [])}
+        )
+        return await self.jinax.render_response(
+            "admin/profile.html",
+            {
+                "user": user,
+                "models": self.registry.get_all(),
+                "error": error,
+                "role_details": role_details,
+                "direct_permissions": sorted(record.get("permissions", [])),
+                "effective_permissions": effective_permissions,
+                "trusted_devices": self.auth.list_trusted_devices(user.username),
+                "session_backend": type(self.auth.backend).__name__,
+                "mfa_enabled": bool(record.get("mfa_secret")),
+                "mfa_secret": record.get("mfa_pending_secret") if mfa_uri else None,
+                "mfa_uri": mfa_uri,
+                "mfa_qr": mfa_qr,
+                "mfa_recovery_codes": recovery_codes,
+                "mfa_pending": bool(record.get("mfa_pending_secret")),
+                "email_verified": bool(record.get("email_verified")),
+            },
+        )
+
+    async def _update_profile_mfa(self, request, user, *, record, form, error):
+        mfa_uri = None
+        recovery_codes = []
+        if form.get("mfa_action") == "enable":
+            if await self._allow_auth_action(request, "mfa-enroll", user.username):
+                mfa_uri, recovery_codes = self.auth.begin_mfa_setup(user.username, self.config.site_title)
+            else:
+                error = "Too many MFA enrollment attempts. Try again later."
+        elif form.get("mfa_action") == "confirm":
+            allowed = await self._allow_auth_action(request, "mfa-confirm", user.username)
+            if not allowed or not self.auth.confirm_mfa_setup(user.username, str(form.get("otp", ""))):
+                error = "Enter the current six-digit code to confirm MFA."
+        elif form.get("mfa_action") == "disable":
+            allowed = await self._allow_auth_action(request, "mfa-disable", user.username)
+            code = str(form.get("otp", ""))
+            valid = self.auth.verify_otp(record.get("mfa_secret", ""), code)
+            valid = valid or self.auth.consume_recovery_code(user.username, code)
+            if not allowed or not valid:
+                error = "Enter a valid authenticator or recovery code to disable MFA."
+            else:
+                record.pop("mfa_secret", None)
+                record.pop("mfa_recovery_codes", None)
+        return error, mfa_uri, recovery_codes
 
     @staticmethod
     def _mfa_qr_data(uri: str | None) -> str | None:
         if not uri:
             return None
         try:
-            import qrcode
+            qrcode = import_module("qrcode")
+
             image = qrcode.make(uri)
             output = BytesIO()
             image.save(output, format="PNG")
@@ -929,17 +1200,25 @@ class AdminDashboard:
             return None
 
     async def users_view(self, request: Request) -> Response:
+        """Render the users page for the current request."""
         await self._require_user(request, "admin.manage_users")
         error = None
         if request.method == "POST":
             form = self.validate_csrf(self._form_dict(await request.form()))
             try:
                 roles = [r.strip() for r in str(form.get("roles", "staff")).split(",") if r.strip()]
-                self.auth.add_user({"username": form.get("username", ""), "email": form.get("email", ""), "password": form.get("password", ""), "roles": roles})
+                self.auth.add_user({
+                    "username": form.get("username", ""),
+                    "email": form.get("email", ""),
+                    "password": form.get("password", ""),
+                    "roles": roles,
+                })
                 if self.store:
                     created = self.auth.users[str(form.get("username", ""))]
                     self.store.set("users", created["username"], created)
-                self.record_activity("user_created", "user", request, details={"username": form.get("username")})
+                self.record_activity(
+                    "user_created", "user", request, details={"username": form.get("username")}
+                )
                 await self._persist_database()
             except (ValueError, TypeError) as exc:
                 error = str(exc)
@@ -948,7 +1227,9 @@ class AdminDashboard:
             for record in self.auth.users.values()
         ]
         user_permission_keys = {
-            item["username"]: sorted({self.permission_catalog.resolve(value) for value in item.get("permissions", [])})
+            item["username"]: sorted({
+                self.permission_catalog.resolve(value) for value in item.get("permissions", [])
+            })
             for item in public_users
         }
         return await self.jinax.render_response(
@@ -966,6 +1247,7 @@ class AdminDashboard:
         )
 
     async def roles_view(self, request: Request) -> Response:
+        """Render the roles page for the current request."""
         await self._require_user(request, "admin.manage_groups")
         error = None
         if request.method == "POST":
@@ -985,18 +1267,18 @@ class AdminDashboard:
                         self.store.set("meta", "role_descriptions", self.role_descriptions)
                     self.record_activity("role_deleted", "role", request, details={"role": name})
                     await self._persist_database()
-                return await self.jinax.render_response("admin/roles.html", {"roles": self.roles, "role_descriptions": self.role_descriptions, "models": self.registry.get_all(), "error": error, "user": getattr(request, "user", None), **self._permission_context()})
-            if hasattr(form, "get_list"):
-                submitted = form.get_list("permissions")
-            else:
-                submitted = form.get("permissions", [])
-                submitted = submitted if isinstance(submitted, list) else [submitted]
-            permissions = []
-            for item in submitted:
-                for value in str(item).split(","):
-                    value = value.strip()
-                    if value:
-                        permissions.append(self.permission_catalog.resolve(value))
+                return await self.jinax.render_response(
+                    "admin/roles.html",
+                    {
+                        "roles": self.roles,
+                        "role_descriptions": self.role_descriptions,
+                        "models": self.registry.get_all(),
+                        "error": error,
+                        "user": getattr(request, "user", None),
+                        **self._permission_context(),
+                    },
+                )
+            permissions = self._role_form_permissions(form)
             if not name:
                 error = "Role name is required."
             else:
@@ -1008,9 +1290,35 @@ class AdminDashboard:
                     self.store.set("meta", "role_descriptions", self.role_descriptions)
                 self.record_activity("role_updated", "role", request, details={"role": name})
                 await self._persist_database()
-        return await self.jinax.render_response("admin/roles.html", {"roles": self.roles, "role_descriptions": self.role_descriptions, "models": self.registry.get_all(), "error": error, "user": getattr(request, "user", None), **self._permission_context()})
+        return await self.jinax.render_response(
+            "admin/roles.html",
+            {
+                "roles": self.roles,
+                "role_descriptions": self.role_descriptions,
+                "models": self.registry.get_all(),
+                "error": error,
+                "user": getattr(request, "user", None),
+                **self._permission_context(),
+            },
+        )
+
+    def _role_form_permissions(self, form):
+        if hasattr(form, "get_list"):
+            submitted = form.get_list("permissions")
+        else:
+            submitted = form.get("permissions", [])
+            submitted = submitted if isinstance(submitted, list) else [submitted]
+        permissions = []
+        for item in submitted:
+            for raw_value in str(item).split(","):
+                value = raw_value
+                value = value.strip()
+                if value:
+                    permissions.append(self.permission_catalog.resolve(value))
+        return permissions
 
     async def user_api(self, request: Request, username: str) -> Response:
+        """Perform the user api operation for admin dashboard."""
         actor = await self._require_user(request, "admin.manage_users")
         if request.method != "GET" and not self.csrf.verify_token(request.headers.get("x-csrf-token", "")):
             raise Forbidden("CSRF token missing or invalid")
@@ -1018,15 +1326,7 @@ class AdminDashboard:
         if record is None:
             raise NotFound("User not found.")
         if request.method == "DELETE":
-            if username == actor.username:
-                raise BadRequest("You cannot delete your own account.")
-            del self.auth.users[username]
-            if hasattr(self.auth.backend, "revoke_all"):
-                await self.auth.backend.revoke_all(record.get("id", username))
-            if self.store:
-                self.store.delete("users", username)
-            await self._persist_database()
-            return JSONResponse({"deleted": True})
+            return await self._user_api_delete(actor=actor, record=record, username=username)
         data = await request.json() or {}
         if "email" in data:
             record["email"] = str(data["email"])
@@ -1037,91 +1337,141 @@ class AdminDashboard:
         if "active" in data:
             record["active"] = bool(data["active"])
         if data.get("password"):
-            try:
-                self.auth.validate_password(str(data["password"]))
-            except ValueError as exc:
-                raise BadRequest(str(exc)) from exc
-            record["password_hash"] = self.auth.hasher.hash(str(data["password"]))
-            self.auth.invalidate_user_sessions(username)
+            self._update_user_password(record, username, str(data["password"]))
         if self.store:
             self.store.set("users", username, record)
         await self._persist_database()
         return JSONResponse(self.auth.public(record))
 
+    def _update_user_password(self, record, username, password):
+        try:
+            self.auth.validate_password(password)
+        except ValueError as exc:
+            raise BadRequest(str(exc)) from exc
+        record["password_hash"] = self.auth.hasher.hash(password)
+        self.auth.invalidate_user_sessions(username)
+
+    async def _user_api_delete(self, *, actor, record, username):
+        """Handle delete behavior for user api."""
+        if username == actor.username:
+            raise BadRequest("You cannot delete your own account.")
+        del self.auth.users[username]
+        if hasattr(self.auth.backend, "revoke_all"):
+            await self.auth.backend.revoke_all(record.get("id", username))
+        if self.store:
+            self.store.delete("users", username)
+        await self._persist_database()
+        return JSONResponse({"deleted": True})
+
+    async def _inspect_uploaded_image(self, relative, *, path, content, upload_size):
+        try:
+            image_type = import_attribute("PIL", "Image")
+
+            if self.media_storage is not None:
+                image_bytes = content
+                with image_type.open(BytesIO(image_bytes)) as image:
+                    image.verify()
+                with image_type.open(BytesIO(image_bytes)) as image:
+                    (
+                        self.media_metadata[relative]["width"],
+                        self.media_metadata[relative]["height"],
+                    ) = image.size
+                if upload_size <= self.thumbnail_sync_limit:
+                    self.media_metadata[relative]["thumbnail_status"] = "pending"
+                    self._schedule_thumbnail(relative, image_bytes)
+                else:
+                    self.media_metadata[relative]["thumbnail_status"] = "pending"
+                    self._schedule_thumbnail(relative, image_bytes)
+            else:
+                with image_type.open(path) as image:
+                    image.verify()
+                with image_type.open(path) as image:
+                    (
+                        self.media_metadata[relative]["width"],
+                        self.media_metadata[relative]["height"],
+                    ) = image.size
+                if upload_size <= self.thumbnail_sync_limit:
+                    thumbnail = self.media.create_thumbnail(path)
+                    if thumbnail:
+                        self.media_metadata[relative]["thumbnail_url"] = self.media.get_url(thumbnail)
+                else:
+                    self.media_metadata[relative]["thumbnail_status"] = "pending"
+                    self._schedule_thumbnail(relative, None)
+        except (ImportError, OSError, ValueError) as exc:
+            if self.media_storage is not None:
+                await self.media_storage.delete(relative)
+            else:
+                self.media.delete(path)
+            self.media_metadata.pop(relative, None)
+            raise BadRequest("Uploaded image data is invalid.") from exc
+
+    async def _upload_media_file(self, request):
+        message = None
+        form = await request.form()
+        self.validate_csrf(form.to_dict() if hasattr(form, "to_dict") else form)
+        values = form.get_all().values() if hasattr(form, "get_all") else form.values()
+        upload = next((v for v in values if hasattr(v, "filename")), None)
+        if upload is not None:
+            if getattr(upload, "size", 0) > self.max_upload_size:
+                raise BadRequest("Uploaded file exceeds the configured size limit.")
+            content_type = str(getattr(upload, "content_type", "application/octet-stream"))
+            if content_type not in self.allowed_upload_types:
+                raise BadRequest("This file type is not allowed.")
+            folder = "/".join(
+                Sanitizer.sanitize_filename(part)
+                for part in str(form.get("folder", "")).split("/")
+                if part.strip()
+            )
+            filename = self._media_filename(str(getattr(upload, "filename", "upload.bin")), content_type)
+            content = await upload.read()
+            if len(content) > self.max_upload_size:
+                raise BadRequest("Uploaded file exceeds the configured size limit.")
+            content = await self._validate_media_bytes(content, content_type)
+            if self.media_storage is not None:
+                relative = "/".join(part for part in (folder, filename) if part)
+                await self._storage_write(relative, content, content_type)
+                path = relative
+                upload_size = len(content)
+            else:
+                path = self.media.save_bytes(content, self.media.generate_filename(filename), path=folder)
+                relative = str(os.path.relpath(path, self.media.base_path)).replace(os.sep, "/")
+                upload_size = len(content)
+                self.media_metadata.setdefault(relative, {})["sha256"] = hashlib.sha256(content).hexdigest()
+            if self.media_storage is not None:
+                self.media_metadata.setdefault(relative, {})["sha256"] = hashlib.sha256(content).hexdigest()
+            self.media_metadata.setdefault(relative, {})["content_type"] = content_type
+            self.media_metadata[relative]["original_name"] = str(getattr(upload, "filename", ""))
+            self.media_metadata[relative]["size"] = upload_size
+            if content_type.startswith("image/"):
+                await self._inspect_uploaded_image(
+                    relative, path=path, content=content, upload_size=upload_size
+                )
+            if self.store:
+                self.store.set("media", "metadata", self.media_metadata)
+            self.record_activity("media_uploaded", "media", request, details={"filename": upload.filename})
+            await self._persist_database()
+            message = (
+                self.media_storage.get_url(path)
+                if self.media_storage is not None
+                else self.media.get_url(path)
+            )
+        return message
+
+    @staticmethod
+    def _media_kind(file: dict[str, Any]) -> str:
+        content_type = str((file.get("metadata") or {}).get("content_type", "")).lower()
+        if content_type.startswith("image/"):
+            return "images"
+        if content_type in {"application/pdf", "text/plain", "application/zip", "application/json"}:
+            return "documents"
+        return "other"
+
     async def media_view(self, request: Request) -> Response:
+        """Render the media page for the current request."""
         await self._require_user(request, "media.manage_library")
         message = None
         if request.method == "POST":
-            form = await request.form()
-            self.validate_csrf(form.to_dict() if hasattr(form, "to_dict") else form)
-            values = form.get_all().values() if hasattr(form, "get_all") else form.values()
-            upload = next((v for v in values if hasattr(v, "filename")), None)
-            if upload is not None:
-                if getattr(upload, "size", 0) > self.max_upload_size:
-                    raise BadRequest("Uploaded file exceeds the configured size limit.")
-                content_type = str(getattr(upload, "content_type", "application/octet-stream"))
-                if content_type not in self.allowed_upload_types:
-                    raise BadRequest("This file type is not allowed.")
-                folder = "/".join(Sanitizer.sanitize_filename(part) for part in str(form.get("folder", "")).split("/") if part.strip())
-                filename = self._media_filename(str(getattr(upload, "filename", "upload.bin")), content_type)
-                content = await upload.read()
-                if len(content) > self.max_upload_size:
-                    raise BadRequest("Uploaded file exceeds the configured size limit.")
-                content = await self._validate_media_bytes(content, content_type)
-                if self.media_storage is not None:
-                    relative = "/".join(part for part in (folder, filename) if part)
-                    await self._storage_write(relative, content, content_type)
-                    path = relative
-                    upload_size = len(content)
-                else:
-                    path = self.media.save_bytes(content, self.media.generate_filename(filename), path=folder)
-                    relative = str(os.path.relpath(path, self.media.base_path)).replace(os.sep, "/")
-                    upload_size = len(content)
-                    self.media_metadata.setdefault(relative, {})["sha256"] = hashlib.sha256(content).hexdigest()
-                if self.media_storage is not None:
-                    self.media_metadata.setdefault(relative, {})["sha256"] = hashlib.sha256(content).hexdigest()
-                self.media_metadata.setdefault(relative, {})["content_type"] = content_type
-                self.media_metadata[relative]["original_name"] = str(getattr(upload, "filename", ""))
-                self.media_metadata[relative]["size"] = upload_size
-                if content_type.startswith("image/"):
-                    try:
-                        from PIL import Image
-                        if self.media_storage is not None:
-                            image_bytes = content
-                            with Image.open(BytesIO(image_bytes)) as image:
-                                image.verify()
-                            with Image.open(BytesIO(image_bytes)) as image:
-                                self.media_metadata[relative]["width"], self.media_metadata[relative]["height"] = image.size
-                            if upload_size <= self.thumbnail_sync_limit:
-                                self.media_metadata[relative]["thumbnail_status"] = "pending"
-                                self._schedule_thumbnail(relative, image_bytes)
-                            else:
-                                self.media_metadata[relative]["thumbnail_status"] = "pending"
-                                self._schedule_thumbnail(relative, image_bytes)
-                        else:
-                            with Image.open(path) as image:
-                                image.verify()
-                            with Image.open(path) as image:
-                                self.media_metadata[relative]["width"], self.media_metadata[relative]["height"] = image.size
-                            if upload_size <= self.thumbnail_sync_limit:
-                                thumbnail = self.media.create_thumbnail(path)
-                                if thumbnail:
-                                    self.media_metadata[relative]["thumbnail_url"] = self.media.get_url(thumbnail)
-                            else:
-                                self.media_metadata[relative]["thumbnail_status"] = "pending"
-                                self._schedule_thumbnail(relative, None)
-                    except (ImportError, OSError, ValueError) as exc:
-                        if self.media_storage is not None:
-                            await self.media_storage.delete(relative)
-                        else:
-                            self.media.delete(path)
-                        self.media_metadata.pop(relative, None)
-                        raise BadRequest("Uploaded image data is invalid.") from exc
-                if self.store:
-                    self.store.set("media", "metadata", self.media_metadata)
-                self.record_activity("media_uploaded", "media", request, details={"filename": upload.filename})
-                await self._persist_database()
-                message = self.media_storage.get_url(path) if self.media_storage is not None else self.media.get_url(path)
+            message = await self._upload_media_file(request)
         all_files = await self._media_files()
         query = str(request.query.get("q", "")).strip().lower()
         selected_folder = str(request.query.get("folder", "")).strip().strip("/")
@@ -1141,21 +1491,28 @@ class AdminDashboard:
                 )
             ).lower()
 
-        def media_kind(file: dict[str, Any]) -> str:
-            content_type = str((file.get("metadata") or {}).get("content_type", "")).lower()
-            if content_type.startswith("image/"):
-                return "images"
-            if content_type in {"application/pdf", "text/plain", "application/zip", "application/json"}:
-                return "documents"
-            return "other"
-
         filtered = [file for file in all_files if not query or query in searchable(file)]
         if selected_folder:
-            filtered = [file for file in filtered if str(file.get("relative_name", "")).strip("/").startswith(selected_folder + "/")]
+            filtered = [
+                file
+                for file in filtered
+                if str(file.get("relative_name", "")).strip("/").startswith(selected_folder + "/")
+            ]
         if selected_kind in {"images", "documents", "other"}:
-            filtered = [file for file in filtered if media_kind(file) == selected_kind]
-        sort_key = selected_sort.lstrip("-") if selected_sort.lstrip("-") in {"name", "size", "modified", "created"} else "modified"
-        filtered.sort(key=lambda file: (file.get(sort_key) or (file.get("metadata") or {}).get(sort_key) or 0) if sort_key != "name" else str(file.get("name", "")).lower(), reverse=selected_sort.startswith("-"))
+            filtered = [file for file in filtered if self._media_kind(file) == selected_kind]
+        sort_key = (
+            selected_sort.lstrip("-")
+            if selected_sort.lstrip("-") in {"name", "size", "modified", "created"}
+            else "modified"
+        )
+        filtered.sort(
+            key=lambda file: (
+                (file.get(sort_key) or (file.get("metadata") or {}).get(sort_key) or 0)
+                if sort_key != "name"
+                else str(file.get("name", "")).lower()
+            ),
+            reverse=selected_sort.startswith("-"),
+        )
         try:
             per_page = min(100, max(12, int(request.query.get("per_page", "24") or 24)))
         except (TypeError, ValueError):
@@ -1169,9 +1526,23 @@ class AdminDashboard:
         page = min(page, pages)
         files = filtered[(page - 1) * per_page : page * per_page]
         for file in files:
-            file["is_image"] = str((file.get("metadata") or {}).get("content_type", "")).lower().startswith("image/") or str(file.get("name", "")).lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".webp"))
-        folders = sorted(set(self.media_folders) | {str(file.get("relative_name", "")).rsplit("/", 1)[0] for file in all_files if "/" in str(file.get("relative_name", ""))})
-        folder_counts = {folder: sum(1 for file in all_files if str(file.get("relative_name", "")).startswith(folder + "/")) for folder in folders}
+            file["is_image"] = str((file.get("metadata") or {}).get("content_type", "")).lower().startswith(
+                "image/"
+            ) or str(file.get("name", "")).lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".webp"))
+        folders = sorted(
+            set(self.media_folders)
+            | {
+                str(file.get("relative_name", "")).rsplit("/", 1)[0]
+                for file in all_files
+                if "/" in str(file.get("relative_name", ""))
+            }
+        )
+        folder_counts = {
+            folder: sum(
+                1 for file in all_files if str(file.get("relative_name", "")).startswith(folder + "/")
+            )
+            for folder in folders
+        }
         return await self.jinax.render_response(
             "admin/media.html",
             {
@@ -1190,23 +1561,14 @@ class AdminDashboard:
         )
 
     async def resumable_media(self, request: Request, upload_id: str | None = None) -> Response:
+        """Perform the resumable media operation for admin dashboard."""
         await self._require_user(request, "media.manage_library")
         if self.resumable_uploads is None:
             raise BadRequest("Resumable uploads require persistent AdminStore storage.")
         if request.method != "GET" and not self.csrf.verify_token(request.headers.get("x-csrf-token", "")):
             raise Forbidden("CSRF token missing or invalid")
         if request.method == "POST" and upload_id is None:
-            data = await request.json() or {}
-            filename = Sanitizer.sanitize_filename(str(data.get("filename", "upload.bin")))
-            total_size = int(data.get("total_size", 0))
-            if total_size <= 0 or total_size > self.max_upload_size:
-                raise BadRequest("Invalid upload size.")
-            content_type = str(data.get("content_type", "application/octet-stream")).lower()
-            if content_type not in self.allowed_upload_types:
-                raise BadRequest("This file type is not allowed.")
-            filename = self._media_filename(filename, content_type)
-            upload_id = self.resumable_uploads.create(filename, total_size, data.get("sha256"), content_type=content_type)
-            return JSONResponse({"upload_id": upload_id, "offset": 0}, status_code=201)
+            return await self._resumable_media_post(request=request, upload_id=upload_id)
         if upload_id is None:
             raise NotFound("Upload session not found.")
         if request.method == "GET":
@@ -1227,14 +1589,38 @@ class AdminDashboard:
         else:
             path = self.media.save_bytes(content, filename)
             url = self.media.get_url(path)
-        self.media_metadata[filename] = {"original_name": filename, "size": len(content), "content_type": content_type, "sha256": hashlib.sha256(content).hexdigest()}
+        self.media_metadata[filename] = {
+            "original_name": filename,
+            "size": len(content),
+            "content_type": content_type,
+            "sha256": hashlib.sha256(content).hexdigest(),
+        }
         if content_type.startswith("image/"):
             self.media_metadata[filename]["thumbnail_status"] = "pending"
             self._schedule_thumbnail(filename, content if self.media_storage is not None else None)
         if self.store:
             self.store.set("media", "metadata", self.media_metadata)
         await self._persist_database()
-        return JSONResponse({"filename": filename, "url": url, "sha256": self.media_metadata[filename]["sha256"]}, status_code=201)
+        return JSONResponse(
+            {"filename": filename, "url": url, "sha256": self.media_metadata[filename]["sha256"]},
+            status_code=201,
+        )
+
+    async def _resumable_media_post(self, *, request, upload_id):
+        """Handle post behavior for resumable media."""
+        data = await request.json() or {}
+        filename = Sanitizer.sanitize_filename(str(data.get("filename", "upload.bin")))
+        total_size = int(data.get("total_size", 0))
+        if total_size <= 0 or total_size > self.max_upload_size:
+            raise BadRequest("Invalid upload size.")
+        content_type = str(data.get("content_type", "application/octet-stream")).lower()
+        if content_type not in self.allowed_upload_types:
+            raise BadRequest("This file type is not allowed.")
+        filename = self._media_filename(filename, content_type)
+        upload_id = self.resumable_uploads.create(
+            filename, total_size, data.get("sha256"), content_type=content_type
+        )
+        return JSONResponse({"upload_id": upload_id, "offset": 0}, status_code=201)
 
     def _schedule_thumbnail(self, relative: str, image_bytes: bytes | None) -> None:
         if self.job_worker is not None:
@@ -1247,18 +1633,27 @@ class AdminDashboard:
     async def _generate_thumbnail(self, relative: str, image_bytes: bytes | None) -> None:
         try:
             if self.media_storage is None:
-                thumbnail = await asyncio.to_thread(self.media.create_thumbnail, str(self.media._safe_path(relative)))
+                thumbnail = await asyncio.to_thread(
+                    self.media.create_thumbnail, str(self.media._safe_path(relative))
+                )
                 if thumbnail:
-                    self.media_metadata.setdefault(relative, {})["thumbnail_url"] = self.media.get_url(thumbnail)
+                    self.media_metadata.setdefault(relative, {})["thumbnail_url"] = self.media.get_url(
+                        thumbnail
+                    )
             else:
-                from PIL import Image
-                with Image.open(BytesIO(image_bytes or await self.media_storage.read(relative))) as image:
+                image_type = import_attribute("PIL", "Image")
+
+                with image_type.open(
+                    BytesIO(image_bytes or await self.media_storage.read(relative))
+                ) as image:
                     image.thumbnail((320, 240))
                     output = BytesIO()
                     image.convert("RGB").save(output, format="JPEG", quality=85)
                 thumb_name = f"thumbnails/{Path(relative).stem}.jpg"
                 await self._storage_write(thumb_name, output.getvalue(), "image/jpeg")
-                self.media_metadata.setdefault(relative, {})["thumbnail_url"] = self.media_storage.get_url(thumb_name)
+                self.media_metadata.setdefault(relative, {})["thumbnail_url"] = self.media_storage.get_url(
+                    thumb_name
+                )
             self.media_metadata.setdefault(relative, {})["thumbnail_status"] = "ready"
             if self.store:
                 self.store.set("media", "metadata", self.media_metadata)
@@ -1269,7 +1664,11 @@ class AdminDashboard:
 
     async def _storage_write(self, path: str, data: bytes, content_type: str | None = None) -> None:
         try:
-            result = self.media_storage.write(path, data, content_type) if content_type else self.media_storage.write(path, data)
+            result = (
+                self.media_storage.write(path, data, content_type)
+                if content_type
+                else self.media_storage.write(path, data)
+            )
         except TypeError:
             result = self.media_storage.write(path, data)
         if hasattr(result, "__await__"):
@@ -1293,18 +1692,24 @@ class AdminDashboard:
             safe = str(Path(safe).with_suffix(sorted(allowed)[0]))
         return safe
 
-    async def _validate_media_bytes(self, data: bytes, content_type: str) -> bytes:
+    async def _scan_media_bytes(self, data, content_type):
         if self.media_scanner is not None:
             scanner = getattr(self.media_scanner, "scan", self.media_scanner)
             result = scanner(data, content_type)
             result = await result if hasattr(result, "__await__") else result
-            if result is False or (isinstance(result, dict) and (result.get("clean") is False or result.get("infected"))):
+            if result is False or (
+                isinstance(result, dict) and (result.get("clean") is False or result.get("infected"))
+            ):
                 raise BadRequest("The uploaded file failed security scanning.")
+
+    async def _validate_media_bytes(self, data: bytes, content_type: str) -> bytes:
+        await self._scan_media_bytes(data, content_type)
         # The browser-provided Content-Type is metadata, not proof of file
         # type. ``python-magic`` is optional because libmagic is a system
         # dependency on some platforms.
         try:
-            import magic
+            magic = import_module("magic")
+
             detected_type = str(magic.from_buffer(data, mime=True) or "").lower()
         except Exception:
             detected_type = ""
@@ -1317,13 +1722,16 @@ class AdminDashboard:
             raise BadRequest("The file content does not match its PDF type.")
         if content_type.startswith("image/"):
             try:
-                from PIL import Image
-                image = Image.open(BytesIO(data))
+                image_type = import_attribute("PIL", "Image")
+
+                image = image_type.open(BytesIO(data))
                 if image.width > self.max_image_dimensions[0] or image.height > self.max_image_dimensions[1]:
                     raise BadRequest("The image dimensions exceed the configured limit.")
                 image.load()
                 output = BytesIO()
-                image_format = image.format or ("JPEG" if content_type in {"image/jpeg", "image/jpg"} else "PNG")
+                image_format = image.format or (
+                    "JPEG" if content_type in {"image/jpeg", "image/jpg"} else "PNG"
+                )
                 save_kwargs = {"exif": b""} if image_format in {"JPEG", "WEBP", "PNG"} else {}
                 image.save(output, format=image_format, **save_kwargs)
                 return output.getvalue()
@@ -1347,7 +1755,7 @@ class AdminDashboard:
             metadata["thumbnail_url"] = thumbnail_url
             thumbnail_relative = thumbnail_url.split("?", 1)[0].lstrip("/")
             if thumbnail_relative.startswith(self.media.url_prefix.lstrip("/") + "/"):
-                thumbnail_relative = thumbnail_relative[len(self.media.url_prefix.lstrip("/")) + 1:]
+                thumbnail_relative = thumbnail_relative[len(self.media.url_prefix.lstrip("/")) + 1 :]
             if self.media_storage is not None:
                 available = await self.media_storage.exists(thumbnail_relative)
             else:
@@ -1357,49 +1765,60 @@ class AdminDashboard:
             return metadata
 
         if self.media_storage is not None:
-            files = []
-            for relative in await self.media_storage.list(""):
-                if not relative or relative.startswith("thumbnails/"):
-                    continue
-                size = await self.media_storage.size(relative)
-                files.append({"name": Path(relative).name, "size": size, "relative_name": relative, "url": self.media_storage.get_url(relative), "metadata": await display_metadata(relative)})
-            return files
+            return await self._media_files_media_storage(display_metadata=display_metadata)
         files = []
         for path in self.media.base_path.rglob("*"):
             if path.is_file():
                 relative = str(path.relative_to(self.media.base_path)).replace(os.sep, "/")
                 if relative.startswith("thumbnails/"):
                     continue
-                files.append(self.media.get_file_info(str(path)) | {"relative_name": relative, "url": self.media.get_url(str(path)), "metadata": await display_metadata(relative)})
+                files.append(
+                    self.media.get_file_info(str(path))
+                    | {
+                        "relative_name": relative,
+                        "url": self.media.get_url(str(path)),
+                        "metadata": await display_metadata(relative),
+                    }
+                )
+        return files
+
+    async def _media_files_media_storage(self, *, display_metadata):
+        """Handle media storage behavior for  media files."""
+        files = []
+        for relative in await self.media_storage.list(""):
+            if not relative or relative.startswith("thumbnails/"):
+                continue
+            size = await self.media_storage.size(relative)
+            files.append({
+                "name": Path(relative).name,
+                "size": size,
+                "relative_name": relative,
+                "url": self.media_storage.get_url(relative),
+                "metadata": await display_metadata(relative),
+            })
         return files
 
     async def media_folders_api(self, request: Request) -> Response:
+        """Perform the media folders api operation for admin dashboard."""
         await self._require_user(request, "media.manage_library")
-        folder = "/".join(Sanitizer.sanitize_filename(part) for part in str(request.path.rsplit("/folders/", 1)[-1] if "/folders/" in request.path else "").split("/") if part.strip())
+        folder = "/".join(
+            Sanitizer.sanitize_filename(part)
+            for part in str(
+                request.path.rsplit("/folders/", 1)[-1] if "/folders/" in request.path else ""
+            ).split("/")
+            if part.strip()
+        )
         if request.method == "DELETE":
-            if not folder:
-                raise BadRequest("Folder name is required.")
-            if not self.csrf.verify_token(request.headers.get("x-csrf-token", "")):
-                raise Forbidden("CSRF token missing or invalid")
-            prefix = folder.rstrip("/") + "/"
-            if self.media_storage is not None:
-                for name in await self.media_storage.list(folder):
-                    await self.media_storage.delete(name)
-            else:
-                self.media.delete_directory(folder)
-            self.media_folders = [item for item in self.media_folders if item != folder and not item.startswith(prefix)]
-            self.media_metadata = {name: value for name, value in self.media_metadata.items() if name != folder and not name.startswith(prefix)}
-            if self.store:
-                self.store.set("media", "folders", self.media_folders)
-                self.store.set("media", "metadata", self.media_metadata)
-            await self._persist_database()
-            self.record_activity("media_folder_deleted", "media", request, details={"folder": folder})
-            return JSONResponse({"deleted": True, "folders": self.media_folders})
+            return await self._media_folders_api_delete(folder=folder, request=request)
         if request.method == "POST":
             if not self.csrf.verify_token(request.headers.get("x-csrf-token", "")):
                 raise Forbidden("CSRF token missing or invalid")
             data = await request.json() or {}
-            folder = "/".join(Sanitizer.sanitize_filename(part) for part in str(data.get("name", "")).split("/") if part.strip())
+            folder = "/".join(
+                Sanitizer.sanitize_filename(part)
+                for part in str(data.get("name", "")).split("/")
+                if part.strip()
+            )
             if not folder:
                 raise BadRequest("Folder name is required.")
             if self.media_storage is None:
@@ -1415,6 +1834,33 @@ class AdminDashboard:
             await self._persist_database()
         return JSONResponse({"folders": self.media_folders})
 
+    async def _media_folders_api_delete(self, *, folder, request):
+        """Handle delete behavior for media folders api."""
+        if not folder:
+            raise BadRequest("Folder name is required.")
+        if not self.csrf.verify_token(request.headers.get("x-csrf-token", "")):
+            raise Forbidden("CSRF token missing or invalid")
+        prefix = folder.rstrip("/") + "/"
+        if self.media_storage is not None:
+            for name in await self.media_storage.list(folder):
+                await self.media_storage.delete(name)
+        else:
+            self.media.delete_directory(folder)
+        self.media_folders = [
+            item for item in self.media_folders if item != folder and not item.startswith(prefix)
+        ]
+        self.media_metadata = {
+            name: value
+            for name, value in self.media_metadata.items()
+            if name != folder and not name.startswith(prefix)
+        }
+        if self.store:
+            self.store.set("media", "folders", self.media_folders)
+            self.store.set("media", "metadata", self.media_metadata)
+        await self._persist_database()
+        self.record_activity("media_folder_deleted", "media", request, details={"folder": folder})
+        return JSONResponse({"deleted": True, "folders": self.media_folders})
+
     async def media_bulk_api(self, request: Request) -> Response:
         """Apply an explicit action to selected media records."""
         await self._require_user(request, "media.manage_library")
@@ -1429,8 +1875,16 @@ class AdminDashboard:
             raise BadRequest("Unsupported media action.")
         deleted = 0
         for raw_name in names:
-            name = "/".join(Sanitizer.sanitize_filename(part) for part in str(raw_name).split("/") if part not in {"", "."})
-            exists = await self.media_storage.exists(name) if self.media_storage is not None else self.media.exists(str(self.media._safe_path(name)))
+            name = "/".join(
+                Sanitizer.sanitize_filename(part)
+                for part in str(raw_name).split("/")
+                if part not in {"", "."}
+            )
+            exists = (
+                await self.media_storage.exists(name)
+                if self.media_storage is not None
+                else self.media.exists(str(self.media._safe_path(name)))
+            )
             if not exists:
                 continue
             if self.media_storage is not None:
@@ -1446,65 +1900,112 @@ class AdminDashboard:
         return JSONResponse({"deleted": deleted})
 
     async def media_signed_url(self, request: Request, filename: str) -> Response:
+        """Perform the media signed url operation for admin dashboard."""
         await self._require_user(request, "media.manage_library")
-        name = "/".join(Sanitizer.sanitize_filename(part) for part in filename.split("/") if part not in {"", "."})
-        exists = await self.media_storage.exists(name) if self.media_storage is not None else self.media.exists(str(self.media._safe_path(name)))
+        name = "/".join(
+            Sanitizer.sanitize_filename(part) for part in filename.split("/") if part not in {"", "."}
+        )
+        exists = (
+            await self.media_storage.exists(name)
+            if self.media_storage is not None
+            else self.media.exists(str(self.media._safe_path(name)))
+        )
         if not exists:
             raise NotFound("Media file not found.")
         if self.media_storage is not None and hasattr(self.media_storage, "get_signed_url"):
             result = self.media_storage.get_signed_url(name, int(request.query.get("expires", "900") or 900))
             url = await result if hasattr(result, "__await__") else result
         else:
-            url = self.media_storage.get_url(name) if self.media_storage is not None else self.media.get_url(str(self.media._safe_path(name)))
-        return JSONResponse({"name": name, "url": url, "signed": bool(self.media_storage is not None and hasattr(self.media_storage, "get_signed_url"))})
+            url = (
+                self.media_storage.get_url(name)
+                if self.media_storage is not None
+                else self.media.get_url(str(self.media._safe_path(name)))
+            )
+        return JSONResponse({
+            "name": name,
+            "url": url,
+            "signed": bool(self.media_storage is not None and hasattr(self.media_storage, "get_signed_url")),
+        })
 
     async def media_api(self, request: Request, filename: str) -> Response:
+        """Perform the media api operation for admin dashboard."""
         await self._require_user(request, "media.manage_library")
         if not self.csrf.verify_token(request.headers.get("x-csrf-token", "")):
             raise Forbidden("CSRF token missing or invalid")
-        filename = "/".join(Sanitizer.sanitize_filename(part) for part in filename.split("/") if part not in {"", "."})
+        filename = "/".join(
+            Sanitizer.sanitize_filename(part) for part in filename.split("/") if part not in {"", "."}
+        )
         path = str(self.media._safe_path(filename))
-        exists = await self.media_storage.exists(filename) if self.media_storage is not None else self.media.exists(path)
+        exists = (
+            await self.media_storage.exists(filename)
+            if self.media_storage is not None
+            else self.media.exists(path)
+        )
         if not exists:
             raise NotFound("Media file not found.")
         if request.method == "DELETE":
-            if self.media_storage is not None:
-                await self.media_storage.delete(filename)
-            else:
-                self.media.delete(path)
-            self.media_metadata.pop(filename, None)
-            if self.store:
-                self.store.set("media", "metadata", self.media_metadata)
-            await self._persist_database()
-            return JSONResponse({"deleted": True})
+            return await self._media_api_delete(filename=filename, path=path)
         data = await request.json() or {}
-        new_name = "/".join(Sanitizer.sanitize_filename(part) for part in str(data.get("name", filename)).split("/") if part not in {"", "."})
+        new_name = "/".join(
+            Sanitizer.sanitize_filename(part)
+            for part in str(data.get("name", filename)).split("/")
+            if part not in {"", "."}
+        )
         if not new_name:
             raise BadRequest("A media filename is required.")
         if new_name != filename:
-            target_exists = await self.media_storage.exists(new_name) if self.media_storage is not None else self.media.exists(str(self.media._safe_path(new_name)))
+            target_exists = (
+                await self.media_storage.exists(new_name)
+                if self.media_storage is not None
+                else self.media.exists(str(self.media._safe_path(new_name)))
+            )
             if target_exists:
                 raise BadRequest("A media file with that name already exists.")
         target = str(self.media._safe_path(new_name))
         Path(target).parent.mkdir(parents=True, exist_ok=True)
         if self.media_storage is not None:
-            await self._storage_write(new_name, await self.media_storage.read(filename), self.media_metadata.get(filename, {}).get("content_type"))
+            await self._storage_write(
+                new_name,
+                await self.media_storage.read(filename),
+                self.media_metadata.get(filename, {}).get("content_type"),
+            )
             await self.media_storage.delete(filename)
         else:
-            os.replace(path, target)
+            Path(path).replace(target)
         metadata = self.media_metadata.pop(filename, {})
-        editable_metadata = {"alt", "title", "caption", "description", "credit"}
-        for key, value in (data.get("metadata") or {}).items():
-            if key in editable_metadata:
-                metadata[key] = str(value).strip()[:1000]
+        self._update_media_metadata(metadata, data)
         self.media_metadata[new_name] = metadata
         if self.store:
             self.store.set("media", "metadata", self.media_metadata)
         await self._persist_database()
-        url = self.media_storage.get_url(new_name) if self.media_storage is not None else self.media.get_url(target)
+        url = (
+            self.media_storage.get_url(new_name)
+            if self.media_storage is not None
+            else self.media.get_url(target)
+        )
         return JSONResponse({"name": new_name, "url": url, "metadata": metadata})
 
+    @staticmethod
+    def _update_media_metadata(metadata, data):
+        editable_metadata = {"alt", "title", "caption", "description", "credit"}
+        for key, value in (data.get("metadata") or {}).items():
+            if key in editable_metadata:
+                metadata[key] = str(value).strip()[:1000]
+
+    async def _media_api_delete(self, *, filename, path):
+        """Handle delete behavior for media api."""
+        if self.media_storage is not None:
+            await self.media_storage.delete(filename)
+        else:
+            self.media.delete(path)
+        self.media_metadata.pop(filename, None)
+        if self.store:
+            self.store.set("media", "metadata", self.media_metadata)
+        await self._persist_database()
+        return JSONResponse({"deleted": True})
+
     async def search(self, request: Request) -> Response:
+        """Perform the search operation for admin dashboard."""
         user = await self._require_user(request, "admin.view_dashboard")
         needle = request.query.get("q", "").lower().strip()
         results = []
@@ -1513,10 +2014,18 @@ class AdminDashboard:
                 for obj in await self._visible_instances(model, user):
                     values = self._safe_record(UpdateView._snapshot(obj))
                     if needle in " ".join(str(v) for v in values.values()).lower():
-                        results.append({"model": model.get_name(), "label": model.get_verbose_name(), "id": values.get("id", ""), "values": values})
-        return await self.jinax.render_response("admin/search.html", {"query": needle, "results": results, "models": self.registry.get_all()})
+                        results.append({
+                            "model": model.get_name(),
+                            "label": model.get_verbose_name(),
+                            "id": values.get("id", ""),
+                            "values": values,
+                        })
+        return await self.jinax.render_response(
+            "admin/search.html", {"query": needle, "results": results, "models": self.registry.get_all()}
+        )
 
     async def relationship_choices(self, request: Request, model_name: str, field_name: str) -> Response:
+        """Perform the relationship choices operation for admin dashboard."""
         await self._require_model_user(request, model_name, "read")
         registered = self.registry.get(model_name)
         adapter = registered.model
@@ -1529,9 +2038,13 @@ class AdminDashboard:
             raise BadRequest("page must be an integer") from exc
         rows = await adapter.related_rows(field, str(request.query.get("q", ""))[:200])
         start = (page - 1) * 25
-        return JSONResponse({"items": [{"id": str(row.pk), "label": str(row)} for row in rows[start:start + 25]], "more": len(rows) > start + 25})
+        return JSONResponse({
+            "items": [{"id": str(row.pk), "label": str(row)} for row in rows[start : start + 25]],
+            "more": len(rows) > start + 25,
+        })
 
     async def model_export(self, request: Request, model_name: str) -> Response:
+        """Perform the model export operation for admin dashboard."""
         await self._require_model_user(request, model_name, "read")
         admin_model = self.registry.get(model_name)
         if not admin_model:
@@ -1545,21 +2058,53 @@ class AdminDashboard:
             writer = csv.DictWriter(output, fieldnames=fields, extrasaction="ignore")
             writer.writeheader()
             writer.writerows(records)
-            return Response(output.getvalue(), media_type="text/csv; charset=utf-8", headers={"content-disposition": f"attachment; filename={model_name}.csv"})
-        return JSONResponse(records, headers={"content-disposition": f"attachment; filename={model_name}.json"})
+            return Response(
+                output.getvalue(),
+                media_type="text/csv; charset=utf-8",
+                headers={"content-disposition": f"attachment; filename={model_name}.csv"},
+            )
+        return JSONResponse(
+            records, headers={"content-disposition": f"attachment; filename={model_name}.json"}
+        )
 
     async def model_import(self, request: Request, model_name: str) -> Response:
+        """Validate an import, enforce model permissions, and report transaction outcomes."""
         await self._require_model_user(request, model_name, "create")
         admin_model = self.registry.get(model_name)
         if not admin_model:
             return await self._not_found()
-        form = await request.form() if "multipart/form-data" in request.headers.get("content-type", "") else None
+        records = await self._import_document(request)
+        valid, errors = await self._validate_import_rows(admin_model, records)
+        preview = str(request.query.get("preview", "")).lower() in {"1", "true", "yes"}
+        if preview:
+            return JSONResponse({"valid": len(valid), "errors": errors, "rows": [row for row, _ in valid]})
+        allow_partial = str(request.query.get("allow_partial", "")).lower() in {"1", "true", "yes"}
+        if errors and not allow_partial:
+            return JSONResponse({"imported": 0, "errors": errors, "rolled_back": True}, status_code=422)
+        if hasattr(admin_model.model, "transaction"):
+            return await self._import_transactional_rows(
+                request=request,
+                model_name=model_name,
+                admin_model=admin_model,
+                valid=valid,
+                errors=errors,
+                allow_partial=allow_partial,
+            )
+        return await self._import_legacy_rows(request, model_name, admin_model, valid, errors, allow_partial)
+
+    async def _import_document(self, request: Request) -> list:
+        form = (
+            await request.form() if "multipart/form-data" in request.headers.get("content-type", "") else None
+        )
         if form is not None:
-            form_data = form.to_dict() if hasattr(form, "to_dict") else dict(form)
-            self.validate_csrf(form_data)
+            self.validate_csrf(form.to_dict() if hasattr(form, "to_dict") else dict(form))
         elif not self.csrf.verify_token(request.headers.get("x-csrf-token", "")):
             raise Forbidden("CSRF token missing or invalid")
-        raw = next((value for value in form.get_all().values() if hasattr(value, "filename")), None) if form else None
+        raw = (
+            next((value for value in form.get_all().values() if hasattr(value, "filename")), None)
+            if form
+            else None
+        )
         if raw is not None:
             payload = (await raw.read()).decode("utf-8")
             fmt = "csv" if str(raw.filename).lower().endswith(".csv") else "json"
@@ -1572,13 +2117,16 @@ class AdminDashboard:
             raise BadRequest(f"Invalid import document: {exc}") from exc
         if not isinstance(records, list):
             raise BadRequest("Import document must contain a list of records.")
-        created, errors, valid = [], [], []
+        return records
+
+    async def _validate_import_rows(self, admin_model, records):
+        valid, errors = [], []
+        validator = admin_model.validate_import or getattr(admin_model.model, "validate_instance", None)
         for row, record in enumerate(records, 1):
             if not isinstance(record, dict):
                 errors.append({"row": row, "error": "Record must be an object."})
                 continue
             try:
-                validator = admin_model.validate_import or getattr(admin_model.model, "validate_instance", None)
                 if validator is not None:
                     checked = validator(record)
                     checked = await checked if hasattr(checked, "__await__") else checked
@@ -1587,55 +2135,71 @@ class AdminDashboard:
                 valid.append((row, record))
             except Exception as exc:
                 errors.append({"row": row, "error": str(exc)})
-        preview = str(request.query.get("preview", "")).lower() in {"1", "true", "yes"}
-        if preview:
-            return JSONResponse({"valid": len(valid), "errors": errors, "rows": [row for row, _ in valid]})
-        allow_partial = str(request.query.get("allow_partial", "")).lower() in {"1", "true", "yes"}
-        if errors and not allow_partial:
-            return JSONResponse({"imported": 0, "errors": errors, "rolled_back": True}, status_code=422)
-        if hasattr(admin_model.model, "transaction"):
-            imported = 0
-            try:
-                if allow_partial:
-                    for row, record in valid:
-                        try:
-                            async with admin_model.model.transaction():
-                                await admin_model.model.create_instance(record)
-                            imported += 1
-                        except Exception as exc:
-                            errors.append({"row": row, "error": str(exc)})
-                else:
-                    async with admin_model.model.transaction():
-                        for row, record in valid:
-                            await admin_model.model.create_instance(record)
-                            imported += 1
-            except Exception as exc:
-                return JSONResponse({"imported": 0, "errors": [{"row": row, "error": str(exc)}], "rolled_back": True}, status_code=422)
-            self.record_activity("imported", model_name, request, imported=imported, errors=len(errors))
-            return JSONResponse({"imported": imported, "errors": errors}, status_code=207 if errors else 201)
-        created_records: list[dict[str, Any]] = []
+        return valid, errors
+
+    async def _import_transactional_rows(
+        self, *, request, model_name, admin_model, valid, errors, allow_partial
+    ):
+        imported, active_row = 0, None
         try:
-            for row, record in valid:
-                result = admin_model.model.create_instance(record) if hasattr(admin_model.model, "create_instance") else None
+            if allow_partial:
+                imported = await self._import_individual_transactions(admin_model, valid, errors)
+            else:
+                async with admin_model.model.transaction():
+                    for row, record in valid:
+                        active_row = row
+                        await admin_model.model.create_instance(record)
+                        imported += 1
+        except Exception as exc:
+            return JSONResponse(
+                {"imported": 0, "errors": [{"row": active_row, "error": str(exc)}], "rolled_back": True},
+                status_code=422,
+            )
+        self.record_activity("imported", model_name, request, imported=imported, errors=len(errors))
+        return JSONResponse({"imported": imported, "errors": errors}, status_code=207 if errors else 201)
+
+    async def _import_individual_transactions(self, admin_model, valid, errors):
+        imported = 0
+        for row, record in valid:
+            try:
+                async with admin_model.model.transaction():
+                    await admin_model.model.create_instance(record)
+                imported += 1
+            except Exception as exc:
+                errors.append({"row": row, "error": str(exc)})
+        return imported
+
+    async def _import_legacy_rows(self, *, request, model_name, admin_model, valid, errors, allow_partial):
+        created_records = []
+        try:
+            for _, record in valid:
+                creator = getattr(admin_model.model, "create_instance", None)
+                result = creator(record) if creator is not None else None
                 result = await result if hasattr(result, "__await__") else result
                 created_records.append(result or record)
-            created = created_records
         except Exception as exc:
-            if not allow_partial:
-                for item in created_records:
-                    identifier = item.get("id") if isinstance(item, dict) else getattr(item, "id", None)
-                    delete = getattr(admin_model.model, "delete_instance", None)
-                    if delete is not None and identifier is not None:
-                        result = delete(identifier)
-                        if hasattr(result, "__await__"):
-                            await result
-                errors.append({"row": "unknown", "error": str(exc)})
-                return JSONResponse({"imported": 0, "errors": errors, "rolled_back": True}, status_code=422)
             errors.append({"row": "unknown", "error": str(exc)})
-        self.record_activity("imported", model_name, request, details={"imported": len(created), "errors": len(errors)})
-        return JSONResponse({"imported": len(created), "errors": errors}, status_code=201 if not errors else 207)
+            if not allow_partial:
+                await self._rollback_legacy_import(admin_model, created_records)
+                return JSONResponse({"imported": 0, "errors": errors, "rolled_back": True}, status_code=422)
+        self.record_activity(
+            "imported", model_name, request, details={"imported": len(created_records), "errors": len(errors)}
+        )
+        return JSONResponse(
+            {"imported": len(created_records), "errors": errors}, status_code=201 if not errors else 207
+        )
+
+    async def _rollback_legacy_import(self, admin_model, created_records):
+        for item in created_records:
+            identifier = item.get("id") if isinstance(item, dict) else getattr(item, "id", None)
+            delete = getattr(admin_model.model, "delete_instance", None)
+            if delete is not None and identifier is not None:
+                result = delete(identifier)
+                if hasattr(result, "__await__"):
+                    await result
 
     async def settings_view(self, request: Request) -> Response:
+        """Render the settings page for the current request."""
         await self._require_user(request, "admin.manage_settings")
         if request.method == "POST":
             form = self.validate_csrf(self._form_dict(await request.form()))
@@ -1661,11 +2225,14 @@ class AdminDashboard:
         )
 
     async def history(self, request: Request, model_name: str, object_id: str) -> Response:
+        """Perform the history operation for admin dashboard."""
         user = await self._require_user(request, "admin.view_dashboard")
         model = self.registry.get(model_name)
         if not model:
             return await self._not_found()
-        entries = [a.to_dict() for a in self.activities if a.resource == model_name and a.record_id == object_id]
+        entries = [
+            a.to_dict() for a in self.activities if a.resource == model_name and a.record_id == object_id
+        ]
         obj = None
         if hasattr(model.model, "get_instance"):
             result = model.model.get_instance(object_id)
@@ -1685,6 +2252,7 @@ class AdminDashboard:
         )
 
     async def activity_view(self, request: Request) -> Response:
+        """Render the activity page for the current request."""
         user = await self._require_user(request, "admin.view_dashboard")
         query = request.query.get("q", "").lower().strip()
         action = request.query.get("action", "").lower().strip()
@@ -1693,7 +2261,11 @@ class AdminDashboard:
         entries = []
         for item in self.activities:
             value = item.to_dict()
-            if query and query not in f"{item.action} {item.resource} {item.username} {item.record_id or ''}".lower():
+            if (
+                query
+                and query
+                not in f"{item.action} {item.resource} {item.username} {item.record_id or ''}".lower()
+            ):
                 continue
             if action and item.action.lower() != action:
                 continue
@@ -1717,49 +2289,70 @@ class AdminDashboard:
         )
 
     async def activity_export(self, request: Request) -> Response:
+        """Perform the activity export operation for admin dashboard."""
         await self._require_user(request, "admin.view_dashboard")
         output = io.StringIO()
-        writer = csv.DictWriter(output, fieldnames=["action", "resource", "record_id", "username", "timestamp", "details"])
+        writer = csv.DictWriter(
+            output, fieldnames=["action", "resource", "record_id", "username", "timestamp", "details"]
+        )
         writer.writeheader()
         for item in reversed(self.activities):
             writer.writerow(item.to_dict())
-        return Response(output.getvalue(), media_type="text/csv; charset=utf-8", headers={"content-disposition": "attachment; filename=flaxon-activity.csv"})
+        return Response(
+            output.getvalue(),
+            media_type="text/csv; charset=utf-8",
+            headers={"content-disposition": "attachment; filename=flaxon-activity.csv"},
+        )
 
     async def notifications_api(self, request: Request) -> Response:
         """Return and update durable per-user admin notifications."""
         user = await self._require_user(request, "admin.view_dashboard")
         username = getattr(user, "username", "system")
         if request.method == "POST":
-            if not self.csrf.verify_token(request.headers.get("x-csrf-token", "")):
-                raise Forbidden("CSRF token missing or invalid")
-            body = await request.json() or {}
-            ids = body.get("ids")
-            if body.get("all"):
-                ids = [item["id"] for item in self.notifications]
-            if not isinstance(ids, list):
-                raise BadRequest("Notification ids must be a list.")
-            selected = {str(item) for item in ids}
-            for item in self.notifications:
-                if item.get("id") in selected and username not in item.setdefault("read_by", []):
-                    item["read_by"].append(username)
-            if self.notification_service is not None:
-                self.notification_service.mark_read(username, [str(item) for item in ids], all_messages=bool(body.get("all")))
-            if self.store:
-                self.store.set("meta", "notifications", self.notifications[-1000:])
-            await self._persist_database()
+            await self._mark_notifications_read(request, username)
         if self.notification_service is not None:
             entries = []
             for message in self.notification_service.list(username, unread_only=True, limit=20):
                 payload = message.get("payload") or {}
-                entries.append({**payload, "id": message.get("id"), "username": username, "timestamp": message.get("created_at"), "delivery_status": message.get("delivery_status")})
+                entries.append({
+                    **payload,
+                    "id": message.get("id"),
+                    "username": username,
+                    "timestamp": message.get("created_at"),
+                    "delivery_status": message.get("delivery_status"),
+                })
         else:
-            entries = [item for item in self.notifications[::-1] if username not in item.get("read_by", [])][:20]
+            entries = [item for item in self.notifications[::-1] if username not in item.get("read_by", [])][
+                :20
+            ]
         return JSONResponse({
             "items": entries,
             "unread": len(entries),
         })
 
+    async def _mark_notifications_read(self, request, username):
+        if not self.csrf.verify_token(request.headers.get("x-csrf-token", "")):
+            raise Forbidden("CSRF token missing or invalid")
+        body = await request.json() or {}
+        ids = body.get("ids")
+        if body.get("all"):
+            ids = [item["id"] for item in self.notifications]
+        if not isinstance(ids, list):
+            raise BadRequest("Notification ids must be a list.")
+        selected = {str(item) for item in ids}
+        for item in self.notifications:
+            if item.get("id") in selected and username not in item.setdefault("read_by", []):
+                item["read_by"].append(username)
+        if self.notification_service is not None:
+            self.notification_service.mark_read(
+                username, [str(item) for item in ids], all_messages=bool(body.get("all"))
+            )
+        if self.store:
+            self.store.set("meta", "notifications", self.notifications[-1000:])
+        await self._persist_database()
+
     async def notification_preferences(self, request: Request) -> Response:
+        """Perform the notification preferences operation for admin dashboard."""
         user = await self._require_user(request, "admin.view_dashboard")
         if self.notification_service is None:
             raise BadRequest("Notification preferences require persistent AdminStore storage.")
@@ -1771,10 +2364,12 @@ class AdminDashboard:
         return JSONResponse(self.notification_service.preferences(username))
 
     async def audit_verify(self, request: Request) -> Response:
+        """Perform the audit verify operation for admin dashboard."""
         await self._require_user(request, "admin.view_dashboard")
         return JSONResponse({"valid": self.audit_log.verify() if self.audit_log else False})
 
     async def webauthn_api(self, request: Request) -> Response:
+        """Perform the webauthn api operation for admin dashboard."""
         user = await self._require_user(request, "admin.manage_profile")
         if self.webauthn is None:
             raise BadRequest("WebAuthn requires persistent AdminStore storage.")
@@ -1783,7 +2378,11 @@ class AdminDashboard:
         data = await request.json() or {}
         operation = request.path.rsplit("/", 1)[-1]
         if operation == "begin":
-            result = self.webauthn.begin_registration(user.username) if "/register/" in request.path else self.webauthn.begin_authentication(user.username)
+            result = (
+                self.webauthn.begin_registration(user.username)
+                if "/register/" in request.path
+                else self.webauthn.begin_authentication(user.username)
+            )
         elif "/register/" in request.path:
             result = self.webauthn.finish_registration(user.username, data)
         else:
@@ -1793,19 +2392,23 @@ class AdminDashboard:
         return JSONResponse({"result": result})
 
     async def trusted_devices_api(self, request: Request, device_id: str | None = None) -> Response:
+        """Perform the trusted devices api operation for admin dashboard."""
         user = await self._require_user(request, "admin.manage_profile")
         if request.method != "GET" and not self.csrf.verify_token(request.headers.get("x-csrf-token", "")):
             raise Forbidden("CSRF token missing or invalid")
         if request.method == "GET":
             return JSONResponse({"items": self.auth.list_trusted_devices(user.username)})
         if request.method == "DELETE":
-            return JSONResponse({"revoked": self.auth.revoke_trusted_device(user.username, str(device_id or ""))})
+            return JSONResponse({
+                "revoked": self.auth.revoke_trusted_device(user.username, str(device_id or ""))
+            })
         body = await request.json() or {}
         token = self.auth.issue_trusted_device(user.username, str(body.get("label", "Browser")))
         await self._persist_database()
         return JSONResponse({"token": token}, status_code=201)
 
     async def mfa_recovery_api(self, request: Request) -> Response:
+        """Perform the mfa recovery api operation for admin dashboard."""
         user = await self._require_user(request, "admin.manage_profile")
         if not self.csrf.verify_token(request.headers.get("x-csrf-token", "")):
             raise Forbidden("CSRF token missing or invalid")
@@ -1815,11 +2418,15 @@ class AdminDashboard:
         return JSONResponse({"codes": codes})
 
     async def operations_view(self, request: Request) -> Response:
+        """Render the operations page for the current request."""
         user = await self._require_user(request, "admin.view_dashboard")
         health = getattr(self.app, "health", None)
         checks = []
         if health is not None and hasattr(health, "checks"):
-            checks = [{"name": name, "status": getattr(check, "status", "registered")} for name, check in getattr(health, "checks", {}).items()]
+            checks = [
+                {"name": name, "status": getattr(check, "status", "registered")}
+                for name, check in getattr(health, "checks", {}).items()
+            ]
             self._record_operation("health", {"checks": checks})
         metrics = getattr(self.app, "metrics", None)
         tasks = await self._task_snapshots()
@@ -1851,6 +2458,7 @@ class AdminDashboard:
         )
 
     async def operations_tasks_api(self, request: Request) -> Response:
+        """Perform the operations tasks api operation for admin dashboard."""
         await self._require_user(request, "admin.view_dashboard")
         return JSONResponse({"tasks": await self._task_snapshots()})
 
@@ -1859,7 +2467,17 @@ class AdminDashboard:
         if queue is None or not hasattr(queue, "get_all_tasks"):
             return []
         tasks = await queue.get_all_tasks()
-        snapshots = [{"id": task.id, "name": task.name, "status": getattr(task.status, "value", str(task.status)), "error": task.error, "queue": task.queue, "created_at": task.created_at.isoformat()} for task in tasks]
+        snapshots = [
+            {
+                "id": task.id,
+                "name": task.name,
+                "status": getattr(task.status, "value", str(task.status)),
+                "error": task.error,
+                "queue": task.queue,
+                "created_at": task.created_at.isoformat(),
+            }
+            for task in tasks
+        ]
         failures = [item for item in snapshots if item["status"] in {"failed", "timeout"}]
         if failures:
             self._record_operation("task_failure", {"tasks": failures})
@@ -1875,6 +2493,7 @@ class AdminDashboard:
             self.store.set("operations", "records", self.operations)
 
     def get_urls(self) -> list[tuple[str, str, Any]]:
+        """Return the urls."""
         return [
             (f"{self.url_prefix}/", "GET", self.index),
             (f"{self.url_prefix}/<model_name>", "GET", self.list_view),

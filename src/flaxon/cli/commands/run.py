@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import argparse
-import os
 import sys
+from pathlib import Path
 from typing import Any
 
+from flaxon._imports import import_attribute, import_module
 from flaxon.cli.base import Command
 
 
 class RunCommand(Command):
+    """Run command implementation for the cli subsystem."""
+
     def __init__(self) -> None:
         super().__init__(
             name="run",
@@ -28,16 +31,17 @@ class RunCommand(Command):
 
     def _run(self, args: argparse.Namespace, console: Any) -> int:
         try:
-            import uvicorn
+            uvicorn = import_module("uvicorn")
         except ImportError:
             console.error("Uvicorn is not installed. Run: pip install uvicorn")
             return 1
 
         if args.env_file:
-            from dotenv import load_dotenv
+            load_dotenv = import_attribute("dotenv", "load_dotenv")
+
             load_dotenv(args.env_file)
 
-        cwd = os.getcwd()
+        cwd = str(Path.cwd())
         if cwd not in sys.path:
             sys.path.insert(0, cwd)
 

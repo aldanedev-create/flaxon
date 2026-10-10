@@ -26,6 +26,7 @@ class StaticFiles:
         self.cache_control = cache_control
 
     async def __call__(self, request: Request, filepath: str) -> Response:
+        """Handle the supplied call using this object's configured behavior."""
         target = (self.directory / filepath).resolve()
 
         try:

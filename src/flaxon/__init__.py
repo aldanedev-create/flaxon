@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from .version import __version__, __version_info__, version_info
 
+from flaxon._imports import import_attribute
+
 version = __version__
 
 __all__ = [
@@ -36,53 +38,36 @@ __all__ = [
 ]
 
 
+_EXPORTS = {
+    "Config": "flaxon.application",
+    "Flaxon": "flaxon.application",
+    "State": "flaxon.application",
+    "Router": "flaxon.routing",
+    "Query": "flaxon.routing",
+    "HTMLResponse": "flaxon.http",
+    "JSONResponse": "flaxon.http",
+    "LegacyJSONResponse": "flaxon.http",
+    "RedirectResponse": "flaxon.http",
+    "Request": "flaxon.http",
+    "Response": "flaxon.http",
+    "StreamingResponse": "flaxon.http",
+    "TextResponse": "flaxon.http",
+    "WebSocket": "flaxon.websocket",
+    "WebSocketDisconnect": "flaxon.websocket",
+    "WebSocketManager": "flaxon.websocket",
+    "ConfigurationError": "flaxon.exceptions",
+    "FlaxonError": "flaxon.exceptions",
+    "HTTPException": "flaxon.exceptions",
+    "MethodNotAllowed": "flaxon.exceptions",
+    "NotFound": "flaxon.exceptions",
+    "Jinax": "flaxon.jinax",
+    "Teloce": "flaxon.teloce",
+}
+
+
 def __getattr__(name: str) -> object:
-    """Lazily import public objects to keep package metadata importable."""
-    if name in {"Config", "Flaxon", "State"}:
-        from .application import Config, Flaxon, State
-
-        return {"Config": Config, "Flaxon": Flaxon, "State": State}[name]
-    if name == "Router":
-        from .routing import Router
-
-        return Router
-    if name == "Query":
-        from .routing import Query
-
-        return Query
-    if name in {
-        "HTMLResponse",
-        "JSONResponse",
-        "LegacyJSONResponse",
-        "RedirectResponse",
-        "Request",
-        "Response",
-        "StreamingResponse",
-        "TextResponse",
-    }:
-        from . import http
-
-        return getattr(http, name)
-    if name in {"WebSocket", "WebSocketDisconnect", "WebSocketManager"}:
-        from . import websocket
-
-        return getattr(websocket, name)
-    if name in {
-        "ConfigurationError",
-        "FlaxonError",
-        "HTTPException",
-        "MethodNotAllowed",
-        "NotFound",
-    }:
-        from . import exceptions
-
-        return getattr(exceptions, name)
-    if name == "Jinax":
-        from .jinax import Jinax
-
-        return Jinax
-    if name == "Teloce":
-        from .teloce import Teloce
-
-        return Teloce
-    raise AttributeError(f"module 'flaxon' has no attribute {name!r}")
+    """Resolve a public export only when it is requested."""
+    module_name = _EXPORTS.get(name)
+    if module_name is None:
+        raise AttributeError(f"module 'flaxon' has no attribute {name!r}")
+    return import_attribute(module_name, name)

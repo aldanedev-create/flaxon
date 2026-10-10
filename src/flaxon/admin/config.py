@@ -4,7 +4,9 @@ from typing import Any
 
 
 class AdminConfig:
-    def __init__(
+    """Admin config implementation for the admin subsystem."""
+
+    def __init__(  # noqa: PLR0917 - preserve existing positional API
         self,
         site_title: str = "Flaxon Admin",
         site_header: str = "Flaxon Administration",
@@ -35,6 +37,7 @@ class AdminConfig:
         self.settings = dict(settings or {})
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a dictionary representation of the current value."""
         return {
             "site_title": self.site_title,
             "site_header": self.site_header,

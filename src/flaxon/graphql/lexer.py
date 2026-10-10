@@ -6,6 +6,8 @@ from .exceptions import GraphQLSyntaxError
 
 
 class TokenType(Enum):
+    """Token type implementation for the graphql subsystem."""
+
     EOF = "EOF"
     NAME = "NAME"
     INT = "INT"
@@ -29,6 +31,8 @@ class TokenType(Enum):
 
 
 class Token:
+    """Token implementation for the graphql subsystem."""
+
     def __init__(self, type: TokenType, value: str, line: int, column: int) -> None:
         self.type = type
         self.value = value
@@ -36,10 +40,13 @@ class Token:
         self.column = column
 
     def __repr__(self) -> str:
+        """Return the token type, value, and source position for debugging."""
         return f"Token({self.type.value}, {self.value!r}, {self.line}, {self.column})"
 
 
 class Lexer:
+    """Lexer implementation for the graphql subsystem."""
+
     def __init__(self, source: str) -> None:
         self.source = source
         self.position = 0
@@ -48,59 +55,41 @@ class Lexer:
         self._peek_cache = None
 
     def next_token(self) -> Token:
+        """Read the next token, raising a syntax error for unsupported characters."""
         self._skip_whitespace()
-
         if self.position >= len(self.source):
             return Token(TokenType.EOF, "", self.line, self.column)
-
         char = self.source[self.position]
-
-        if char == "(":
-            return self._make_token(TokenType.LEFT_PAREN, "(")
-        if char == ")":
-            return self._make_token(TokenType.RIGHT_PAREN, ")")
-        if char == "{":
-            return self._make_token(TokenType.LEFT_BRACE, "{")
-        if char == "}":
-            return self._make_token(TokenType.RIGHT_BRACE, "}")
-        if char == "[":
-            return self._make_token(TokenType.LEFT_BRACKET, "[")
-        if char == "]":
-            return self._make_token(TokenType.RIGHT_BRACKET, "]")
-        if char == ":":
-            return self._make_token(TokenType.COLON, ":")
-        if char == "=":
-            return self._make_token(TokenType.EQUALS, "=")
-        if char == "!":
-            return self._make_token(TokenType.BANG, "!")
-        if char == "$":
-            return self._make_token(TokenType.DOLLAR, "$")
-        if char == "@":
-            return self._make_token(TokenType.AT, "@")
-        if char == "|":
-            return self._make_token(TokenType.PIPE, "|")
-        if char == "&":
-            return self._make_token(TokenType.AMPERSAND, "&")
-
+        punctuation = {
+            "(": TokenType.LEFT_PAREN,
+            ")": TokenType.RIGHT_PAREN,
+            "{": TokenType.LEFT_BRACE,
+            "}": TokenType.RIGHT_BRACE,
+            "[": TokenType.LEFT_BRACKET,
+            "]": TokenType.RIGHT_BRACKET,
+            ":": TokenType.COLON,
+            "=": TokenType.EQUALS,
+            "!": TokenType.BANG,
+            "$": TokenType.DOLLAR,
+            "@": TokenType.AT,
+            "|": TokenType.PIPE,
+            "&": TokenType.AMPERSAND,
+        }
+        if char in punctuation:
+            return self._make_token(punctuation[char], char)
         if char == ".":
             if self._peek() == "." and self._peek(2) == ".":
                 self.position += 3
                 self.column += 3
                 return Token(TokenType.SPREAD, "...", self.line, self.column - 3)
             raise GraphQLSyntaxError(f"Unexpected character: {char}", self.line, self.column)
-
-        if char == '"':
-            return self._read_string()
-
-        if char == "#":
-            return self._read_comment()
-
+        readers = {'"': self._read_string, "#": self._read_comment}
+        if char in readers:
+            return readers[char]()
         if char.isdigit() or char == "-":
             return self._read_number()
-
         if char.isalpha() or char == "_":
             return self._read_name()
-
         raise GraphQLSyntaxError(f"Unexpected character: {char}", self.line, self.column)
 
     def _peek(self, offset: int = 1) -> str:
@@ -117,7 +106,7 @@ class Lexer:
     def _skip_whitespace(self) -> None:
         while self.position < len(self.source):
             char = self.source[self.position]
-            if char == " " or char == "\t" or char == ",":
+            if char in {" ", "\t", ","}:
                 self.position += 1
                 self.column += 1
             elif char == "\n":
@@ -149,22 +138,26 @@ class Lexer:
                     break
 
                 char = self.source[self.position]
-                if char == '"':
-                    value += '"'
-                elif char == "\\":
-                    value += "\\"
-                elif char == "/":
-                    value += "/"
-                elif char == "b":
-                    value += "\b"
-                elif char == "f":
-                    value += "\f"
-                elif char == "n":
-                    value += "\n"
-                elif char == "r":
-                    value += "\r"
-                elif char == "t":
-                    value += "\t"
+                if char in {
+                    '"': '"',
+                    "\\": "\\",
+                    "/": "/",
+                    "b": "\x08",
+                    "f": "\x0c",
+                    "n": "\n",
+                    "r": "\r",
+                    "t": "\t",
+                }:
+                    value += {
+                        '"': '"',
+                        "\\": "\\",
+                        "/": "/",
+                        "b": "\x08",
+                        "f": "\x0c",
+                        "n": "\n",
+                        "r": "\r",
+                        "t": "\t",
+                    }[char]
                 elif char == "u":
                     self.position += 1
                     self.column += 1

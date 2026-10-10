@@ -12,6 +12,8 @@ from flaxon.cli.generator import Generator
 
 
 class NewCommand(Command):
+    """New command implementation for the cli subsystem."""
+
     def __init__(self) -> None:
         super().__init__(
             name="new",
@@ -75,7 +77,7 @@ class NewCommand(Command):
     def _create_environment(directory: Path, console: Any) -> None:
         """Keep slow ensurepip work visible and bound the subprocess lifetime."""
         command = [sys.executable, "-m", "venv", ".venv"]
-        process = subprocess.Popen(command, cwd=directory)
+        process = subprocess.Popen(command, cwd=directory)  # noqa: S603 - local CLI argument list; no shell interpolation
         started = time.monotonic()
         try:
             while True:

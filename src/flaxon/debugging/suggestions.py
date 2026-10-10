@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+from typing import Any, ClassVar
+
 
 class SuggestionEngine:
-    COMMON_ERRORS = {
+    """Suggestion engine implementation for the debugging subsystem."""
+
+    COMMON_ERRORS: ClassVar[Any] = {
         "No module named": "You need to install a missing dependency. Run: pip install <module>",
-        "ImportError": "There is an import error. Check that all modules are installed and paths are correct.",
+        (
+            "ImportError"
+        ): "There is an import error. Check that all modules are installed and paths are correct.",
         "AttributeError": "You are trying to access an attribute that doesn't exist. Check the object type.",
         "TypeError": "You are using the wrong type for an operation. Check your types.",
         "ValueError": "You passed an invalid value. Check the allowed values for this operation.",
@@ -20,7 +26,7 @@ class SuggestionEngine:
         "OSError": "An operating system error occurred. Check file paths and permissions.",
     }
 
-    ROUTING_ERRORS = {
+    ROUTING_ERRORS: ClassVar[Any] = {
         "404": "The route you requested was not found. Check the URL path.",
         "405": "The HTTP method is not allowed for this route. Check the allowed methods.",
         "MethodNotAllowed": "The HTTP method is not allowed for this route. Check the allowed methods.",
@@ -28,7 +34,7 @@ class SuggestionEngine:
         "Router": "There is an issue with the router. Check your route definitions.",
     }
 
-    VALIDATION_ERRORS = {
+    VALIDATION_ERRORS: ClassVar[Any] = {
         "ValidationError": "The request data failed validation. Check the required fields and types.",
         "required": "A required field is missing. Check the schema definition.",
         "min_length": "The value is too short. Check the minimum length requirement.",
@@ -41,8 +47,10 @@ class SuggestionEngine:
         "choice": "The value is not in the list of allowed choices. Check the choices.",
     }
 
-    DATABASE_ERRORS = {
-        "IntegrityError": "There is a database integrity issue. Check for duplicate keys or foreign key violations.",
+    DATABASE_ERRORS: ClassVar[Any] = {
+        (
+            "IntegrityError"
+        ): "There is a database integrity issue. Check for duplicate keys or foreign key violations.",
         "UniqueViolation": "A duplicate value was inserted. Check for uniqueness constraints.",
         "ForeignKeyViolation": "A foreign key reference is invalid. Check the referenced record exists.",
         "NotNullViolation": "A required field is null. Check the field is provided.",
@@ -51,6 +59,7 @@ class SuggestionEngine:
     }
 
     def get_suggestion(self, error: Exception) -> str | None:
+        """Return the suggestion."""
         error_str = str(error)
         error_type = type(error).__name__
 
@@ -75,6 +84,7 @@ class SuggestionEngine:
         return None
 
     def get_validation_suggestions(self, errors: dict[str, list[str]]) -> dict[str, str]:
+        """Return the validation suggestions."""
         suggestions = {}
         for field, field_errors in errors.items():
             for error in field_errors:
@@ -87,6 +97,7 @@ class SuggestionEngine:
         return suggestions
 
     def suggest_fix(self, code: str) -> str | None:
+        """Perform the suggest fix operation for suggestion engine."""
         suggestions = {
             "FX-HTTP-404": "Check that the URL is correct and the route is registered.",
             "FX-HTTP-405": "Check that you are using the correct HTTP method for this route.",

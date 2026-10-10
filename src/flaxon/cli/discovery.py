@@ -3,10 +3,11 @@ from __future__ import annotations
 import importlib
 import importlib.util
 import logging
-import os
 import sys
 from pathlib import Path
 from typing import Any
+
+from flaxon._imports import import_module
 
 from .base import Command
 from .commands import (
@@ -28,6 +29,8 @@ from .commands import (
 
 
 class CommandDiscovery:
+    """Command discovery implementation for the cli subsystem."""
+
     def __init__(self) -> None:
         self._builtin_commands = [
             RunCommand(),
@@ -47,22 +50,24 @@ class CommandDiscovery:
         ]
 
     def discover(self, *, include_project: bool = True) -> list[Command]:
+        """Perform the discover operation for command discovery."""
         commands = list(self._builtin_commands)
 
         if not include_project:
             return commands
 
-        cwd = os.getcwd()
+        cwd = str(Path.cwd())
         if cwd not in sys.path:
             sys.path.insert(0, cwd)
 
         try:
-            import flaxon_cli
+            flaxon_cli = import_module("flaxon_cli")
+
             commands.extend(self._discover_from_module(flaxon_cli))
         except ImportError:
             pass
 
-        if os.path.exists("cli"):
+        if Path("cli").exists():
             commands.extend(self._discover_from_path("cli"))
 
         return commands

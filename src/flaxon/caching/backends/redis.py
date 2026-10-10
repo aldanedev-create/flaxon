@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from flaxon._imports import import_module
+
 
 class RedisBackend:
     """Store cache entries using an optional Redis client."""
@@ -21,7 +23,7 @@ class RedisBackend:
     async def connect(self) -> None:
         """Open the backend connection when it is needed."""
         try:
-            import redis.asyncio as redis
+            redis = import_module("redis.asyncio")
 
             self._client = redis.from_url(
                 self.redis_url,

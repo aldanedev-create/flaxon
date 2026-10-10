@@ -131,8 +131,7 @@ class WebSocketAuth:
             if not hmac.compare_digest(expected, signature):
                 return None
 
-            user = json.loads(base64.urlsafe_b64decode(payload + "=="))
-            return user
+            return json.loads(base64.urlsafe_b64decode(payload + "=="))
 
         except (ValueError, UnicodeDecodeError):
             return None

@@ -14,6 +14,7 @@ async def execute(
     variables: dict[str, Any] | None = None,
     operation_name: str | None = None,
 ) -> dict[str, Any]:
+    """Execute the supplied operation with its parameters."""
     variables = variables or {}
 
     # Locate target operation
@@ -74,6 +75,7 @@ async def execute_selection_set(
     parent_type: Any,
     root_value: Any,
 ) -> dict[str, Any]:
+    """Execute the selection set."""
     result: dict[str, Any] = {}
 
     for selection in selection_set.selections:
@@ -83,7 +85,7 @@ async def execute_selection_set(
         kind = getattr(selection, "kind", type(selection).__name__)
 
         # Field execution
-        if kind == "Field" or kind == "FieldNode" or hasattr(selection, "alias"):
+        if kind in {"Field", "FieldNode"} or hasattr(selection, "alias"):
             field_name = selection.name.value if hasattr(selection.name, "value") else str(selection.name)
             response_key = selection.alias.value if getattr(selection, "alias", None) else field_name
 
@@ -118,7 +120,7 @@ async def execute_selection_set(
             )
 
         # Inline Fragment (... on Type)
-        elif kind == "InlineFragment" or kind == "InlineFragmentNode" or hasattr(selection, "type_condition"):
+        elif kind in {"InlineFragment", "InlineFragmentNode"} or hasattr(selection, "type_condition"):
             type_condition = (
                 selection.type_condition.name.value
                 if hasattr(selection.type_condition, "name")
@@ -134,7 +136,7 @@ async def execute_selection_set(
                 result.update(fragment_res)
 
         # Fragment Spread (... FragmentName)
-        elif kind == "FragmentSpread" or kind == "FragmentSpreadNode" or hasattr(selection, "fragment_name"):
+        elif kind in {"FragmentSpread", "FragmentSpreadNode"} or hasattr(selection, "fragment_name"):
             frag_name = selection.name.value if hasattr(selection.name, "value") else str(selection.name)
             frag_def = exec_context["fragments"].get(frag_name)
             if frag_def:
@@ -152,6 +154,7 @@ async def execute_selection_set(
 async def resolve_field_value(
     field_def: Any, parent_value: Any, args: dict[str, Any], context: Any, info: Any
 ) -> Any:
+    """Resolve the field value."""
     if field_def.resolver and callable(field_def.resolver):
         res = field_def.resolver(parent_value, args, context, info)
         if asyncio.iscoroutine(res) or hasattr(res, "__await__"):
@@ -168,6 +171,7 @@ async def resolve_field_value(
 
 
 async def complete_value(exec_context: dict[str, Any], field_type: Any, selection: Any, value: Any) -> Any:
+    """Perform the complete value operation for this subsystem."""
     if isinstance(field_type, NonNull):
         completed = await complete_value(exec_context, field_type.type, selection, value)
         if completed is None:
@@ -197,6 +201,7 @@ async def complete_value(exec_context: dict[str, Any], field_type: Any, selectio
 
 
 def should_skip(selection: Any, variables: dict[str, Any]) -> bool:
+    """Perform the should skip operation for this subsystem."""
     directives = getattr(selection, "directives", []) or []
     for directive in directives:
         name = directive.name.value if hasattr(directive.name, "value") else str(directive.name)
@@ -210,6 +215,7 @@ def should_skip(selection: Any, variables: dict[str, Any]) -> bool:
 
 
 def resolve_arguments(node: Any, variables: dict[str, Any]) -> dict[str, Any]:
+    """Resolve the arguments."""
     args = {}
     node_args = getattr(node, "arguments", []) or []
     for arg in node_args:
@@ -221,7 +227,8 @@ def resolve_arguments(node: Any, variables: dict[str, Any]) -> dict[str, Any]:
 def coerce_arguments(args: dict[str, Any], definitions: dict[str, Any]) -> dict[str, Any]:
     """Coerce parsed argument values according to the field declaration."""
     coerced = dict(args)
-    for name, type_def in definitions.items():
+    for name, raw_type_def in definitions.items():
+        type_def = raw_type_def
         if name not in coerced or coerced[name] is None:
             continue
         value = coerced[name]
@@ -237,6 +244,7 @@ def coerce_arguments(args: dict[str, Any], definitions: dict[str, Any]) -> dict[
 
 
 def coerce_argument_value(value: Any, type_def: Any) -> Any:
+    """Coerce the argument value."""
     if isinstance(type_def, NonNull):
         return coerce_argument_value(value, type_def.type)
     if isinstance(type_def, List):
@@ -246,20 +254,19 @@ def coerce_argument_value(value: Any, type_def: Any) -> Any:
         ]
     if isinstance(type_def, Scalar):
         return type_def.parse_value(value)
-    if type_def is int:
-        return int(value)
-    if type_def is float:
-        return float(value)
+    coercers = ((int, int), (float, float), (str, str))
+    for target, convert in coercers:
+        if type_def is target:
+            return convert(value)
     if type_def is bool:
         return value if isinstance(value, bool) else str(value).lower() == "true"
-    if type_def is str:
-        return str(value)
     return value
 
 
 def resolve_value_node(value_node: Any, variables: dict[str, Any]) -> Any:
+    """Resolve the value node."""
     kind = getattr(value_node, "kind", type(value_node).__name__)
-    if kind == "VariableNode" or kind == "Variable" or hasattr(value_node, "variable"):
+    if kind in {"VariableNode", "Variable"} or hasattr(value_node, "variable"):
         var_name = value_node.name.value if hasattr(value_node.name, "value") else str(value_node.name)
         return variables.get(var_name)
     if hasattr(value_node, "value"):
@@ -268,6 +275,7 @@ def resolve_value_node(value_node: Any, variables: dict[str, Any]) -> Any:
 
 
 def resolve_variables(operation: Any, variables: dict[str, Any]) -> dict[str, Any]:
+    """Resolve the variables."""
     coerced = {}
     var_defs = getattr(operation, "variable_definitions", []) or []
     for var_def in var_defs:

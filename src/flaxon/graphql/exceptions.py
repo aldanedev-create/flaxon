@@ -6,6 +6,8 @@ from flaxon.exceptions import FlaxonError
 
 
 class GraphQLError(FlaxonError):
+    """Report a graph qlerror failure."""
+
     def __init__(
         self, message: str, locations: list[dict[str, int]] | None = None, path: list[str | int] | None = None
     ) -> None:
@@ -15,6 +17,7 @@ class GraphQLError(FlaxonError):
         self.path = path or []
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a dictionary representation of the current value."""
         result = {"message": self.message}
         if self.locations:
             result["locations"] = self.locations
@@ -24,6 +27,8 @@ class GraphQLError(FlaxonError):
 
 
 class GraphQLSyntaxError(GraphQLError):
+    """Report a graph qlsyntax failure."""
+
     def __init__(self, message: str, line: int, column: int) -> None:
         super().__init__(message)
         self.line = line
@@ -32,15 +37,21 @@ class GraphQLSyntaxError(GraphQLError):
 
 
 class GraphQLValidationError(GraphQLError):
+    """Report a graph qlvalidation failure."""
+
     def __init__(self, message: str) -> None:
         super().__init__(message)
 
 
 class GraphQLExecutionError(GraphQLError):
+    """Report a graph qlexecution failure."""
+
     def __init__(self, message: str) -> None:
         super().__init__(message)
 
 
 class GraphQLTypeError(GraphQLError):
+    """Report a graph qltype failure."""
+
     def __init__(self, message: str) -> None:
         super().__init__(message)

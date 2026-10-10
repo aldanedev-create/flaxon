@@ -9,7 +9,9 @@ from __future__ import annotations
 import io
 import mimetypes
 import re
+import uuid
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, BinaryIO
 
 from flaxon.exceptions import BadRequest
@@ -76,7 +78,7 @@ class UploadedFile:
         if hasattr(self.file, "seek"):
             self.file.seek(0)
 
-        with open(path, "wb") as f:
+        with Path(path).open("wb") as f:
             if hasattr(self.file, "read"):
                 while True:
                     chunk = self.file.read(8192)
@@ -158,8 +160,9 @@ class MultipartParser:
 
         result: dict[str, list[str] | UploadedFile] = {}
 
-        for part in parts:
-            if not part or part == b"--\r\n" or part == b"--":
+        for raw_part in parts:
+            part = raw_part
+            if not part or part in {b"--\r\n", b"--"}:
                 continue
 
             part = part.strip(b"\r\n")
@@ -206,9 +209,8 @@ class MultipartParser:
     def _is_file(self, headers: list[bytes]) -> bool:
         """Check if the part is a file."""
         for header in headers:
-            if header.lower().startswith(b"content-disposition:"):
-                if b"filename=" in header:
-                    return True
+            if header.lower().startswith(b"content-disposition:") and b"filename=" in header:
+                return True
         return False
 
     def _get_filename(self, headers: list[bytes]) -> str:
@@ -262,8 +264,7 @@ class FileStorage:
 
     def _ensure_upload_dir(self) -> None:
         """Create the upload directory if it doesn't exist."""
-        import os
-        os.makedirs(self.upload_dir, exist_ok=True)
+        Path(self.upload_dir).mkdir(parents=True, exist_ok=True)
 
     def save(self, uploaded_file: UploadedFile, filename: str | None = None) -> str:
         """
@@ -279,9 +280,6 @@ class FileStorage:
         Raises:
             ValueError: If the file is too large.
         """
-        import os
-        import uuid
-
         if uploaded_file.size > self.max_size:
             raise ValueError(f"File too large: {uploaded_file.size} bytes (max: {self.max_size})")
 
@@ -289,6 +287,6 @@ class FileStorage:
             ext = uploaded_file.extension
             filename = f"{uuid.uuid4().hex}{ext}"
 
-        path = os.path.join(self.upload_dir, filename)
+        path = str(Path(self.upload_dir) / filename)
         uploaded_file.save(path)
         return path

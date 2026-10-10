@@ -10,6 +10,8 @@ import gzip
 import zlib
 from typing import Any
 
+from flaxon._imports import import_module
+
 from .base import Middleware
 
 
@@ -87,11 +89,15 @@ class CompressionMiddleware(Middleware):
                 length = self._get_content_length(headers)
                 already_encoded = any(key.lower() == b"content-encoding" for key, _ in headers)
                 # Unknown-length streams pass through without buffering.
-                if (length is not None and length >= self.minimum_size
-                        and self._is_compressible(content_type)
-                        and not content_type.startswith("text/event-stream")
-                        and not already_encoded and scope.get("method") != "HEAD"
-                        and message["status"] not in {204, 304}):
+                if (
+                    length is not None
+                    and length >= self.minimum_size
+                    and self._is_compressible(content_type)
+                    and not content_type.startswith("text/event-stream")
+                    and not already_encoded
+                    and scope.get("method") != "HEAD"
+                    and message["status"] not in {204, 304}
+                ):
                     start_message = dict(message)
                     return
             elif message["type"] == "http.response.body" and start_message is not None:
@@ -107,11 +113,14 @@ class CompressionMiddleware(Middleware):
                     if not any(value.lower() in {"accept-encoding", "*"} for value in values):
                         values.append("Accept-Encoding")
                     start_message["headers"] = [
-                        (k, v) for k, v in original
+                        (k, v)
+                        for k, v in original
                         if k.lower() not in {b"content-length", b"content-encoding", b"vary"}
-                    ] + [(b"content-length", str(len(body)).encode()),
-                         (b"content-encoding", encoding.encode()),
-                         (b"vary", ", ".join(values).encode("latin-1"))]
+                    ] + [
+                        (b"content-length", str(len(body)).encode()),
+                        (b"content-encoding", encoding.encode()),
+                        (b"vary", ", ".join(values).encode("latin-1")),
+                    ]
                 await send(start_message)
                 await send({"type": "http.response.body", "body": body, "more_body": False})
                 start_message = None
@@ -157,11 +166,7 @@ class CompressionMiddleware(Middleware):
         if not content_type:
             return False
 
-        for pattern in self.compressible_types:
-            if content_type.startswith(pattern):
-                return True
-
-        return False
+        return any(content_type.startswith(pattern) for pattern in self.compressible_types)
 
     def _compress(self, data: bytes, encoding: str) -> bytes:
         if encoding == "gzip":
@@ -172,7 +177,7 @@ class CompressionMiddleware(Middleware):
 
         if encoding == "br":
             try:
-                import brotli
+                brotli = import_module("brotli")
 
                 return brotli.compress(data, quality=self.level)
             except ImportError:

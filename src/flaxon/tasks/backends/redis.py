@@ -4,6 +4,7 @@ import json
 from datetime import datetime
 from typing import Any
 
+from flaxon._imports import import_module
 from flaxon.tasks.exceptions import TaskNotFoundError
 from flaxon.tasks.result import TaskResult
 from flaxon.tasks.task import Task, TaskStatus
@@ -28,7 +29,7 @@ class RedisBackend:
     async def connect(self) -> None:
         """Create a Redis client for task storage and queue operations."""
         try:
-            import redis.asyncio as redis
+            redis = import_module("redis.asyncio")
 
             self._client = redis.from_url(self.redis_url, decode_responses=True)
             self._pub = redis.from_url(self.redis_url, decode_responses=True)

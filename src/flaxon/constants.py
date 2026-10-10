@@ -109,17 +109,17 @@ CORRELATION_ID_HEADER = "x-correlation-id"
 
 # Recommended middleware order (first = outermost)
 MIDDLEWARE_ORDER = [
-    "ProxyHeadersMiddleware",      # Trust proxy headers first
-    "TrustedHostMiddleware",       # Validate host before anything else
-    "RequestIDMiddleware",         # Add request ID early for logging
-    "CORSMiddleware",              # CORS before authentication
-    "BodyLimitMiddleware",         # Limit body size early
-    "TimeoutMiddleware",           # Timeout before processing
-    "RateLimitMiddleware",         # Rate limit after validation
-    "AuthenticationMiddleware",    # Authenticate before authorization
-    "AuthorizationMiddleware",     # Authorize before business logic
-    "LoggingMiddleware",           # Log after authentication
-    "RecoveryMiddleware",          # Catch exceptions last (outermost)
+    "ProxyHeadersMiddleware",  # Trust proxy headers first
+    "TrustedHostMiddleware",  # Validate host before anything else
+    "RequestIDMiddleware",  # Add request ID early for logging
+    "CORSMiddleware",  # CORS before authentication
+    "BodyLimitMiddleware",  # Limit body size early
+    "TimeoutMiddleware",  # Timeout before processing
+    "RateLimitMiddleware",  # Rate limit after validation
+    "AuthenticationMiddleware",  # Authenticate before authorization
+    "AuthorizationMiddleware",  # Authorize before business logic
+    "LoggingMiddleware",  # Log after authentication
+    "RecoveryMiddleware",  # Catch exceptions last (outermost)
 ]
 
 # ============================================================

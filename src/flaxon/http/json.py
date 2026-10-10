@@ -6,6 +6,7 @@ This module provides JSON encoding and decoding utilities.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from dataclasses import asdict, is_dataclass
 from datetime import date, datetime
@@ -55,14 +56,10 @@ class FlaxonJSONEncoder(json.JSONEncoder):
 
 
 class FlaxonJSONDecoder(json.JSONDecoder):
-    """
-    Custom JSON decoder for Flaxon.
-    """
+    """Custom JSON decoder for Flaxon."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        """
-        Initialize the decoder.
-        """
+        """Initialize the decoder."""
         super().__init__(*args, object_hook=self.object_hook, **kwargs)
 
     def object_hook(self, obj: dict[str, Any]) -> dict[str, Any]:
@@ -127,8 +124,6 @@ def load_from_request(request: Any) -> Any:
     Raises:
         BadRequest: If the JSON is invalid.
     """
-    import asyncio
-
     if not hasattr(request, "json"):
         raise BadRequest("Request does not support JSON parsing")
 

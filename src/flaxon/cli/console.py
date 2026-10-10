@@ -5,6 +5,8 @@ from typing import Any
 
 
 class Console:
+    """Console implementation for the cli subsystem."""
+
     def __init__(self, color: bool = True) -> None:
         self.color = color
         self._colors = {
@@ -25,21 +27,27 @@ class Console:
         return f"{self._colors.get(color, '')}{text}{self._colors['reset']}"
 
     def info(self, message: str) -> None:
+        """Perform the info operation for console."""
         print(self._colorize(message, "blue"), flush=True)
 
     def success(self, message: str) -> None:
+        """Perform the success operation for console."""
         print(self._colorize(message, "green"), flush=True)
 
     def warning(self, message: str) -> None:
+        """Perform the warning operation for console."""
         print(self._colorize(message, "yellow"), flush=True)
 
     def error(self, message: str) -> None:
+        """Perform the error operation for console."""
         print(self._colorize(message, "red"), file=sys.stderr, flush=True)
 
     def debug(self, message: str) -> None:
+        """Perform the debug operation for console."""
         print(self._colorize(message, "cyan"))
 
     def table(self, headers: list[str], rows: list[list[Any]]) -> None:
+        """Perform the table operation for console."""
         if not rows:
             return
 
@@ -57,6 +65,7 @@ class Console:
             print(line)
 
     def progress(self, current: int, total: int, prefix: str = "") -> None:
+        """Perform the progress operation for console."""
         percent = (current / total) * 100
         bar_length = 40
         filled = int(bar_length * current / total)
@@ -69,11 +78,14 @@ class Console:
             print()
 
     def confirm(self, message: str) -> bool:
+        """Perform the confirm operation for console."""
         response = input(f"{message} (y/N): ").strip().lower()
         return response in {"y", "yes"}
 
     def input(self, prompt: str) -> str:
+        """Configure or retrieve the input definition."""
         return input(prompt).strip()
 
     def clear(self) -> None:
+        """Remove the stored entries."""
         print("\033[2J\033[H")

@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 from typing import Any
+from urllib.parse import urlsplit
 
+from flaxon._imports import import_attribute
 from flaxon.cli.base import Command
 
 
 class MigrateCommand(Command):
+    """Migrate command implementation for the cli subsystem."""
+
     def __init__(self) -> None:
         super().__init__(
             name="migrate",
@@ -40,19 +45,19 @@ class MigrateCommand(Command):
 
     def _build_adapter(self, database: str) -> Any:
         if "://" not in database:
-            from flaxon.database.adapters.sqlite import SQLiteAdapter
+            sqlite_adapter_type = import_attribute("flaxon.database.adapters.sqlite", "SQLiteAdapter")
 
-            return SQLiteAdapter(database=database)
-
-        from urllib.parse import urlsplit
+            return sqlite_adapter_type(database=database)
 
         parts = urlsplit(database)
         scheme = (parts.scheme or "").split("+")[0]
 
         if scheme in {"postgres", "postgresql"}:
-            from flaxon.database.adapters.postgresql import PostgreSQLAdapter
+            postgre_sqladapter_type = import_attribute(
+                "flaxon.database.adapters.postgresql", "PostgreSQLAdapter"
+            )
 
-            return PostgreSQLAdapter(
+            return postgre_sqladapter_type(
                 host=parts.hostname or "localhost",
                 port=parts.port or 5432,
                 database=parts.path.lstrip("/") or "postgres",
@@ -60,9 +65,9 @@ class MigrateCommand(Command):
                 password=parts.password or "",
             )
         if scheme == "mysql":
-            from flaxon.database.adapters.mysql import MySQLAdapter
+            my_sqladapter_type = import_attribute("flaxon.database.adapters.mysql", "MySQLAdapter")
 
-            return MySQLAdapter(
+            return my_sqladapter_type(
                 host=parts.hostname or "localhost",
                 port=parts.port or 3306,
                 database=parts.path.lstrip("/") or "",
@@ -70,17 +75,15 @@ class MigrateCommand(Command):
                 password=parts.password or "",
             )
         if scheme == "sqlite":
-            from flaxon.database.adapters.sqlite import SQLiteAdapter
+            sqlite_adapter_type = import_attribute("flaxon.database.adapters.sqlite", "SQLiteAdapter")
 
-            return SQLiteAdapter(database=parts.path.lstrip("/") or ":memory:")
+            return sqlite_adapter_type(database=parts.path.lstrip("/") or ":memory:")
 
         raise ValueError(f"Unsupported database scheme: '{scheme}'. Use sqlite, postgresql, or mysql.")
 
     def _run(self, args: argparse.Namespace, console: Any) -> int:
-        import asyncio
-
-        from flaxon.database.manager import DatabaseManager
-        from flaxon.database.migrations import MigrationRunner
+        database_manager_type = import_attribute("flaxon.database.manager", "DatabaseManager")
+        migration_runner_type = import_attribute("flaxon.database.migrations", "MigrationRunner")
 
         try:
             adapter = self._build_adapter(args.database)
@@ -88,71 +91,80 @@ class MigrateCommand(Command):
             console.error(str(exc))
             return 1
 
-        db = DatabaseManager(adapter)
-        runner = MigrationRunner(db, migration_dir=args.migrations_dir)
-
-        async def main() -> int:
-            await db.initialize()
-            try:
-                if args.status:
-                    status = await runner.status()
-                    console.info(f"{status['applied_count']} applied, {status['pending_count']} pending")
-                    for m in status["migrations"]:
-                        mark = "[x]" if m["applied"] else "[ ]"
-                        console.info(f"  {mark} {m['version']}  {m['name']}")
-                    return 0
-
-                if args.direction == "up":
-                    status = await runner.status()
-                    pending = [m for m in status["migrations"] if not m["applied"]]
-                    if args.target:
-                        pending = [m for m in pending if m["version"] <= args.target]
-
-                    if not pending:
-                        console.info("No pending migrations.")
-                        return 0
-
-                    if args.dry_run:
-                        console.info(f"Would apply {len(pending)} migration(s):")
-                        for m in pending:
-                            console.info(f"  {m['version']}  {m['name']}")
-                        return 0
-
-                    console.info(f"Applying {len(pending)} migration(s)...")
-                    applied = await runner.migrate(target_version=args.target)
-                    for version in applied:
-                        console.success(f"  [x] {version}")
-                    console.success(f"Applied {len(applied)} migration(s).")
-                    return 0
-
-                # direction == "down"
-                console.warning("This will rollback migrations!")
-
-                if args.dry_run:
-                    status = await runner.status()
-                    applied_versions = sorted(m["version"] for m in status["migrations"] if m["applied"])
-                    to_roll_back = applied_versions[-args.steps :] if applied_versions else []
-                    if not to_roll_back:
-                        console.info("Nothing to roll back.")
-                        return 0
-                    console.info(f"Would roll back {len(to_roll_back)} migration(s):")
-                    for version in reversed(to_roll_back):
-                        console.info(f"  {version}")
-                    return 0
-
-                rolled_back = await runner.rollback(steps=args.steps)
-                if not rolled_back:
-                    console.info("Nothing to roll back.")
-                    return 0
-                for version in rolled_back:
-                    console.success(f"  [ ] {version}")
-                console.success(f"Rolled back {len(rolled_back)} migration(s).")
-                return 0
-            finally:
-                await db.close()
+        db = database_manager_type(adapter)
+        runner = migration_runner_type(db, migration_dir=args.migrations_dir)
 
         try:
-            return asyncio.run(main())
+            return asyncio.run(self._execute_migrations(args, console, db, runner))
         except Exception as exc:
             console.error(f"Migration failed: {exc}")
             return 1
+
+    async def _execute_migrations(self, args, console, db, runner):
+        await db.initialize()
+        try:
+            if args.status:
+                return await self._show_status(console, runner)
+            if args.direction == "up":
+                return await self._migrate_up(args, console, runner)
+            return await self._migrate_down(args, console, runner)
+        finally:
+            await db.close()
+
+    @staticmethod
+    async def _show_status(console, runner):
+        status = await runner.status()
+        console.info(f"{status['applied_count']} applied, {status['pending_count']} pending")
+        for m in status["migrations"]:
+            mark = "[x]" if m["applied"] else "[ ]"
+            console.info(f"  {mark} {m['version']}  {m['name']}")
+        return 0
+
+    @staticmethod
+    async def _migrate_up(args, console, runner):
+        status = await runner.status()
+        pending = [m for m in status["migrations"] if not m["applied"]]
+        if args.target:
+            pending = [m for m in pending if m["version"] <= args.target]
+
+        if not pending:
+            console.info("No pending migrations.")
+            return 0
+
+        if args.dry_run:
+            console.info(f"Would apply {len(pending)} migration(s):")
+            for m in pending:
+                console.info(f"  {m['version']}  {m['name']}")
+            return 0
+
+        console.info(f"Applying {len(pending)} migration(s)...")
+        applied = await runner.migrate(target_version=args.target)
+        for version in applied:
+            console.success(f"  [x] {version}")
+        console.success(f"Applied {len(applied)} migration(s).")
+        return 0
+
+    @staticmethod
+    async def _migrate_down(args, console, runner):
+        console.warning("This will rollback migrations!")
+
+        if args.dry_run:
+            status = await runner.status()
+            applied_versions = sorted(m["version"] for m in status["migrations"] if m["applied"])
+            to_roll_back = applied_versions[-args.steps :] if applied_versions else []
+            if not to_roll_back:
+                console.info("Nothing to roll back.")
+                return 0
+            console.info(f"Would roll back {len(to_roll_back)} migration(s):")
+            for version in reversed(to_roll_back):
+                console.info(f"  {version}")
+            return 0
+
+        rolled_back = await runner.rollback(steps=args.steps)
+        if not rolled_back:
+            console.info("Nothing to roll back.")
+            return 0
+        for version in rolled_back:
+            console.success(f"  [ ] {version}")
+        console.success(f"Rolled back {len(rolled_back)} migration(s).")
+        return 0

@@ -7,8 +7,11 @@ This module provides utilities for streaming responses and request bodies.
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import AsyncIterator, Callable, Iterator
 from typing import Any
+
+from flaxon._imports import import_module
 
 from .response import StreamingResponse
 
@@ -86,8 +89,9 @@ class Stream:
         Returns:
             A streaming response.
         """
+
         async def stream_file() -> AsyncIterator[bytes]:
-            import aiofiles
+            aiofiles = import_module("aiofiles")
 
             async with aiofiles.open(path, "rb") as f:
                 while True:
@@ -110,9 +114,10 @@ class Stream:
         Returns:
             A streaming response.
         """
+
         async def stream_text() -> AsyncIterator[bytes]:
             for i in range(0, len(text), chunk_size):
-                yield text[i:i + chunk_size].encode("utf-8")
+                yield text[i : i + chunk_size].encode("utf-8")
 
         return StreamingResponse(stream_text())
 
@@ -127,7 +132,6 @@ class Stream:
         Returns:
             A streaming response.
         """
-        import json
 
         async def stream_json_lines() -> AsyncIterator[bytes]:
             for item in data:
@@ -146,6 +150,7 @@ class Stream:
         Returns:
             A streaming response.
         """
+
         async def stream_sse() -> AsyncIterator[bytes]:
             async for event in events:
                 data = event.get("data", "")

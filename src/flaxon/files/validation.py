@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import mimetypes
-from typing import Any
+from typing import Any, ClassVar
+
+from flaxon._imports import import_attribute
 
 from .upload import UploadedFile
 
 
 class FileValidator:
+    """File validator implementation for the files subsystem."""
+
     def __init__(
         self,
         max_size: int | None = None,
@@ -16,10 +20,11 @@ class FileValidator:
     ) -> None:
         self.max_size = max_size
         self.min_size = min_size
-        self.allowed_extensions = set(ext.lower() for ext in (allowed_extensions or []))
-        self.allowed_mime_types = set(mime.lower() for mime in (allowed_mime_types or []))
+        self.allowed_extensions = {ext.lower() for ext in (allowed_extensions or [])}
+        self.allowed_mime_types = {mime.lower() for mime in (allowed_mime_types or [])}
 
     def validate(self, file: UploadedFile) -> list[str]:
+        """Check the supplied value against the configured constraints."""
         errors = []
 
         if self.max_size is not None and file.size > self.max_size:
@@ -41,9 +46,11 @@ class FileValidator:
         return errors
 
     def is_valid(self, file: UploadedFile) -> bool:
+        """Return whether valid holds for the current value."""
         return len(self.validate(file)) == 0
 
     def validate_many(self, files: list[UploadedFile]) -> dict[str, list[str]]:
+        """Validate the many."""
         errors = {}
         for i, file in enumerate(files):
             file_errors = self.validate(file)
@@ -52,21 +59,30 @@ class FileValidator:
         return errors
 
     def get_extension_from_mime(self, mime_type: str) -> str | None:
+        """Return the extension from mime."""
         ext = mimetypes.guess_extension(mime_type)
         return ext[1:] if ext else None
 
     def get_mime_from_extension(self, extension: str) -> str | None:
+        """Return the mime from extension."""
         mime, _ = mimetypes.guess_type(f"file.{extension}")
         return mime
 
 
 class ImageValidator(FileValidator):
-    IMAGE_MIME_TYPES = {
-        "image/jpeg", "image/png", "image/gif", "image/webp",
-        "image/svg+xml", "image/bmp", "image/tiff",
+    """Image validator implementation for the files subsystem."""
+
+    IMAGE_MIME_TYPES: ClassVar[Any] = {
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+        "image/svg+xml",
+        "image/bmp",
+        "image/tiff",
     }
 
-    IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp", ".tiff"}
+    IMAGE_EXTENSIONS: ClassVar[Any] = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp", ".tiff"}
 
     def __init__(
         self,
@@ -89,11 +105,13 @@ class ImageValidator(FileValidator):
         self.min_height = min_height
 
     def validate_image(self, file: UploadedFile) -> list[str]:
+        """Validate the image."""
         errors = self.validate(file)
 
         try:
-            from PIL import Image
-            image = Image.open(file.file)
+            image_type = import_attribute("PIL", "Image")
+
+            image = image_type.open(file.file)
             width, height = image.size
 
             if self.max_width is not None and width > self.max_width:

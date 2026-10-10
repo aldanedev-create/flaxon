@@ -1,17 +1,24 @@
 from __future__ import annotations
 
+import json
 from typing import Any
+
+from flaxon._imports import import_attribute
 
 
 class GraphQLMiddleware:
+    """Graph qlmiddleware implementation for the graphql subsystem."""
+
     def __init__(self, app: Any) -> None:
         self.app = app
         self._middleware: list[Any] = []
 
     def add(self, middleware: Any) -> None:
+        """Add the supplied item to this collection."""
         self._middleware.append(middleware)
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        """Handle the supplied call using this object's configured behavior."""
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return
@@ -23,9 +30,9 @@ class GraphQLMiddleware:
             return
 
         request = None
-        from flaxon.http import Request
+        request_type = import_attribute("flaxon.http", "Request")
 
-        request = Request(scope, receive, None)
+        request = request_type(scope, receive, None)
 
         if request.method == "GET":
             await self._handle_get(request, scope, receive, send)
@@ -37,8 +44,6 @@ class GraphQLMiddleware:
     async def _handle_get(self, request: Any, scope: dict[str, Any], receive: Any, send: Any) -> None:
         query = request.query.get("query", "")
         variables = request.query.get("variables", "{}")
-
-        import json
 
         try:
             variables = json.loads(variables)
@@ -78,7 +83,6 @@ class GraphQLMiddleware:
         await self._send_response(result, scope, send)
 
     async def _send_response(self, data: dict[str, Any], scope: dict[str, Any], send: Any) -> None:
-        import json
 
         body = json.dumps(data).encode("utf-8")
 
@@ -98,7 +102,6 @@ class GraphQLMiddleware:
         })
 
     async def _send_error(self, status: int, message: str, scope: dict[str, Any], send: Any) -> None:
-        import json
 
         body = json.dumps({"errors": [{"message": message}]}).encode("utf-8")
 

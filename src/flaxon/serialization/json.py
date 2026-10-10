@@ -11,10 +11,13 @@ from .types import SerializationError
 
 
 class JSONEncoder(Encoder):
+    """Jsonencoder implementation for the serialization subsystem."""
+
     def __init__(self, **kwargs: Any) -> None:
         self.kwargs = kwargs
 
     def encode(self, data: Any) -> str:
+        """Perform the encode operation for jsonencoder."""
         try:
             return json.dumps(
                 data, default=self._default, ensure_ascii=False, separators=(",", ":"), **self.kwargs
@@ -35,10 +38,13 @@ class JSONEncoder(Encoder):
 
 
 class JSONDecoder(Decoder):
+    """Jsondecoder implementation for the serialization subsystem."""
+
     def __init__(self, **kwargs: Any) -> None:
         self.kwargs = kwargs
 
     def decode(self, data: str | bytes) -> Any:
+        """Perform the decode operation for jsondecoder."""
         try:
             if isinstance(data, bytes):
                 data = data.decode("utf-8")
@@ -48,8 +54,10 @@ class JSONDecoder(Decoder):
 
 
 def json_encoder() -> JSONEncoder:
+    """Perform the json encoder operation for this subsystem."""
     return JSONEncoder()
 
 
 def json_decoder() -> JSONDecoder:
+    """Perform the json decoder operation for this subsystem."""
     return JSONDecoder()

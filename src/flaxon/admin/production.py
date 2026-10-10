@@ -22,6 +22,8 @@ from typing import Any
 
 @dataclass
 class DurableJob:
+    """Durable job implementation for the admin subsystem."""
+
     id: str
     name: str
     payload: dict[str, Any]
@@ -37,6 +39,7 @@ class DurableJob:
     lease_until: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a dictionary representation of the current value."""
         return self.__dict__.copy()
 
 
@@ -77,6 +80,7 @@ class DurableJobStore:
         del history[:-100]
 
     def list(self, status: str | None = None) -> list[DurableJob]:
+        """Return the matching entries."""
         jobs = [DurableJob(**item) for item in (self.store.get(self.namespace, "jobs", {}) or {}).values()]
         return [job for job in jobs if status is None or job.status == status]
 
@@ -89,6 +93,7 @@ class DurableJobStore:
         run_after: float = 0.0,
         job_id: str | None = None,
     ) -> DurableJob:
+        """Perform the enqueue operation for durable job store."""
         now = time.time()
         job = DurableJob(
             job_id or secrets.token_urlsafe(16),
@@ -112,6 +117,7 @@ class DurableJobStore:
         return DurableJob(**self._mutate(add))
 
     def claim_due(self, limit: int = 10) -> list[DurableJob]:
+        """Perform the claim due operation for durable job store."""
         now = time.time()
 
         def claim(jobs: dict[str, Any]) -> list[dict[str, Any]]:
@@ -137,6 +143,8 @@ class DurableJobStore:
         return [DurableJob(**raw) for raw in self._mutate(claim)]
 
     def complete(self, job_id: str) -> None:
+        """Perform the complete operation for durable job store."""
+
         def finish(jobs: dict[str, Any]) -> None:
             raw = jobs.get(job_id)
             if raw is None or raw.get("status") == "completed":
@@ -147,6 +155,8 @@ class DurableJobStore:
         self._mutate(finish)
 
     def fail(self, job_id: str, error: str, retry_delay: float = 5.0) -> None:
+        """Perform the fail operation for durable job store."""
+
         def fail_job(jobs: dict[str, Any]) -> None:
             raw = jobs.get(job_id)
             if raw is None or raw.get("status") == "completed":
@@ -185,6 +195,7 @@ class DurableJobStore:
         return DurableJob(**self._mutate(retry))
 
     def history(self, job_id: str | None = None) -> list[dict[str, Any]]:
+        """Perform the history operation for durable job store."""
         jobs = self.list()
         events = [
             event | {"job_id": job.id, "name": job.name} for job in jobs for event in (job.history or [])
@@ -195,14 +206,18 @@ class DurableJobStore:
 
 
 class DurableJobWorker:
+    """Durable job worker implementation for the admin subsystem."""
+
     def __init__(self, jobs: DurableJobStore) -> None:
         self.jobs = jobs
         self.handlers: dict[str, Callable[[dict[str, Any]], Any]] = {}
 
     def register(self, name: str, handler: Callable[[dict[str, Any]], Any]) -> None:
+        """Perform the register operation for durable job worker."""
         self.handlers[name] = handler
 
     async def run_once(self, limit: int = 10) -> list[DurableJob]:
+        """Perform the run once operation for durable job worker."""
         completed: list[DurableJob] = []
         for job in self.jobs.claim_due(limit):
             try:
@@ -239,6 +254,7 @@ class ImmutableAuditLog:
         ip: str | None = None,
         user_agent: str | None = None,
     ) -> dict[str, Any]:
+        """Perform the append operation for immutable audit log."""
         created: dict[str, Any] = {}
 
         def append_entry(current: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -272,6 +288,7 @@ class ImmutableAuditLog:
         return created
 
     def verify(self) -> bool:
+        """Perform the verify operation for immutable audit log."""
         anchors = self.store.get(self.namespace, "anchors", []) or []
         previous = anchors[-1].get("hash") if anchors else "0" * 64
         for entry in self.store.get(self.namespace, "entries", []) or []:
@@ -288,6 +305,7 @@ class ImmutableAuditLog:
         return True
 
     def prune(self, before: float) -> int:
+        """Perform the prune operation for immutable audit log."""
         entries = self.store.get(self.namespace, "entries", []) or []
         kept = [entry for entry in entries if entry.get("created_at", 0) >= before]
         if len(kept) != len(entries):
@@ -303,24 +321,31 @@ class ImmutableAuditLog:
 
 
 class NotificationService:
+    """Notification service implementation for the admin subsystem."""
+
     def __init__(self, store: Any, namespace: str = "notifications", max_messages: int = 5000) -> None:
         self.store = store
         self.namespace = namespace
         self.max_messages = max(100, max_messages)
         self.channel_senders: dict[str, Callable[[str, dict[str, Any]], Any]] = {}
+        self._delivery_tasks: set[asyncio.Task[None]] = set()
 
     def register_channel(self, channel: str, sender: Callable[[str, dict[str, Any]], Any]) -> None:
+        """Register the channel."""
         self.channel_senders[str(channel)] = sender
 
     def set_preferences(self, username: str, preferences: dict[str, bool]) -> None:
+        """Set the preferences."""
         values = self.store.get(self.namespace, "preferences", {}) or {}
         values[username] = {str(key): bool(value) for key, value in preferences.items()}
         self.store.set(self.namespace, "preferences", values)
 
     def preferences(self, username: str) -> dict[str, bool]:
+        """Perform the preferences operation for notification service."""
         return (self.store.get(self.namespace, "preferences", {}) or {}).get(username, {})
 
     def list(self, username: str, *, unread_only: bool = False, limit: int = 20) -> list[dict[str, Any]]:
+        """Return the matching entries."""
         messages = [
             item
             for item in self.store.get(self.namespace, "messages", []) or []
@@ -331,6 +356,7 @@ class NotificationService:
         return list(reversed(messages[-max(1, min(limit, self.max_messages)) :]))
 
     def mark_read(self, username: str, ids: list[str] | None = None, *, all_messages: bool = False) -> int:
+        """Mark the read."""
         selected = {str(item) for item in (ids or [])}
         messages = self.store.get(self.namespace, "messages", []) or []
         changed = 0
@@ -391,6 +417,7 @@ class NotificationService:
         payload: dict[str, Any],
         sender: Callable[[str, dict[str, Any]], Any] | None = None,
     ) -> dict[str, Any]:
+        """Perform the publish operation for notification service."""
         preferences = self.preferences(username)
         if preferences.get(channel) is False:
             return {"delivered": False, "reason": "disabled"}
@@ -416,7 +443,9 @@ class NotificationService:
             except RuntimeError:
                 asyncio.run(finish())
             else:
-                loop.create_task(finish())
+                task = loop.create_task(finish())
+                self._delivery_tasks.add(task)
+                task.add_done_callback(self._delivery_tasks.discard)
                 message["delivery_status"] = "pending"
                 return {"delivered": True, "pending": True, "message": message}
         self._set_delivery(message["id"], "delivered")
@@ -429,6 +458,7 @@ class NotificationService:
         payload: dict[str, Any],
         sender: Callable[[str, dict[str, Any]], Any] | None = None,
     ) -> dict[str, Any]:
+        """Publish the async."""
         preferences = self.preferences(username)
         if preferences.get(channel) is False:
             return {"delivered": False, "reason": "disabled"}
@@ -456,6 +486,7 @@ class ResumableUploadStore:
         content_type: str = "application/octet-stream",
         expires_in: int = 86400,
     ) -> str:
+        """Create a new entry from the supplied values."""
         if total_size < 0:
             raise ValueError("Upload size cannot be negative")
         upload_id = secrets.token_urlsafe(16)
@@ -475,6 +506,7 @@ class ResumableUploadStore:
         return upload_id
 
     def status(self, upload_id: str) -> dict[str, Any]:
+        """Return the current status."""
         uploads = self.store.get(self.namespace, "sessions", {}) or {}
         session = uploads.get(upload_id)
         if session is None or session.get("expires_at", 0) < time.time():
@@ -490,6 +522,7 @@ class ResumableUploadStore:
         }
 
     def put_chunk(self, upload_id: str, offset: int, data: bytes) -> None:
+        """Perform the put chunk operation for resumable upload store."""
         uploads = self.store.get(self.namespace, "sessions", {}) or {}
         session = uploads.get(upload_id)
         if (
@@ -507,6 +540,7 @@ class ResumableUploadStore:
         self.store.set(self.namespace, "sessions", uploads)
 
     def finalize(self, upload_id: str) -> tuple[str, bytes]:
+        """Perform the finalize operation for resumable upload store."""
         uploads = self.store.get(self.namespace, "sessions", {}) or {}
         session = uploads.get(upload_id)
         if session is None or session.get("expires_at", 0) < time.time():
@@ -526,6 +560,7 @@ class ResumableUploadStore:
         return session["filename"], data
 
     def cleanup_expired(self, now: float | None = None) -> int:
+        """Perform the cleanup expired operation for resumable upload store."""
         current = now or time.time()
         uploads = self.store.get(self.namespace, "sessions", {}) or {}
         expired = [key for key, session in uploads.items() if session.get("expires_at", 0) < current]
@@ -549,11 +584,13 @@ class WebAuthnService:
         self.namespace = namespace
 
     def begin_registration(self, username: str, **kwargs: Any) -> Any:
+        """Begin the registration."""
         if self.provider is None:
             raise RuntimeError("A WebAuthn provider is required")
         return self.provider.begin_registration(username, **kwargs)
 
     def finish_registration(self, username: str, response: Any) -> Any:
+        """Finish the registration."""
         if self.provider is None:
             raise RuntimeError("A WebAuthn provider is required")
         credential = self.provider.finish_registration(username, response)
@@ -563,6 +600,7 @@ class WebAuthnService:
         return credential
 
     def begin_authentication(self, username: str) -> Any:
+        """Begin the authentication."""
         if self.provider is None:
             raise RuntimeError("A WebAuthn provider is required")
         return self.provider.begin_authentication(
@@ -570,6 +608,7 @@ class WebAuthnService:
         )
 
     def finish_authentication(self, username: str, response: Any) -> bool:
+        """Finish the authentication."""
         if self.provider is None:
             raise RuntimeError("A WebAuthn provider is required")
         return bool(

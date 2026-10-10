@@ -1,13 +1,10 @@
-
 from __future__ import annotations
 
 from typing import Any
 
 
 class TemplateEngine:
-    """
-    Template engine for generating project files and code components.
-    """
+    """Template engine for generating project files and code components."""
 
     def __init__(self) -> None:
         """Initialize the template engine with default Flaxon templates."""
@@ -91,7 +88,6 @@ async def create(request):
     data = await request.json()
     return {{"created": True, "data": data}}
 """,
-
             "schema.py": """from flaxon.validation import Schema, fields
 
 class Create{name_capitalize}(Schema):
@@ -105,7 +101,6 @@ class Update{name_capitalize}(Schema):
     email = fields.Email(required=False)
     age = fields.Integer(required=False, minimum=13, maximum=120)
 """,
-
             "service.py": """class {name_capitalize}Service:
     def __init__(self, db):
         self.db = db
@@ -140,7 +135,6 @@ class Update{name_capitalize}(Schema):
             id,
         )
 """,
-
             "middleware.py": """from flaxon.middleware import Middleware
 
 class {name_capitalize}Middleware(Middleware):
@@ -160,8 +154,7 @@ class {name_capitalize}Middleware(Middleware):
 
         await self.app(scope, receive, send_wrapper)
 """,
-
- "task.py": """from flaxon.tasks import Task, task
+            "task.py": """from flaxon.tasks import Task, task
 from flaxon.tasks.retry import RetryPolicy
 
 
@@ -243,20 +236,14 @@ async def run_{name}_tasks():
     result = await queue.get_result(task.id)
     return result
 """,
-
-
-
-}
-
+        }
 
     def render(
         self,
         template_name: str,
         context: dict[str, Any] | None = None,
     ) -> str:
-        """
-        Render a registered template by name.
-        """
+        """Render a registered template by name."""
         context = context or {}
         template = self._templates.get(template_name, "")
         return self.render_string(template, context)
@@ -266,9 +253,7 @@ async def run_{name}_tasks():
         template: str,
         context: dict[str, Any] | None = None,
     ) -> str:
-        """
-        Render a template string using the supplied context.
-        """
+        """Render a template string using the supplied context."""
         context = context or {}
         result = template
 

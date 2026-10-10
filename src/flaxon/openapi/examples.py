@@ -4,11 +4,14 @@ from typing import Any
 
 
 class Example:
+    """Example implementation for the openapi subsystem."""
+
     def __init__(self, summary: str | None = None, value: Any = None) -> None:
         self.summary = summary
         self.value = value
 
     def build(self) -> dict[str, Any]:
+        """Perform the build operation for example."""
         result = {}
         if self.summary:
             result["summary"] = self.summary
@@ -18,8 +21,11 @@ class Example:
 
 
 class Examples:
+    """Examples implementation for the openapi subsystem."""
+
     @staticmethod
     def user_create() -> dict[str, Any]:
+        """Perform the user create operation for examples."""
         return {
             "name": "John Doe",
             "email": "john@example.com",
@@ -28,6 +34,7 @@ class Examples:
 
     @staticmethod
     def user_response() -> dict[str, Any]:
+        """Perform the user response operation for examples."""
         return {
             "id": 1,
             "name": "John Doe",
@@ -38,6 +45,7 @@ class Examples:
 
     @staticmethod
     def users_response() -> list[dict[str, Any]]:
+        """Perform the users response operation for examples."""
         return [
             {
                 "id": 1,
@@ -57,6 +65,7 @@ class Examples:
 
     @staticmethod
     def error_response() -> dict[str, Any]:
+        """Perform the error response operation for examples."""
         return {
             "success": False,
             "error": {
@@ -70,6 +79,7 @@ class Examples:
 
     @staticmethod
     def paginated_response() -> dict[str, Any]:
+        """Perform the paginated response operation for examples."""
         return {
             "success": True,
             "data": [
@@ -88,6 +98,7 @@ class Examples:
 
     @staticmethod
     def health_check() -> dict[str, Any]:
+        """Report the current health of the configured resource."""
         return {
             "success": True,
             "status": "healthy",
@@ -97,6 +108,7 @@ class Examples:
 
     @staticmethod
     def get_example(name: str) -> dict[str, Any] | None:
+        """Return the example."""
         examples = {
             "user_create": Examples.user_create(),
             "user_response": Examples.user_response(),

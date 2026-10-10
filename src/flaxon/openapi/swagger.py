@@ -25,24 +25,23 @@ class SwaggerUI:
         self.try_it_out_enabled = try_it_out_enabled
 
     def render(self) -> HTMLResponse:
+        """Render the requested content using the supplied context."""
         title = html.escape(self.title, quote=True)
         asset_url = html.escape(self.asset_url, quote=True)
-        config = json.dumps(
-            {
-                "url": self.openapi_url,
-                "dom_id": "#swagger-ui",
-                "deepLinking": True,
-                "docExpansion": "list",
-                "defaultModelsExpandDepth": 1,
-                "defaultModelExpandDepth": 1,
-                "displayRequestDuration": True,
-                "filter": True,
-                "persistAuthorization": self.persist_authorization,
-                "tryItOutEnabled": self.try_it_out_enabled,
-                "showExtensions": True,
-                "showCommonExtensions": True,
-            }
-        ).replace("</", "<\\/")
+        config = json.dumps({
+            "url": self.openapi_url,
+            "dom_id": "#swagger-ui",
+            "deepLinking": True,
+            "docExpansion": "list",
+            "defaultModelsExpandDepth": 1,
+            "defaultModelExpandDepth": 1,
+            "displayRequestDuration": True,
+            "filter": True,
+            "persistAuthorization": self.persist_authorization,
+            "tryItOutEnabled": self.try_it_out_enabled,
+            "showExtensions": True,
+            "showCommonExtensions": True,
+        }).replace("</", "<\\/")
         html_text = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -65,4 +64,5 @@ class SwaggerUI:
 
 
 def create_swagger_ui(openapi_url: str = "/openapi.json", title: str = "Flaxon API") -> HTMLResponse:
+    """Create the swagger ui."""
     return SwaggerUI(openapi_url, title).render()

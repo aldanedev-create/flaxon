@@ -1,17 +1,19 @@
 from __future__ import annotations
 
 import mimetypes
-import os
 from dataclasses import dataclass, field
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formatdate
+from pathlib import Path
 from typing import Any
 
 
 @dataclass
 class EmailAddress:
+    """Email address implementation for the mail subsystem."""
+
     address: str
     name: str | None = None
 
@@ -21,11 +23,14 @@ class EmailAddress:
         return self.address
 
     def to_tuple(self) -> tuple[str, str]:
+        """Convert to the tuple."""
         return (self.address, self.name or "")
 
 
 @dataclass
 class Attachment:
+    """Attachment implementation for the mail subsystem."""
+
     filename: str
     content: bytes
     content_type: str | None = None
@@ -38,6 +43,8 @@ class Attachment:
 
 @dataclass
 class Email:
+    """Email implementation for the mail subsystem."""
+
     from_address: EmailAddress | str
     to: list[EmailAddress | str] = field(default_factory=list)
     cc: list[EmailAddress | str] = field(default_factory=list)
@@ -65,6 +72,7 @@ class Email:
         return [self._normalize_address(addr) for addr in addresses]
 
     def to_mime(self) -> MIMEMultipart:
+        """Convert to the mime."""
         msg = MIMEMultipart("alternative")
 
         msg["Subject"] = self.subject
@@ -101,6 +109,7 @@ class Email:
         return msg
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a dictionary representation of the current value."""
         return {
             "from": str(self.from_address),
             "to": [str(addr) for addr in self.to],
@@ -114,14 +123,18 @@ class Email:
 
 
 class Message:
+    """Message implementation for the mail subsystem."""
+
     def __init__(self) -> None:
         self.email = Email(from_address="", to=[])
 
     def from_address(self, address: str, name: str | None = None) -> Message:
+        """Construct from the address."""
         self.email.from_address = EmailAddress(address, name)
         return self
 
     def to(self, *addresses: str | tuple[str, str]) -> Message:
+        """Perform the to operation for message."""
         for addr in addresses:
             if isinstance(addr, tuple):
                 self.email.to.append(EmailAddress(addr[0], addr[1]))
@@ -130,6 +143,7 @@ class Message:
         return self
 
     def cc(self, *addresses: str | tuple[str, str]) -> Message:
+        """Perform the cc operation for message."""
         for addr in addresses:
             if isinstance(addr, tuple):
                 self.email.cc.append(EmailAddress(addr[0], addr[1]))
@@ -138,6 +152,7 @@ class Message:
         return self
 
     def bcc(self, *addresses: str | tuple[str, str]) -> Message:
+        """Perform the bcc operation for message."""
         for addr in addresses:
             if isinstance(addr, tuple):
                 self.email.bcc.append(EmailAddress(addr[0], addr[1]))
@@ -146,24 +161,28 @@ class Message:
         return self
 
     def subject(self, subject: str) -> Message:
+        """Perform the subject operation for message."""
         self.email.subject = subject
         return self
 
     def body(self, body: str) -> Message:
+        """Perform the body operation for message."""
         self.email.body = body
         return self
 
     def html(self, html: str) -> Message:
+        """Perform the html operation for message."""
         self.email.html_body = html
         return self
 
     def attach(
         self, filename: str, content: bytes | str | None = None, content_type: str | None = None
     ) -> Message:
+        """Perform the attach operation for message."""
         if content is None:
-            with open(filename, "rb") as f:
+            with Path(filename).open("rb") as f:
                 content = f.read()
-                filename = os.path.basename(filename)
+                filename = Path(filename).name
 
         if isinstance(content, str):
             content = content.encode("utf-8")
@@ -172,12 +191,15 @@ class Message:
         return self
 
     def reply_to(self, address: str, name: str | None = None) -> Message:
+        """Perform the reply to operation for message."""
         self.email.reply_to = EmailAddress(address, name)
         return self
 
     def header(self, key: str, value: str) -> Message:
+        """Perform the header operation for message."""
         self.email.headers[key] = value
         return self
 
     def build(self) -> Email:
+        """Perform the build operation for message."""
         return self.email

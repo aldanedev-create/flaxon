@@ -7,16 +7,20 @@ from .base import BaseAdapter
 
 
 class CustomAdapter(BaseAdapter):
+    """Custom adapter implementation for the database subsystem."""
+
     def __init__(self, connection: Any) -> None:
         self._conn = connection
 
     async def connect(self) -> None:
+        """Open the configured connection."""
         if hasattr(self._conn, "connect"):
             result = self._conn.connect()
             if inspect.isawaitable(result):
                 await result
 
     async def disconnect(self) -> None:
+        """Close the configured connection."""
         if hasattr(self._conn, "disconnect"):
             result = self._conn.disconnect()
             if inspect.isawaitable(result):
@@ -27,48 +31,56 @@ class CustomAdapter(BaseAdapter):
                 await result
 
     async def execute(self, query: str, *args: Any) -> Any:
+        """Execute the supplied operation with its parameters."""
         if hasattr(self._conn, "execute"):
             result = self._conn.execute(query, *args)
             return await result if inspect.isawaitable(result) else result
         raise NotImplementedError("Custom adapter does not support execute")
 
     async def fetch_one(self, query: str, *args: Any) -> dict[str, Any] | None:
+        """Fetch the one."""
         if hasattr(self._conn, "fetch_one"):
             result = self._conn.fetch_one(query, *args)
             return await result if inspect.isawaitable(result) else result
         raise NotImplementedError("Custom adapter does not support fetch_one")
 
     async def fetch_all(self, query: str, *args: Any) -> list[dict[str, Any]]:
+        """Fetch the all."""
         if hasattr(self._conn, "fetch_all"):
             result = self._conn.fetch_all(query, *args)
             return await result if inspect.isawaitable(result) else result
         raise NotImplementedError("Custom adapter does not support fetch_all")
 
     async def fetch_val(self, query: str, *args: Any) -> Any:
+        """Fetch the val."""
         if hasattr(self._conn, "fetch_val"):
             result = self._conn.fetch_val(query, *args)
             return await result if inspect.isawaitable(result) else result
         raise NotImplementedError("Custom adapter does not support fetch_val")
 
     async def begin(self) -> None:
+        """Perform the begin operation for custom adapter."""
         if hasattr(self._conn, "begin"):
             result = self._conn.begin()
             if inspect.isawaitable(result):
                 await result
 
     async def commit(self) -> None:
+        """Perform the commit operation for custom adapter."""
         if hasattr(self._conn, "commit"):
             result = self._conn.commit()
             if inspect.isawaitable(result):
                 await result
 
     async def rollback(self) -> None:
+        """Perform the rollback operation for custom adapter."""
         if hasattr(self._conn, "rollback"):
             result = self._conn.rollback()
             if inspect.isawaitable(result):
                 await result
 
     async def ping(self) -> bool:
+        """Perform the ping operation for custom adapter."""
         try:
             await self.fetch_val("SELECT 1")
             return True

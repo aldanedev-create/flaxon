@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 import argparse
+import csv
+import io
+import json
+from pathlib import Path
 from typing import Any
 
+from flaxon._imports import import_attribute
 from flaxon.cli.base import Command
 
 
 class RoutesCommand(Command):
+    """Routes command implementation for the cli subsystem."""
+
     def __init__(self) -> None:
         super().__init__(
             name="routes",
@@ -23,7 +30,7 @@ class RoutesCommand(Command):
         parser.add_argument("--output", help="Output file path")
 
     def _run(self, args: argparse.Namespace, console: Any) -> int:
-        from flaxon.utils.import_string import import_string
+        import_string = import_attribute("flaxon.utils.import_string", "import_string")
 
         try:
             app = import_string(args.application)
@@ -43,13 +50,8 @@ class RoutesCommand(Command):
             rows.append(["WEBSOCKET", route.path, route.name or ""])
 
         if args.format == "json":
-            import json
-
             output = json.dumps({"routes": rows}, indent=2)
         elif args.format == "csv":
-            import csv
-            import io
-
             output = io.StringIO()
             writer = csv.writer(output)
             writer.writerow(["Method", "Path", "Name"])
@@ -63,7 +65,7 @@ class RoutesCommand(Command):
             return 0
 
         if args.output:
-            with open(args.output, "w") as f:
+            with Path(args.output).open("w") as f:
                 f.write(output)
             console.success(f"Routes written to {args.output}")
         else:

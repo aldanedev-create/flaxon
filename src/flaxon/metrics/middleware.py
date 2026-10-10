@@ -9,6 +9,8 @@ from .collector import MetricsCollector
 
 
 class MetricsMiddleware:
+    """Metrics middleware implementation for the metrics subsystem."""
+
     def __init__(
         self,
         app: Any,
@@ -24,6 +26,7 @@ class MetricsMiddleware:
         self.include_status = include_status
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        """Handle the supplied call using this object's configured behavior."""
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return

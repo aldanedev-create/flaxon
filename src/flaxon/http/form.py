@@ -10,6 +10,7 @@ import json
 from typing import Any
 from urllib.parse import parse_qs
 
+from flaxon._imports import import_attribute
 from flaxon.exceptions import BadRequest
 
 
@@ -214,14 +215,12 @@ class FormData:
         if "multipart/form-data" in content_type:
             return await cls._parse_multipart(request, content_type)
 
-        raise BadRequest(
-            "Content-Type must be application/x-www-form-urlencoded or multipart/form-data"
-        )
+        raise BadRequest("Content-Type must be application/x-www-form-urlencoded or multipart/form-data")
 
     @classmethod
     async def _parse_multipart(cls, request: Any, content_type: str) -> FormData:
         """Parse multipart form data."""
-        from flaxon.http.uploads import MultipartParser
+        multipart_parser_type = import_attribute("flaxon.http.uploads", "MultipartParser")
 
-        parser = MultipartParser(content_type)
+        parser = multipart_parser_type(content_type)
         return await parser.parse(request)

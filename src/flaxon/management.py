@@ -11,12 +11,14 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from flaxon._imports import import_attribute, import_module
 from flaxon.config import Settings, management_mode
 
 TORTOISE_ORM: dict[str, Any] = {}
 
 
 def load_application(application: str):
+    """Load the application."""
     module_name, attribute = application.split(":", 1)
     token = management_mode.set(True)
     try:
@@ -29,19 +31,21 @@ def load_application(application: str):
 
 
 def admin_store(settings):
+    """Perform the admin store operation for this subsystem."""
     if getattr(settings, "ADMIN_STORE_BACKEND", "sqlite") == "orm":
-        from flaxon.db.admin_store import ORMAdminStore
+        ormadmin_store_type = import_attribute("flaxon.db.admin_store", "ORMAdminStore")
 
-        return ORMAdminStore(settings.DATABASE_URL)
-    from flaxon.admin.services import AdminStore
+        return ormadmin_store_type(settings.DATABASE_URL)
+    admin_store_type = import_attribute("flaxon.admin.services", "AdminStore")
 
     path = Path(settings.ADMIN_STORAGE_PATH)
     path.parent.mkdir(parents=True, exist_ok=True)
-    return AdminStore(str(path))
+    return admin_store_type(str(path))
 
 
 def setup_admin(settings, username=None):
-    from flaxon.admin.services import AdminAuth
+    """Perform the setup admin operation for this subsystem."""
+    admin_auth_type = import_attribute("flaxon.admin.services", "AdminAuth")
 
     store = admin_store(settings)
     username = (username or input("Administrator username: ")).strip()
@@ -52,7 +56,7 @@ def setup_admin(settings, username=None):
     password = getpass.getpass("Password: ")
     if password != getpass.getpass("Confirm password: "):
         raise ValueError("Passwords do not match")
-    auth = AdminAuth(users=[], store=store, strict_permissions=True)
+    auth = admin_auth_type(users=[], store=store, strict_permissions=True)
     record = auth.add_user({
         "username": username,
         "password": password,
@@ -69,13 +73,7 @@ def setup_admin(settings, username=None):
     print(f"Administrator '{username}' created. Sign in at /admin/login.")
 
 
-def execute(argv=None, *, settings="settings", application="app:app", project_root=None):
-    """Run project commands; the generated management.py only calls this function."""
-    if project_root is not None:
-        root = Path(project_root).resolve()
-        os.chdir(root)
-        if str(root) not in sys.path:
-            sys.path.insert(0, str(root))
+def _project_command_parser():
     parser = argparse.ArgumentParser(description="Manage your Flaxon project")
     commands = parser.add_subparsers(dest="command", required=True)
     copy_store = commands.add_parser(
@@ -102,6 +100,42 @@ def execute(argv=None, *, settings="settings", application="app:app", project_ro
     server.add_argument("--host", default="127.0.0.1")
     server.add_argument("--port", type=int, default=8000)
     server.add_argument("--no-reload", action="store_true")
+    return parser
+
+
+def _orm_command_arguments(args):
+    cli = ["-c", "flaxon.management.TORTOISE_ORM"]
+    if args.command == "makemigrations":
+        cli += ["makemigrations", *args.labels]
+        if args.name:
+            cli += ["--name", args.name]
+        if args.empty:
+            cli += ["--empty"]
+    elif args.command == "migrate":
+        cli += ["history" if args.status else "migrate", *args.targets]
+        if args.plan and not args.status:
+            cli += ["--dry-run"]
+    elif args.command == "sqlmigrate":
+        cli += ["sqlmigrate", args.label, args.migration]
+        if args.backward:
+            cli += ["--backward"]
+    else:
+        cli += ["shell"]
+    return cli
+
+
+def _prepare_project_root(project_root):
+    if project_root is not None:
+        root = Path(project_root).resolve()
+        os.chdir(root)
+        if str(root) not in sys.path:
+            sys.path.insert(0, str(root))
+
+
+def execute(argv=None, *, settings="settings", application="app:app", project_root=None):
+    """Run project commands; the generated management.py only calls this function."""
+    _prepare_project_root(project_root)
+    parser = _project_command_parser()
     # Preserve existing module command parsing and argument handling.
     args_list = list(sys.argv[1:] if argv is None else argv)
     known = {
@@ -118,12 +152,12 @@ def execute(argv=None, *, settings="settings", application="app:app", project_ro
         "--help",
     }
     if args_list and args_list[0] not in known:
-        from flaxon.cli.console import Console
-        from flaxon.cli.main import create_parser
+        console_type = import_attribute("flaxon.cli.console", "Console")
+        create_parser = import_attribute("flaxon.cli.main", "create_parser")
 
         custom_args = create_parser().parse_args(args_list)
         command = custom_args._commands[custom_args.command]
-        return command.run(custom_args, Console())
+        return command.run(custom_args, console_type())
     args = parser.parse_args(args_list)
     try:
         project_settings = Settings(settings)
@@ -140,47 +174,31 @@ def execute(argv=None, *, settings="settings", application="app:app", project_ro
             setup_admin(project_settings, args.username)
             return 0
         if args.command == "runserver":
-            import uvicorn
+            uvicorn = import_module("uvicorn")
 
             uvicorn.run(application, host=args.host, port=args.port, reload=not args.no_reload)
             return 0
         app = load_application(application)
-        global TORTOISE_ORM
-        TORTOISE_ORM = app.db.configuration()
+        TORTOISE_ORM.clear()
+        TORTOISE_ORM.update(app.db.configuration())
         if args.command == "check":
-            from tortoise.context import TortoiseContext
+            tortoise_context_type = import_attribute("tortoise.context", "TortoiseContext")
 
             async def check():
-                async with TortoiseContext() as context:
+                async with tortoise_context_type() as context:
                     await context.init(config=TORTOISE_ORM, init_connections=False)
 
             asyncio.run(check())
-            from flaxon.admin.registry import Registry
-            from flaxon.db.admin import register_project_models
+            registry_type = import_attribute("flaxon.admin.registry", "Registry")
+            register_project_models = import_attribute("flaxon.db.admin", "register_project_models")
 
-            register_project_models(app, Registry())
+            register_project_models(app, registry_type())
             print("Settings, models, and Admin registrations passed. No database schema was changed.")
             return 0
         project_settings.prepare_database_directory()
-        from tortoise.cli.cli import run_cli_async
+        run_cli_async = import_attribute("tortoise.cli.cli", "run_cli_async")
 
-        cli = ["-c", "flaxon.management.TORTOISE_ORM"]
-        if args.command == "makemigrations":
-            cli += ["makemigrations", *args.labels]
-            if args.name:
-                cli += ["--name", args.name]
-            if args.empty:
-                cli += ["--empty"]
-        elif args.command == "migrate":
-            cli += ["history" if args.status else "migrate", *args.targets]
-            if args.plan and not args.status:
-                cli += ["--dry-run"]
-        elif args.command == "sqlmigrate":
-            cli += ["sqlmigrate", args.label, args.migration]
-            if args.backward:
-                cli += ["--backward"]
-        else:
-            cli += ["shell"]
+        cli = _orm_command_arguments(args)
         return asyncio.run(run_cli_async(cli))
     except (ValueError, OSError, ImportError, RuntimeError) as error:
         parser.exit(1, f"Error: {error}\n")
