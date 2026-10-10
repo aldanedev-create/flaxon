@@ -144,3 +144,19 @@ def test_compile_error_keeps_debug_dashboard_available(tmp_path):
     errors = app.error_store.get_recent()
     assert any(item["type"] == "Teloce compile" and "SSR calls" in item["message"] for item in errors)
     assert client.get("/__debug__").status_code == 200
+
+
+def test_nested_report_and_oversized_length_fail_cleanly(tmp_path):
+    app, client = application(tmp_path)
+    client.get("/")
+    headers = {"origin": "http://testserver", "x-flaxon-debug-token": app.teloce.debugger.token}
+    nested = "[" * 2000 + "0" + "]" * 2000
+    assert (
+        client.post("/__debug__/teloce/errors", content=nested.encode(), headers=headers).status_code == 400
+    )
+    assert (
+        client.post(
+            "/__debug__/teloce/errors", content=b"{}", headers={**headers, "content-length": "9" * 5000}
+        ).status_code
+        == 400
+    )

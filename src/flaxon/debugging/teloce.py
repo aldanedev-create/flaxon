@@ -37,7 +37,7 @@ class TeloceDebugger:
             raise BadRequest("Browser diagnostic is too large")
         try:
             report = json.loads(raw)
-        except (ValueError, UnicodeDecodeError) as error:
+        except (ValueError, UnicodeDecodeError, RecursionError) as error:
             raise BadRequest("Invalid diagnostic JSON") from error
         if not isinstance(report, dict):
             raise BadRequest("Diagnostic must be an object")
@@ -84,7 +84,7 @@ class TeloceDebugger:
         if not hmac.compare_digest(supplied, self.token):
             raise Forbidden("Invalid development diagnostic token")
         length = request.headers.get("content-length", "0")
-        if not length.isdecimal() or int(length) > 32768:
+        if len(length) > 5 or not length.isdecimal() or int(length) > 32768:
             raise BadRequest("Browser diagnostic is too large")
         now = time.monotonic()
         if now - self._window > 60:
