@@ -8,10 +8,13 @@ from .templates import TemplateEngine
 
 
 class Generator:
+    """Generator implementation for the cli subsystem."""
+
     def __init__(self) -> None:
         self.templates = TemplateEngine()
 
     def generate(self, directory: Path, template: str = "fullstack") -> None:
+        """Perform the generate operation for generator."""
         if template not in {"fullstack", "basic"}:
             raise ValueError(f"Unknown project template: {template}")
         if directory.exists():
@@ -53,6 +56,7 @@ class Generator:
             target.write_text(content, encoding="utf-8")
 
     def generate_component(self, type: str, name: str, path: str | Path = ".") -> None:
+        """Generate the component."""
         filename_map = {
             "controller": f"{name}_controller.py",
             "schema": f"{name}_schema.py",
@@ -75,4 +79,5 @@ class Generator:
         full_path.write_text(template_content, encoding="utf-8")
 
     def generate_from_string(self, template: str, context: dict[str, Any]) -> str:
+        """Generate the from string."""
         return self.templates.render_string(template, context)

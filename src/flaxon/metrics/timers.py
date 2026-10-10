@@ -6,6 +6,8 @@ from typing import Any
 
 
 class Timer:
+    """Timer implementation for the metrics subsystem."""
+
     def __init__(self, name: str, help_text: str = "", labels: list[str] | None = None) -> None:
         self.name = name
         self.help_text = help_text
@@ -19,6 +21,7 @@ class Timer:
         return ",".join(f"{k}={labels.get(k)}" for k in self.labels)
 
     def observe(self, duration: float, **labels: Any) -> None:
+        """Perform the observe operation for timer."""
         key = self._key(**labels)
         with self._lock:
             if key not in self._values:
@@ -26,9 +29,11 @@ class Timer:
             self._values[key].append(duration)
 
     def time(self, **labels: Any) -> TimerContext:
+        """Perform the time operation for timer."""
         return TimerContext(self, **labels)
 
     def get_stats(self, **labels: Any) -> dict[str, float]:
+        """Return the stats."""
         key = self._key(**labels)
         values = self._values.get(key, [])
 
@@ -52,6 +57,7 @@ class Timer:
         }
 
     def get_all_stats(self) -> dict[str, dict[str, float]]:
+        """Return the all stats."""
         result = {}
         keys = list(self._values.keys())
         for key in keys:
@@ -65,6 +71,7 @@ class Timer:
         return result
 
     def get_metrics(self) -> dict[str, Any]:
+        """Return the metrics."""
         return {
             "name": self.name,
             "help": self.help_text,
@@ -73,6 +80,8 @@ class Timer:
 
 
 class TimerContext:
+    """Timer context implementation for the metrics subsystem."""
+
     def __init__(self, timer: Timer, **labels: Any) -> None:
         self.timer = timer
         self.labels = labels
@@ -89,6 +98,8 @@ class TimerContext:
 
 
 class Histogram:
+    """Histogram implementation for the metrics subsystem."""
+
     def __init__(
         self,
         name: str,
@@ -109,6 +120,7 @@ class Histogram:
         return ",".join(f"{k}={labels.get(k)}" for k in self.labels)
 
     def observe(self, value: float, **labels: Any) -> None:
+        """Perform the observe operation for histogram."""
         key = self._key(**labels)
         with self._lock:
             if key not in self._values:
@@ -124,13 +136,16 @@ class Histogram:
             self._values[key]["sum"] += value
 
     def get_stats(self, **labels: Any) -> dict[str, Any]:
+        """Return the stats."""
         key = self._key(**labels)
         return dict(self._values.get(key, {}))
 
     def get_all_stats(self) -> dict[str, dict[str, Any]]:
+        """Return the all stats."""
         return dict(self._values)
 
     def get_metrics(self) -> dict[str, Any]:
+        """Return the metrics."""
         return {
             "name": self.name,
             "help": self.help_text,

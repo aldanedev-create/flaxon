@@ -7,6 +7,8 @@ from pathlib import Path
 
 
 class Reloader:
+    """Reloader implementation for the server subsystem."""
+
     def __init__(self, watch_paths: list[str] | None = None, delay: float = 0.5) -> None:
         self.watch_paths = watch_paths or ["."]
         self.delay = delay
@@ -15,10 +17,12 @@ class Reloader:
         self._process: subprocess.Popen | None = None
 
     def start_watching(self) -> None:
+        """Perform the start watching operation for reloader."""
         self._running = True
         self._scan_files()
 
     def stop_watching(self) -> None:
+        """Perform the stop watching operation for reloader."""
         self._running = False
 
     def _scan_files(self) -> None:
@@ -78,7 +82,7 @@ class Reloader:
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"
 
-        self._process = subprocess.Popen(
-            [sys.executable, "-m", "flaxon", "run"] + sys.argv[1:],
+        self._process = subprocess.Popen(  # noqa: S603 - local CLI argument list; no shell interpolation
+            [sys.executable, "-m", "flaxon", "run", *sys.argv[1:]],
             env=env,
         )

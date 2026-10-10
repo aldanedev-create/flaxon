@@ -25,6 +25,7 @@ class CORSMiddleware(Middleware):
         self.allow_methods = allow_methods or ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        """Handle the supplied call using this object's configured behavior."""
         origin = next(
             (value.decode("latin-1") for key, value in scope.get("headers", []) if key.lower() == b"origin"),
             None,

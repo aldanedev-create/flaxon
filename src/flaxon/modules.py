@@ -1,4 +1,5 @@
-"""FlaxonModule -- a Flask-blueprint-style composition unit for Flaxon apps,
+"""FlaxonModule -- a Flask-blueprint-style composition unit for Flaxon apps.
+
 designed around Flaxon's own real primitives instead of copying Flask's.
 
 Importing this module attaches `mount_module()` to the real `Flaxon` app
@@ -61,6 +62,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from flaxon._imports import import_attribute
 from flaxon.routing.route import WebSocketRoute
 from flaxon.routing.router import Router
 
@@ -86,7 +88,7 @@ class FlaxonModule:
     author gets it for free instead of rediscovering it.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0917 - preserve existing positional API
         self,
         name: str,
         template_dir: str | None = None,
@@ -118,21 +120,27 @@ class FlaxonModule:
     # -- routing --------------------------------------------------------
 
     def get(self, path: str, **kw: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        """Retrieve the requested value using this object's configured behavior."""
         return self.router.get(path, **kw)
 
     def post(self, path: str, **kw: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        """Register or issue an HTTP POST operation."""
         return self.router.post(path, **kw)
 
     def put(self, path: str, **kw: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        """Register or issue an HTTP PUT operation."""
         return self.router.put(path, **kw)
 
     def patch(self, path: str, **kw: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        """Register or issue an HTTP PATCH operation."""
         return self.router.patch(path, **kw)
 
     def delete(self, path: str, **kw: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        """Register an HTTP DELETE route."""
         return self.router.delete(path, **kw)
 
     def websocket(self, path: str, **kw: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        """Register a WebSocket endpoint at the supplied path."""
         return self.router.websocket(path, **kw)
 
     # -- dependencies -----------------------------------------------------
@@ -144,25 +152,31 @@ class FlaxonModule:
     # -- app lifecycle ----------------------------------------------------
 
     def on_startup(self, callback: Callable[..., Any]) -> Callable[..., Any]:
+        """Run the optional plugin startup hook."""
         self._startup_hooks.append(callback)
         return callback
 
     def on_shutdown(self, callback: Callable[..., Any]) -> Callable[..., Any]:
+        """Run the optional plugin shutdown hook."""
         self._shutdown_hooks.append(callback)
         return callback
 
     # -- module-scoped request hooks ---------------------------------------
 
     def before_request(self, callback: Callable[..., Any]) -> Callable[..., Any]:
-        """Run before every request handled by this module's routes.
-        Receives the request/socket. Raising here blocks the handler.
+        """
+        Run before every request handled by this module's routes.
+
+                Receives the request/socket. Raising here blocks the handler.
         """
         self._before_request_hooks.append(callback)
         return callback
 
     def after_request(self, callback: Callable[..., Any]) -> Callable[..., Any]:
-        """Run after a successful request handled by this module's routes.
-        Receives (request, result).
+        """
+        Run after a successful request handled by this module's routes.
+
+                Receives (request, result).
         """
         self._after_request_hooks.append(callback)
         return callback
@@ -170,7 +184,8 @@ class FlaxonModule:
     def errorhandler(
         self, exc_type: type[BaseException]
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-        """Register a handler for exceptions raised within this module's
+        """Register a handler for exceptions raised within this module's.
+
         routes. Receives (request, exc); its return value becomes the
         response. Only exceptions from this module's own routes are
         caught -- unrelated routes elsewhere in the app are unaffected.
@@ -187,7 +202,8 @@ class FlaxonModule:
     def cli_command(
         self, name: str, help_text: str = ""
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-        """Register a CLI command owned by this module. The decorated
+        """Register a CLI command owned by this module. The decorated.
+
         function receives `console` (and optionally `args`). Expose the
         module's commands via `module.install_cli_commands(globals())`
         from a `flaxon_cli.py` at your project root -- Flaxon's existing
@@ -202,18 +218,20 @@ class FlaxonModule:
         return decorator
 
     def as_commands(self) -> list[Any]:
-        """Return this module's CLI commands as real `Command` objects,
+        """Return this module's CLI commands as real `Command` objects.
+
         ready to be picked up by Flaxon's CLI plugin discovery.
         """
-        from flaxon.cli.base import Command
+        command_type = import_attribute("flaxon.cli.base", "Command")
 
         commands = []
         for name, func, help_text in self._cli_commands:
-            commands.append(Command(name=name, handler=_make_cli_handler(func), help_text=help_text))
+            commands.append(command_type(name=name, handler=_make_cli_handler(func), help_text=help_text))
         return commands
 
     def install_cli_commands(self, namespace: dict[str, Any]) -> None:
-        """Expose this module's CLI commands to Flaxon's real discovery
+        """Expose this module's CLI commands to Flaxon's real discovery.
+
         mechanism, which scans a module's `dir()` for individual `Command`
         *instances* (verified against the real discovery.py -- it does NOT
         look for a `commands` list attribute, so each command needs its
@@ -241,7 +259,8 @@ class FlaxonModule:
     # -- nesting ------------------------------------------------------------
 
     def register_module(self, child: FlaxonModule, prefix: str = "") -> None:
-        """Nest another module's routes/static/templates/hooks/commands
+        """Nest another module's routes/static/templates/hooks/commands.
+
         into this one, merged at mount time under `prefix` (relative to
         wherever this parent module itself ends up mounted).
         """
@@ -280,7 +299,8 @@ def _accepts_args(func: Callable[..., Any]) -> bool:
 
 
 def _wrap_endpoint(module: FlaxonModule, endpoint: Callable[..., Any]) -> Callable[..., Any]:
-    """Wrap an endpoint with the owning module's before/after-request hooks
+    """Wrap an endpoint with the owning module's before/after-request hooks.
+
     and error handlers, while preserving the endpoint's real signature so
     Flaxon's _invoke() still correctly injects path params / request / DI
     values (it calls endpoint(**kwargs) based on inspect.signature(endpoint)).
@@ -304,33 +324,39 @@ def _wrap_endpoint(module: FlaxonModule, endpoint: Callable[..., Any]) -> Callab
         if synthesized_request:
             call_kwargs.pop("request", None)
 
-        for hook in module._before_request_hooks:
-            result = hook(request)
-            if inspect.isawaitable(result):
-                await result
-
-        try:
-            result = endpoint(**call_kwargs)
-            if inspect.isawaitable(result):
-                result = await result
-        except Exception as exc:
-            for exc_type, error_handler in module._error_handlers.items():
-                if isinstance(exc, exc_type):
-                    handled = error_handler(request, exc)
-                    if inspect.isawaitable(handled):
-                        handled = await handled
-                    return handled
-            raise
-
-        for hook in module._after_request_hooks:
-            hook_result = hook(request, result)
-            if inspect.isawaitable(hook_result):
-                await hook_result
-
-        return result
+        return await _run_module_endpoint(module, endpoint, request, call_kwargs)
 
     wrapped.__signature__ = new_sig  # type: ignore[attr-defined]
     return wrapped
+
+
+async def _run_module_hooks(hooks: list[Callable[..., Any]], *args: Any) -> None:
+    for hook in hooks:
+        result = hook(*args)
+        if inspect.isawaitable(result):
+            await result
+
+
+async def _handle_module_error(module: FlaxonModule, request: Any, error: Exception) -> Any:
+    for error_type, handler in module._error_handlers.items():
+        if isinstance(error, error_type):
+            result = handler(request, error)
+            return await result if inspect.isawaitable(result) else result
+    raise error
+
+
+async def _run_module_endpoint(
+    module: FlaxonModule, endpoint: Callable[..., Any], request: Any, kwargs: dict[str, Any]
+) -> Any:
+    await _run_module_hooks(module._before_request_hooks, request)
+    try:
+        result = endpoint(**kwargs)
+        if inspect.isawaitable(result):
+            result = await result
+    except Exception as error:
+        return await _handle_module_error(module, request, error)
+    await _run_module_hooks(module._after_request_hooks, request, result)
+    return result
 
 
 def _merge_module(
@@ -342,12 +368,7 @@ def _merge_module(
             f"Pass a distinct name= to mount_module() if this is intentional."
         )
 
-    missing = [dep for dep in module._required if not app.container.has(dep)]
-    if missing:
-        raise ModuleDependencyError(
-            f"Module '{module.name}' requires {missing!r} in app.container, "
-            f"but they aren't registered. Register them before mounting."
-        )
+    _check_module_dependencies(app, module)
 
     orm_modules = getattr(app, "_orm_modules", None)
     if orm_modules is None:
@@ -355,6 +376,40 @@ def _merge_module(
     if module not in orm_modules:
         orm_modules.append(module)
 
+    _mount_module_routes(app, module, prefix)
+
+    if module.static_dir:
+        app.mount_static(f"/static/{mount_name}", module.static_dir)
+
+    if module.template_dir:
+        _mount_template_dir(app, module)
+
+    if module.ui_dir:
+        _mount_ui_dir(app, module, mount_name)
+
+    for hook in module._startup_hooks:
+        app.on_startup(hook)
+    for hook in module._shutdown_hooks:
+        app.on_shutdown(hook)
+
+    mounted[mount_name] = prefix
+
+    for child, child_prefix in module._children:
+        combined_prefix = f"{prefix.rstrip('/')}/{child_prefix.lstrip('/')}" if child_prefix else prefix
+        _merge_module(app, child, combined_prefix, f"{mount_name}.{child.name}", mounted)
+
+
+def _check_module_dependencies(app, module):
+    missing = [dep for dep in module._required if not app.container.has(dep)]
+    if missing:
+        raise ModuleDependencyError(
+            f"Module '{module.name}' requires {missing!r} in app.container, "
+            f"but they aren't registered. Register them before mounting."
+        )
+
+
+def _mount_module_routes(app, module, prefix):
+    """Register module HTTP and WebSocket routes under the mount prefix."""
     wrapped_router = Router(prefix=module.router.prefix)
     for source in module.router.routes:
         endpoint = _wrap_endpoint(module, source.endpoint)
@@ -382,51 +437,42 @@ def _merge_module(
             path = f"{mount}{path}" if path.startswith("/") else f"{mount}/{path}"
         app.router.websocket_routes.append(WebSocketRoute(path, source.endpoint, source.name))
 
-    if module.static_dir:
-        app.mount_static(f"/static/{mount_name}", module.static_dir)
 
-    if module.template_dir:
-        from flaxon.jinax import Jinax
-        from flaxon.jinax.loaders import CompositeLoader, FileSystemLoader
+def _mount_ui_dir(app, module, mount_name):
+    """Apply mount ui dir."""
+    teloce_source_type = import_attribute("flaxon.teloce", "TeloceSource")
 
-        if app.jinax is None:
-            app.use_templates(Jinax(module.template_dir))
-        else:
-            # App templates take precedence; module templates are the
-            # fallback -- mirrors Flask's blueprint template-namespacing
-            # intent without requiring a <module_name>/ prefix convention.
-            app.jinax.environment.loader = CompositeLoader([
-                app.jinax.environment.loader,
-                FileSystemLoader(module.template_dir),
-            ])
+    source = teloce_source_type(mount_name, module.ui_dir, module.ui_routes)
+    if app.teloce is not None:
+        app.teloce.register_source(
+            source.name,
+            source.directory,
+            routes=source.routes,
+        )
+    else:
+        pending = getattr(app, "_teloce_ui_sources", None)
+        if pending is None:
+            pending = []
+            app._teloce_ui_sources = pending
+        pending.append(source)
 
-    if module.ui_dir:
-        from flaxon.teloce import TeloceSource
 
-        source = TeloceSource(mount_name, module.ui_dir, module.ui_routes)
-        if app.teloce is not None:
-            app.teloce.register_source(
-                source.name,
-                source.directory,
-                routes=source.routes,
-            )
-        else:
-            pending = getattr(app, "_teloce_ui_sources", None)
-            if pending is None:
-                pending = []
-                app._teloce_ui_sources = pending
-            pending.append(source)
+def _mount_template_dir(app, module):
+    """Apply mount template dir."""
+    jinax_type = import_attribute("flaxon.jinax", "Jinax")
+    composite_loader_type = import_attribute("flaxon.jinax.loaders", "CompositeLoader")
+    file_system_loader_type = import_attribute("flaxon.jinax.loaders", "FileSystemLoader")
 
-    for hook in module._startup_hooks:
-        app.on_startup(hook)
-    for hook in module._shutdown_hooks:
-        app.on_shutdown(hook)
-
-    mounted[mount_name] = prefix
-
-    for child, child_prefix in module._children:
-        combined_prefix = f"{prefix.rstrip('/')}/{child_prefix.lstrip('/')}" if child_prefix else prefix
-        _merge_module(app, child, combined_prefix, f"{mount_name}.{child.name}", mounted)
+    if app.jinax is None:
+        app.use_templates(jinax_type(module.template_dir))
+    else:
+        # App templates take precedence; module templates are the
+        # fallback -- mirrors Flask's blueprint template-namespacing
+        # intent without requiring a <module_name>/ prefix convention.
+        app.jinax.environment.loader = composite_loader_type([
+            app.jinax.environment.loader,
+            file_system_loader_type(module.template_dir),
+        ])
 
 
 def _mount_module(
@@ -457,18 +503,19 @@ class ModuleTestClient:
     """
 
     def __new__(cls, module: FlaxonModule, base_url: str = "http://testserver") -> Any:
-        from flaxon.application.app import Flaxon
-        from flaxon.testing.client import AsyncTestClient
+        """Allocate an instance with the requested configuration."""
+        flaxon_type = import_attribute("flaxon.application.app", "Flaxon")
+        async_test_client_type = import_attribute("flaxon.testing.client", "AsyncTestClient")
 
-        shell = Flaxon(f"module-test-{module.name}")
+        shell = flaxon_type(f"module-test-{module.name}")
         shell.mount_module(module, prefix="")
-        return AsyncTestClient(shell, base_url=base_url)
+        return async_test_client_type(shell, base_url=base_url)
 
 
 def _install() -> None:
-    from flaxon.application.app import Flaxon
+    flaxon_type = import_attribute("flaxon.application.app", "Flaxon")
 
-    Flaxon.mount_module = _mount_module
+    flaxon_type.mount_module = _mount_module
 
 
 _install()

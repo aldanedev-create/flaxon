@@ -6,6 +6,8 @@ from flaxon.middleware import CORSMiddleware as BaseCORSMiddleware
 
 
 class CORSMiddleware(BaseCORSMiddleware):
+    """Corsmiddleware implementation for the security subsystem."""
+
     def __init__(
         self,
         app: Any,
@@ -31,6 +33,7 @@ class CORSMiddleware(BaseCORSMiddleware):
         self.allow_private_network = allow_private_network
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        """Handle the supplied call using this object's configured behavior."""
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return
@@ -58,9 +61,10 @@ class CORSMiddleware(BaseCORSMiddleware):
                             existing = True
                             break
                     if not existing:
-                        headers.append(
-                            (b"access-control-expose-headers", self.exposed_headers.encode("latin-1"))
-                        )
+                        headers.append((
+                            b"access-control-expose-headers",
+                            self.exposed_headers.encode("latin-1"),
+                        ))
                 headers.append((b"vary", b"Origin"))
                 message["headers"] = headers
             await send(message)

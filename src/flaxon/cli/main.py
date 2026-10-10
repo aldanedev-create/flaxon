@@ -10,12 +10,14 @@ from .discovery import CommandDiscovery
 
 
 def create_parser(*, include_project: bool = True) -> argparse.ArgumentParser:
+    """Create the parser."""
     parser = argparse.ArgumentParser(
         prog="flaxon",
         description="Flaxon framework command line tools",
     )
     parser.add_argument(
-        "-v", "--version",
+        "-v",
+        "--version",
         action="version",
         version=f"Flaxon {__version__}",
     )
@@ -33,6 +35,7 @@ def create_parser(*, include_project: bool = True) -> argparse.ArgumentParser:
 
 def main() -> int:
     # Creating a project or printing a version must not import an existing app.
+    """Run the command with the supplied arguments and return its exit status."""
     first = sys.argv[1] if len(sys.argv) > 1 else ""
     parser = create_parser(include_project=first not in {"new", "version", "-v", "--version"})
     args = parser.parse_args()

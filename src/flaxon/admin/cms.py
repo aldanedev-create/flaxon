@@ -26,6 +26,7 @@ AdminStore or the configured database persists content and revision records.
 
 from __future__ import annotations
 
+import asyncio
 import csv
 import hashlib
 import io
@@ -40,6 +41,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from flaxon._imports import import_attribute, import_module
 from flaxon.exceptions import BadRequest, Forbidden, NotFound
 from flaxon.http import HTMLResponse, JSONResponse, Request, Response
 from flaxon.security import Sanitizer
@@ -58,6 +60,7 @@ _MAX_MENU_DEPTH = 5
 
 
 def slugify(value: str) -> str:
+    """Perform the slugify operation for this subsystem."""
     value = (value or "").strip().lower()
     value = _SLUG_RE.sub("-", value).strip("-")
     return value or "untitled"
@@ -71,11 +74,14 @@ def _now() -> str:
 # Schema
 # ---------------------------------------------------------------------------
 
-FieldType = str  # text, textarea, richtext, boolean, number, date, datetime, email, url, select, json, repeater, relationship, file, image
+# Supported types include scalar fields, choices, repeaters, relationships, and uploads.
+FieldType = str
 
 
 @dataclass
 class CMSField:
+    """Validate and convert cms field values."""
+
     name: str
     label: str | None = None
     type: FieldType = "text"
@@ -89,6 +95,7 @@ class CMSField:
             self.label = self.name.replace("_", " ").title()
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a dictionary representation of the current value."""
         return {
             "name": self.name,
             "label": self.label,
@@ -100,17 +107,13 @@ class CMSField:
         }
 
     def coerce(self, raw: Any) -> Any:
+        """Perform the coerce operation for cmsfield."""
         if raw is None:
             return self.default
         if self.type == "boolean":
-            if isinstance(raw, bool):
-                return raw
-            return str(raw).lower() in {"1", "true", "on", "yes"}
+            return self._coerce_boolean(raw=raw)
         if self.type == "number":
-            try:
-                return float(raw) if "." in str(raw) else int(raw)
-            except (ValueError, TypeError):
-                return raw
+            return self._coerce_number(raw)
         if self.type in {"json", "repeater", "relationship"} and isinstance(raw, str):
             try:
                 return json.loads(raw)
@@ -118,9 +121,24 @@ class CMSField:
                 return [] if self.type in {"repeater", "relationship"} else raw
         return raw
 
+    @staticmethod
+    def _coerce_number(raw: Any) -> Any:
+        try:
+            return float(raw) if "." in str(raw) else int(raw)
+        except (ValueError, TypeError):
+            return raw
+
+    def _coerce_boolean(self, *, raw):
+        """Handle boolean behavior for coerce."""
+        if isinstance(raw, bool):
+            return raw
+        return str(raw).lower() in {"1", "true", "on", "yes"}
+
 
 @dataclass
 class BulkAction:
+    """Bulk action implementation for the admin subsystem."""
+
     name: str
     label: str
     handler: Callable[[ContentType, list[str]], Any]
@@ -128,6 +146,8 @@ class BulkAction:
 
 @dataclass
 class ContentType:
+    """Content type implementation for the admin subsystem."""
+
     name: str
     label: str | None = None
     label_plural: str | None = None
@@ -136,7 +156,9 @@ class ContentType:
     list_filter: list[str] = field(default_factory=list)
     search_fields: list[str] = field(default_factory=list)
     has_status: bool = True
-    statuses: list[str] = field(default_factory=lambda: ["draft", "review", "approved", "scheduled", "published", "archived"])
+    statuses: list[str] = field(
+        default_factory=lambda: ["draft", "review", "approved", "scheduled", "published", "archived"]
+    )
     has_slug: bool = True
     slug_source: str = "title"
     icon: str = "fa-file-lines"
@@ -162,16 +184,25 @@ class ContentType:
         # Built-in bulk actions.
         self.register_action("delete", "Delete selected", lambda ct, ids: [ct.delete(i) for i in ids])
         if self.has_status:
-            self.register_action("publish", "Publish selected", lambda ct, ids: ct._set_status(ids, "published"))
-            self.register_action("unpublish", "Unpublish selected", lambda ct, ids: ct._set_status(ids, "draft"))
+            self.register_action(
+                "publish", "Publish selected", lambda ct, ids: ct._set_status(ids, "published")
+            )
+            self.register_action(
+                "unpublish", "Unpublish selected", lambda ct, ids: ct._set_status(ids, "draft")
+            )
 
-    def register_action(self, name: str, label: str, handler: Callable[[ContentType, list[str]], Any]) -> None:
+    def register_action(
+        self, name: str, label: str, handler: Callable[[ContentType, list[str]], Any]
+    ) -> None:
+        """Register the action."""
         self._actions[name] = BulkAction(name, label, handler)
 
     def field_map(self) -> dict[str, CMSField]:
+        """Perform the field map operation for content type."""
         return {f.name: f for f in self.fields}
 
     def schema(self) -> dict[str, Any]:
+        """Perform the schema operation for content type."""
         return {
             "name": self.name,
             "label": self.label,
@@ -190,24 +221,28 @@ class ContentType:
     # -- data ops ----------------------------------------------------
 
     def validate(self, data: dict[str, Any], *, partial: bool = False) -> dict[str, Any]:
+        """Check the supplied value against the configured constraints."""
         cleaned: dict[str, Any] = {}
         fmap = self.field_map()
         for f in self.fields:
             if f.name in data:
                 value = f.coerce(data[f.name])
-                cleaned[f.name] = Sanitizer.allow_html(value) if f.type == "richtext" and isinstance(value, str) else value
+                cleaned[f.name] = (
+                    Sanitizer.allow_html(value) if f.type == "richtext" and isinstance(value, str) else value
+                )
             elif not partial:
                 if f.required:
                     raise BadRequest(f"Field '{f.name}' is required.")
                 cleaned[f.name] = f.coerce(f.default)
-        for key in data:
+        for key, value in data.items():
             if key not in fmap and key in {"status", "slug", "publish_at"}:
-                cleaned[key] = data[key]
+                cleaned[key] = value
         if self.has_status and "status" in cleaned and cleaned["status"] not in self.statuses:
             raise BadRequest(f"Invalid status '{cleaned['status']}'.")
         return cleaned
 
     def create(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Create a new entry from the supplied values."""
         cleaned = self.validate(data)
         item_id = uuid.uuid4().hex[:12]
         now = _now()
@@ -224,6 +259,7 @@ class ContentType:
         return record
 
     def update(self, item_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        """Apply the supplied changes to the requested entry."""
         record = self.items.get(item_id)
         if record is None:
             raise NotFound(f"{self.label} not found.")
@@ -234,16 +270,28 @@ class ContentType:
         if self.has_status and "status" in data:
             record["status"] = data["status"]
         record["updated_at"] = _now()
-        self.revisions.append({"action": "updated", "item_id": item_id, "at": record["updated_at"], "record": dict(record)})
+        self.revisions.append({
+            "action": "updated",
+            "item_id": item_id,
+            "at": record["updated_at"],
+            "record": dict(record),
+        })
         return record
 
     def delete(self, item_id: str) -> bool:
+        """Delete the specified entry from the configured store."""
         record = self.items.pop(item_id, None)
         if record is not None:
-            self.revisions.append({"action": "deleted", "item_id": item_id, "at": _now(), "record": dict(record)})
+            self.revisions.append({
+                "action": "deleted",
+                "item_id": item_id,
+                "at": _now(),
+                "record": dict(record),
+            })
         return record is not None
 
     def restore(self, item_id: str, revision: int) -> dict[str, Any]:
+        """Perform the restore operation for content type."""
         revisions = [r for r in self.revisions if r["item_id"] == item_id]
         try:
             snapshot = dict(revisions[revision]["record"])
@@ -251,21 +299,32 @@ class ContentType:
             raise NotFound("Revision not found.") from exc
         self.items[item_id] = snapshot
         snapshot["updated_at"] = _now()
-        self.revisions.append({"action": "restored", "item_id": item_id, "at": snapshot["updated_at"], "record": dict(snapshot)})
+        self.revisions.append({
+            "action": "restored",
+            "item_id": item_id,
+            "at": snapshot["updated_at"],
+            "record": dict(snapshot),
+        })
         return snapshot
 
     def compare_revisions(self, item_id: str) -> list[dict[str, Any]]:
+        """Perform the compare revisions operation for content type."""
         revisions = [r for r in self.revisions if r["item_id"] == item_id]
         comparisons: list[dict[str, Any]] = []
         for index, revision in enumerate(revisions):
             before = revisions[index - 1]["record"] if index else {}
             after = revision["record"]
             keys = set(before) | set(after)
-            changes = {key: {"before": before.get(key), "after": after.get(key)} for key in keys if before.get(key) != after.get(key)}
+            changes = {
+                key: {"before": before.get(key), "after": after.get(key)}
+                for key in keys
+                if before.get(key) != after.get(key)
+            }
             comparisons.append({**revision, "before": before, "after": after, "changes": changes})
         return comparisons
 
     def get(self, item_id: str) -> dict[str, Any]:
+        """Retrieve the requested value using this object's configured behavior."""
         record = self.items.get(item_id)
         if record is None:
             raise NotFound(f"{self.label} not found.")
@@ -292,13 +351,19 @@ class ContentType:
         current = now or _now()
         published: list[dict[str, Any]] = []
         for record in self.items.values():
-            if self.has_status and record.get("status") == "scheduled" and record.get("publish_at") and record["publish_at"] <= current:
+            if (
+                self.has_status
+                and record.get("status") == "scheduled"
+                and record.get("publish_at")
+                and record["publish_at"] <= current
+            ):
                 record["status"] = "published"
                 record["updated_at"] = current
                 published.append(record)
         return published
 
     def run_action(self, name: str, ids: list[str]) -> None:
+        """Perform the run action operation for content type."""
         action = self._actions.get(name)
         if action is None:
             raise NotFound(f"Unknown action '{name}'.")
@@ -313,12 +378,15 @@ class ContentType:
         page: int = 1,
         per_page: int = 20,
     ) -> dict[str, Any]:
+        """Perform the query operation for content type."""
         self.publish_due()
         records = list(self.items.values())
 
         if q:
             needle = q.lower()
-            fields_to_search = self.search_fields or [f.name for f in self.fields if f.type in {"text", "textarea", "richtext"}]
+            fields_to_search = self.search_fields or [
+                f.name for f in self.fields if f.type in {"text", "textarea", "richtext"}
+            ]
 
             def matches(rec: dict[str, Any]) -> bool:
                 return any(needle in str(rec.get(f, "")).lower() for f in fields_to_search)
@@ -351,8 +419,13 @@ class ContentType:
         }
 
     def stats(self) -> dict[str, Any]:
+        """Return the available statistics."""
         total = len(self.items)
-        published = sum(1 for r in self.items.values() if r.get("status") == "published") if self.has_status else total
+        published = (
+            sum(1 for r in self.items.values() if r.get("status") == "published")
+            if self.has_status
+            else total
+        )
         draft = total - published if self.has_status else 0
         return {"total": total, "published": published, "draft": draft}
 
@@ -365,7 +438,7 @@ class ContentType:
 class CMS:
     """A self-contained, WordPress/Django-admin-style content panel."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0917 - preserve existing positional API
         self,
         app: Any,
         url_prefix: str = "/admin/cms",
@@ -392,9 +465,15 @@ class CMS:
         # The ORM lifecycle object is not the legacy SQL adapter. Metadata uses
         # the dashboard's AdminStore unless a compatible SQL adapter is supplied.
         candidate = database or getattr(app, "database", None) or getattr(app, "db", None)
-        self.database = candidate if all(callable(getattr(candidate, method, None)) for method in ("execute", "fetch_all")) else None
+        self.database = (
+            candidate
+            if all(callable(getattr(candidate, method, None)) for method in ("execute", "fetch_all"))
+            else None
+        )
         if database is not None and self.database is None:
-            raise TypeError("database must implement execute() and fetch_all(); use AdminStore for ORM metadata")
+            raise TypeError(
+                "database must implement execute() and fetch_all(); use AdminStore for ORM metadata"
+            )
         self.publish_interval = max(1.0, publish_interval)
         self.redis_url = redis_url
         self.redis_protocol = redis_protocol
@@ -440,28 +519,47 @@ class CMS:
         if not self.redis_url:
             return None
         if self._publisher_redis is None:
-            import redis.asyncio as redis
-            self._publisher_redis = redis.from_url(self.redis_url, decode_responses=True, protocol=self.redis_protocol, max_connections=self.redis_max_connections)
+            redis = import_module("redis.asyncio")
+
+            self._publisher_redis = redis.from_url(
+                self.redis_url,
+                decode_responses=True,
+                protocol=self.redis_protocol,
+                max_connections=self.redis_max_connections,
+            )
         token = secrets.token_urlsafe(24)
-        acquired = await self._publisher_redis.set(self._publisher_lock_key, token, nx=True, ex=self.publisher_lock_ttl)
+        acquired = await self._publisher_redis.set(
+            self._publisher_lock_key, token, nx=True, ex=self.publisher_lock_ttl
+        )
         return (self._publisher_redis, token) if acquired else None
 
     async def _release_publisher_lock(self, lock: tuple[Any, str] | None) -> None:
         if lock is None:
             return
         client, token = lock
-        await client.eval("if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end", 1, self._publisher_lock_key, token)
+        await client.eval(
+            (
+                "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.c"
+                "all('del', KEYS[1]) else return 0 end"
+            ),
+            1,
+            self._publisher_lock_key,
+            token,
+        )
 
     async def _publish_loop(self) -> None:
-        import asyncio
+
         while True:
             lock = await self._publisher_lock()
             if not self.redis_url or lock is not None:
                 try:
                     for content_type in self.content_types.values():
                         due = [
-                            record for record in content_type.items.values()
-                            if content_type.has_status and record.get("status") == "scheduled" and record.get("publish_at")
+                            record
+                            for record in content_type.items.values()
+                            if content_type.has_status
+                            and record.get("status") == "scheduled"
+                            and record.get("publish_at")
                         ]
                         try:
                             published = content_type.publish_due()
@@ -495,10 +593,13 @@ class CMS:
             self.app.mount_static("/static", str(static_dir))
 
     def register(self, content_type: ContentType) -> ContentType:
+        """Perform the register operation for cms."""
         if self.store:
             stored = self.store.get(f"cms:{content_type.name}", "items", {}) or {}
             if isinstance(stored, dict):
-                content_type.items.update({key: value for key, value in stored.items() if key != "__revisions__"})
+                content_type.items.update({
+                    key: value for key, value in stored.items() if key != "__revisions__"
+                })
                 content_type.revisions.extend(stored.get("__revisions__", []))
         self.content_types[content_type.name] = content_type
         dashboard = getattr(self.app, "_flaxon_admin_dashboard", None)
@@ -507,10 +608,12 @@ class CMS:
         return content_type
 
     def add_hook(self, name: str, callback: Callable[..., Any]) -> Callable[..., Any]:
+        """Add the hook."""
         self.hooks.setdefault(name, []).append(callback)
         return callback
 
     def run_hook(self, name: str, value: Any) -> Any:
+        """Perform the run hook operation for cms."""
         for callback in self.hooks.get(name, []):
             value = callback(value)
         return value
@@ -532,7 +635,11 @@ class CMS:
     async def _save_content(self, content_type: ContentType) -> None:
         for record in content_type.items.values():
             self._sync_scheduler_job(content_type, record)
-        await self._save_database(f"cms:{content_type.name}", "items", {**content_type.items, "__revisions__": content_type.revisions})
+        await self._save_database(
+            f"cms:{content_type.name}",
+            "items",
+            {**content_type.items, "__revisions__": content_type.revisions},
+        )
         await self._save_scheduler_jobs()
 
     async def _save_all_resources(self) -> None:
@@ -574,7 +681,11 @@ class CMS:
         if job.get("state") in {"completed", "canceled"}:
             job["state"] = "queued"
             job["attempts"] = 0
-            job.setdefault("history", []).append({"state": "queued", "at": time.time(), "reason": "schedule updated"})
+            job.setdefault("history", []).append({
+                "state": "queued",
+                "at": time.time(),
+                "reason": "schedule updated",
+            })
 
     def _record_scheduler_event(self, job_id: str, state: str, **details: Any) -> None:
         job = self.scheduler_jobs.setdefault(job_id, {"id": job_id, "attempts": 0, "history": []})
@@ -633,6 +744,7 @@ class CMS:
     # -- handlers --------------------------------------------------------
 
     async def spa(self, request: Request) -> Response:
+        """Perform the spa operation for cms."""
         await self._require_user(request, "admin.view_dashboard")
         html = self.template_path.read_text(encoding="utf-8")
         html = html.replace("__CMS_API_BASE__", f"{self.url_prefix}/api")
@@ -642,6 +754,7 @@ class CMS:
         return HTMLResponse(html)
 
     async def api_config(self, request: Request) -> Response:
+        """Handle the config API operation."""
         user = await self._require_user(request, "admin.view_dashboard")
         types = []
         for content_type in self.content_types.values():
@@ -650,14 +763,20 @@ class CMS:
                 field: (
                     list(content_type.statuses)
                     if field == "status" and content_type.has_status
-                    else sorted({str(item.get(field, "")) for item in content_type.items.values() if item.get(field, "") != ""})[:100]
+                    else sorted({
+                        str(item.get(field, ""))
+                        for item in content_type.items.values()
+                        if item.get(field, "") != ""
+                    })[:100]
                 )
                 for field in content_type.list_filter
             }
             capabilities = {}
             for action in ("read", "create", "update", "delete"):
                 try:
-                    await self.auth.authorize_async(user, canonical_model_permission(content_type.name, action))
+                    await self.auth.authorize_async(
+                        user, canonical_model_permission(content_type.name, action)
+                    )
                     capabilities[action] = True
                 except Forbidden:
                     capabilities[action] = False
@@ -669,6 +788,7 @@ class CMS:
         })
 
     async def api_stats(self, request: Request) -> Response:
+        """Handle the stats API operation."""
         await self._require_user(request, "admin.view_dashboard")
         return JSONResponse({name: ct.stats() for name, ct in self.content_types.items()})
 
@@ -682,58 +802,187 @@ class CMS:
         """
         user = await self._require_user(request, "admin.view_dashboard")
         section = section.strip().lower().replace("_", "-")
-        records = [record | {"content_type": name} for name, content_type in self.content_types.items() for record in content_type.items.values()]
-        if section == "media":
-            dashboard = getattr(self.app, "_flaxon_admin_dashboard", None)
-            if dashboard is None:
-                return JSONResponse({"section": section, "items": [], "stats": {}})
-            dashboard.auth.authorize(user, "media.manage_library")
-            items = await dashboard._media_files()
-            return JSONResponse({"section": section, "items": items, "stats": {"total": len(items)}})
-        if section in {"calendar", "publishing"}:
-            items = sorted(self.scheduler_jobs.values(), key=lambda item: item.get("run_after", ""))
-            return JSONResponse({"section": section, "items": items, "stats": {"scheduled": len(items), "failed": sum(item.get("state") == "retry" for item in items)}})
-        if section in {"board", "review"}:
-            statuses = {status: [item for item in records if item.get("status") == status] for status in ("draft", "review", "approved", "published", "archived", "scheduled")}
-            items = records if section == "board" else statuses.get("review", []) + statuses.get("pending", [])
-            return JSONResponse({"section": section, "items": items, "columns": statuses, "stats": {key: len(value) for key, value in statuses.items()}})
-        if section in {"comments", "moderation"}:
-            return JSONResponse({"section": section, "items": self.comments, "stats": {status: sum(item.get("status") == status for item in self.comments) for status in _COMMENT_STATUSES}})
-        if section in {"taxonomies", "categories", "tags"}:
-            return JSONResponse({"section": section, "items": self.taxonomies, "stats": {"taxonomies": len(self.taxonomies)}})
-        if section in {"menus", "menu"}:
-            return JSONResponse({"section": section, "items": self.menus, "stats": {"menus": len(self.menus)}})
-        if section in {"models", "model-builder", "model-versions"}:
-            items = [{"name": ct.name, "label": ct.label, "fields": [field.to_dict() for field in ct.fields], "records": len(ct.items), "revisions": len(ct.revisions)} for ct in self.content_types.values()]
-            return JSONResponse({"section": section, "items": items, "stats": {"models": len(items)}})
-        if section in {"seo", "search-index"}:
-            items = [{"content_type": item["content_type"], "id": item["id"], "title": item.get("title", ""), "slug": item.get("slug", ""), "indexed": True} for item in records]
-            return JSONResponse({"section": section, "items": items, "stats": {"indexed": len(items)}})
-        if section == "audit":
-            dashboard = getattr(self.app, "_flaxon_admin_dashboard", None)
-            items = dashboard.store.get("audit", "entries", []) if dashboard and dashboard.store and dashboard.audit_log else []
-            return JSONResponse({"section": section, "items": items, "stats": {"total": len(items)}})
-        if section == "references":
-            references = []
-            for item in records:
-                for key, value in item.items():
-                    if isinstance(value, str) and key.endswith(("_id", "_ids")):
-                        references.append({"content_type": item["content_type"], "record_id": item["id"], "field": key, "value": value})
-            return JSONResponse({"section": section, "items": references, "stats": {"total": len(references)}})
-        if section == "trash":
-            items = [item for item in records if item.get("status") in {"trash", "deleted", "archived"}]
-            return JSONResponse({"section": section, "items": items, "stats": {"total": len(items)}})
-        if section in {"sites", "locales", "previews", "integrations", "transfers"}:
-            dashboard = getattr(self.app, "_flaxon_admin_dashboard", None)
-            stored = self.store.get("cms", section, []) if self.store else []
-            if section == "locales" and not stored:
-                stored = [{"code": "en", "label": "English", "default": True}]
-            if section == "integrations":
-                stored = [{"name": name, "handlers": len(callbacks)} for name, callbacks in self.hooks.items()]
-            if section == "transfers" and dashboard and dashboard.job_store:
-                stored = [job.to_dict() for job in dashboard.job_store.list()]
-            return JSONResponse({"section": section, "items": stored or [], "stats": {"total": len(stored or [])}})
+        records = [
+            record | {"content_type": name}
+            for name, content_type in self.content_types.items()
+            for record in content_type.items.values()
+        ]
+        handlers = {
+            "media": "_workspace_media",
+            "calendar": "_workspace_calendar",
+            "publishing": "_workspace_calendar",
+            "board": "_workspace_board",
+            "review": "_workspace_board",
+            "comments": "_workspace_comments",
+            "moderation": "_workspace_comments",
+            "taxonomies": "_workspace_taxonomies",
+            "categories": "_workspace_taxonomies",
+            "tags": "_workspace_taxonomies",
+            "menus": "_workspace_menus",
+            "menu": "_workspace_menus",
+            "models": "_workspace_models",
+            "model-builder": "_workspace_models",
+            "model-versions": "_workspace_models",
+            "seo": "_workspace_seo",
+            "search-index": "_workspace_seo",
+            "audit": "_workspace_audit",
+            "references": "_workspace_references",
+            "trash": "_workspace_trash",
+            "sites": "_workspace_sites",
+            "locales": "_workspace_sites",
+            "previews": "_workspace_sites",
+            "integrations": "_workspace_sites",
+            "transfers": "_workspace_sites",
+        }
+        handler_name = handlers.get(section)
+        if handler_name is not None:
+            return await getattr(self, handler_name)(
+                request=request, user=user, section=section, records=records
+            )
         raise NotFound(f"Unknown CMS workspace '{section}'.")
+
+    async def _workspace_media(self, *, request, user, section, records):
+        """Build the media workspace response."""
+        return await self._api_workspace_media(section=section, user=user)
+
+    async def _workspace_calendar(self, *, request, user, section, records):
+        """Build the calendar workspace response."""
+        items = sorted(self.scheduler_jobs.values(), key=lambda item: item.get("run_after", ""))
+        return JSONResponse({
+            "section": section,
+            "items": items,
+            "stats": {
+                "scheduled": len(items),
+                "failed": sum(item.get("state") == "retry" for item in items),
+            },
+        })
+
+    async def _workspace_board(self, *, request, user, section, records):
+        """Build the board workspace response."""
+        statuses = {
+            status: [item for item in records if item.get("status") == status]
+            for status in ("draft", "review", "approved", "published", "archived", "scheduled")
+        }
+        items = records if section == "board" else statuses.get("review", []) + statuses.get("pending", [])
+        return JSONResponse({
+            "section": section,
+            "items": items,
+            "columns": statuses,
+            "stats": {key: len(value) for key, value in statuses.items()},
+        })
+
+    async def _workspace_comments(self, *, request, user, section, records):
+        """Build the comments workspace response."""
+        return JSONResponse({
+            "section": section,
+            "items": self.comments,
+            "stats": {
+                status: sum(item.get("status") == status for item in self.comments)
+                for status in _COMMENT_STATUSES
+            },
+        })
+
+    async def _workspace_taxonomies(self, *, request, user, section, records):
+        """Build the taxonomies workspace response."""
+        return JSONResponse({
+            "section": section,
+            "items": self.taxonomies,
+            "stats": {"taxonomies": len(self.taxonomies)},
+        })
+
+    async def _workspace_menus(self, *, request, user, section, records):
+        """Build the menus workspace response."""
+        return JSONResponse({
+            "section": section,
+            "items": self.menus,
+            "stats": {"menus": len(self.menus)},
+        })
+
+    async def _workspace_models(self, *, request, user, section, records):
+        """Build the models workspace response."""
+        items = [
+            {
+                "name": ct.name,
+                "label": ct.label,
+                "fields": [field.to_dict() for field in ct.fields],
+                "records": len(ct.items),
+                "revisions": len(ct.revisions),
+            }
+            for ct in self.content_types.values()
+        ]
+        return JSONResponse({"section": section, "items": items, "stats": {"models": len(items)}})
+
+    async def _workspace_seo(self, *, request, user, section, records):
+        """Build the seo workspace response."""
+        items = [
+            {
+                "content_type": item["content_type"],
+                "id": item["id"],
+                "title": item.get("title", ""),
+                "slug": item.get("slug", ""),
+                "indexed": True,
+            }
+            for item in records
+        ]
+        return JSONResponse({"section": section, "items": items, "stats": {"indexed": len(items)}})
+
+    async def _workspace_audit(self, *, request, user, section, records):
+        """Build the audit workspace response."""
+        dashboard = getattr(self.app, "_flaxon_admin_dashboard", None)
+        items = (
+            dashboard.store.get("audit", "entries", [])
+            if dashboard and dashboard.store and dashboard.audit_log
+            else []
+        )
+        return JSONResponse({"section": section, "items": items, "stats": {"total": len(items)}})
+
+    async def _workspace_references(self, *, request, user, section, records):
+        """Build the references workspace response."""
+        references = []
+        for item in records:
+            for key, value in item.items():
+                if isinstance(value, str) and key.endswith(("_id", "_ids")):
+                    references.append({
+                        "content_type": item["content_type"],
+                        "record_id": item["id"],
+                        "field": key,
+                        "value": value,
+                    })
+        return JSONResponse({
+            "section": section,
+            "items": references,
+            "stats": {"total": len(references)},
+        })
+
+    async def _workspace_trash(self, *, request, user, section, records):
+        """Build the trash workspace response."""
+        items = [item for item in records if item.get("status") in {"trash", "deleted", "archived"}]
+        return JSONResponse({"section": section, "items": items, "stats": {"total": len(items)}})
+
+    async def _workspace_sites(self, *, request, user, section, records):
+        """Build the sites workspace response."""
+        dashboard = getattr(self.app, "_flaxon_admin_dashboard", None)
+        stored = self.store.get("cms", section, []) if self.store else []
+        if section == "locales" and not stored:
+            stored = [{"code": "en", "label": "English", "default": True}]
+        if section == "integrations":
+            stored = [{"name": name, "handlers": len(callbacks)} for name, callbacks in self.hooks.items()]
+        if section == "transfers" and dashboard and dashboard.job_store:
+            stored = [job.to_dict() for job in dashboard.job_store.list()]
+        return JSONResponse({
+            "section": section,
+            "items": stored or [],
+            "stats": {"total": len(stored or [])},
+        })
+
+    async def _api_workspace_media(self, *, section, user):
+        """Handle media behavior for api workspace."""
+        dashboard = getattr(self.app, "_flaxon_admin_dashboard", None)
+        if dashboard is None:
+            return JSONResponse({"section": section, "items": [], "stats": {}})
+        dashboard.auth.authorize(user, "media.manage_library")
+        items = await dashboard._media_files()
+        return JSONResponse({"section": section, "items": items, "stats": {"total": len(items)}})
 
     async def _save_admin_upload(self, upload: Any, request: Request) -> str:
         """Store a CMS file field through the configured Admin media pipeline.
@@ -748,7 +997,9 @@ class CMS:
         if dashboard is None:
             raise BadRequest("CMS file fields require an AdminDashboard media configuration.")
 
-        content_type = str(getattr(upload, "content_type", "application/octet-stream")).lower().split(";", 1)[0]
+        content_type = (
+            str(getattr(upload, "content_type", "application/octet-stream")).lower().split(";", 1)[0]
+        )
         size = int(getattr(upload, "size", 0) or 0)
         if size > dashboard.max_upload_size:
             raise BadRequest("Uploaded file exceeds the configured size limit.")
@@ -782,9 +1033,9 @@ class CMS:
         if content_type.startswith("image/"):
             metadata["thumbnail_status"] = "pending"
             try:
-                from PIL import Image
+                image_type = import_attribute("PIL", "Image")
 
-                with Image.open(io.BytesIO(content)) as image:
+                with image_type.open(io.BytesIO(content)) as image:
                     metadata["width"], metadata["height"] = image.size
             except ImportError:
                 pass
@@ -800,7 +1051,9 @@ class CMS:
         await dashboard._persist_database()
         return url
 
-    async def _prepare_uploads(self, request: Request, data: dict[str, Any], content_type: ContentType) -> dict[str, Any]:
+    async def _prepare_uploads(
+        self, request: Request, data: dict[str, Any], content_type: ContentType
+    ) -> dict[str, Any]:
         for content_field in content_type.fields:
             if content_field.type not in {"file", "image"}:
                 continue
@@ -810,6 +1063,7 @@ class CMS:
         return data
 
     async def api_list(self, request: Request, type_name: str) -> Response:
+        """Handle the list API operation."""
         await self._require_content_user(request, type_name, "read")
         ct = self._get_type(type_name)
         published = ct.publish_due()
@@ -823,7 +1077,7 @@ class CMS:
             self._save(ct)
             await self._save_content(ct)
         query = request.query
-        filters = {key[len("filter_"):]: value for key, value in query.items() if key.startswith("filter_")}
+        filters = {key[len("filter_") :]: value for key, value in query.items() if key.startswith("filter_")}
         result = ct.query(
             q=query.get("q") or None,
             filters=filters,
@@ -834,6 +1088,7 @@ class CMS:
         return JSONResponse(result)
 
     async def api_create(self, request: Request, type_name: str) -> Response:
+        """Handle the create API operation."""
         await self._require_content_user(request, type_name, "create")
         ct = self._get_type(type_name)
         data = await self._body_data(request)
@@ -848,11 +1103,13 @@ class CMS:
         return JSONResponse(record, status_code=201)
 
     async def api_get(self, request: Request, type_name: str, item_id: str) -> Response:
+        """Handle the get API operation."""
         await self._require_content_user(request, type_name, "read")
         ct = self._get_type(type_name)
         return JSONResponse(ct.get(item_id))
 
     async def api_update(self, request: Request, type_name: str, item_id: str) -> Response:
+        """Handle the update API operation."""
         await self._require_content_user(request, type_name, "update")
         ct = self._get_type(type_name)
         data = await self._body_data(request)
@@ -867,6 +1124,7 @@ class CMS:
         return JSONResponse(record)
 
     async def api_delete(self, request: Request, type_name: str, item_id: str) -> Response:
+        """Handle the delete API operation."""
         await self._require_content_user(request, type_name, "delete")
         ct = self._get_type(type_name)
         deleted = ct.delete(item_id)
@@ -878,7 +1136,10 @@ class CMS:
         return JSONResponse({"deleted": True})
 
     async def api_action(self, request: Request, type_name: str, action_name: str) -> Response:
-        await self._require_content_user(request, type_name, "publish" if action_name in {"publish", "unpublish"} else "update")
+        """Handle the action API operation."""
+        await self._require_content_user(
+            request, type_name, "publish" if action_name in {"publish", "unpublish"} else "update"
+        )
         ct = self._get_type(type_name)
         body = await request.json() or {}
         ids = body.get("ids", [])
@@ -893,6 +1154,7 @@ class CMS:
         return JSONResponse({"ok": True, "affected": len(ids)})
 
     async def api_restore(self, request: Request, type_name: str, item_id: str, revision: str) -> Response:
+        """Handle the restore API operation."""
         await self._require_content_user(request, type_name, "update")
         await self._require_content_user(request, type_name, "restore")
         ct = self._get_type(type_name)
@@ -900,13 +1162,16 @@ class CMS:
         index = int(revision)
         if index < 0 or index >= len(snapshots):
             raise NotFound("Revision not found.")
-        await self._authorize_publication(request, snapshots[index]["record"], ct.get(item_id) if item_id in ct.items else None)
+        await self._authorize_publication(
+            request, snapshots[index]["record"], ct.get(item_id) if item_id in ct.items else None
+        )
         record = ct.restore(item_id, index)
         self._save(ct)
         await self._save_content(ct)
         return JSONResponse(record)
 
     async def api_export(self, request: Request, type_name: str) -> Response:
+        """Handle the export API operation."""
         await self._require_content_user(request, type_name, "read")
         ct = self._get_type(type_name)
         fmt = request.query.get("format", "json").lower()
@@ -915,11 +1180,19 @@ class CMS:
             output = io.StringIO()
             keys = sorted({key for record in records for key in record})
             writer = csv.DictWriter(output, fieldnames=keys)
-            writer.writeheader(); writer.writerows(records)
-            return Response(output.getvalue(), media_type="text/csv; charset=utf-8", headers={"content-disposition": f"attachment; filename={type_name}.csv"})
-        return JSONResponse(records, headers={"content-disposition": f"attachment; filename={type_name}.json"})
+            writer.writeheader()
+            writer.writerows(records)
+            return Response(
+                output.getvalue(),
+                media_type="text/csv; charset=utf-8",
+                headers={"content-disposition": f"attachment; filename={type_name}.csv"},
+            )
+        return JSONResponse(
+            records, headers={"content-disposition": f"attachment; filename={type_name}.json"}
+        )
 
     async def api_import(self, request: Request, type_name: str) -> Response:
+        """Handle the import API operation."""
         await self._require_content_user(request, type_name, "create")
         ct = self._get_type(type_name)
         if "text/csv" in request.headers.get("content-type", ""):
@@ -945,13 +1218,20 @@ class CMS:
                 errors.append({"row": row_number, "error": str(exc)})
         self._save(ct)
         await self._save_content(ct)
-        return JSONResponse({"imported": len(created), "items": created, "errors": errors}, status_code=201 if created else 422)
+        return JSONResponse(
+            {"imported": len(created), "items": created, "errors": errors},
+            status_code=201 if created else 422,
+        )
 
     async def api_scheduler_jobs(self, request: Request) -> Response:
+        """Handle the scheduler jobs API operation."""
         await self._require_user(request, "admin.view_dashboard")
-        return JSONResponse({"items": sorted(self.scheduler_jobs.values(), key=lambda item: item.get("run_after", ""))})
+        return JSONResponse({
+            "items": sorted(self.scheduler_jobs.values(), key=lambda item: item.get("run_after", ""))
+        })
 
     async def api_scheduler_retry(self, request: Request, job_id: str) -> Response:
+        """Handle the scheduler retry API operation."""
         await self._require_user(request, "cms.publish_content")
         job = self.scheduler_jobs.get(job_id)
         if job is None:
@@ -974,7 +1254,10 @@ class CMS:
         return JSONResponse(await dashboard._media_files())
 
     async def api_taxonomies(self, request: Request) -> Response:
-        await self._require_user(request, "admin.view_dashboard" if request.method == "GET" else "cms.manage_taxonomies")
+        """Handle the taxonomies API operation."""
+        await self._require_user(
+            request, "admin.view_dashboard" if request.method == "GET" else "cms.manage_taxonomies"
+        )
         if request.method == "POST":
             body = await request.json() or {}
             name = str(body.get("name", "")).strip()
@@ -987,6 +1270,7 @@ class CMS:
         return JSONResponse(self.taxonomies)
 
     async def api_taxonomy(self, request: Request, taxonomy_name: str) -> Response:
+        """Handle the taxonomy API operation."""
         await self._require_user(request, "cms.manage_taxonomies")
         if taxonomy_name not in self.taxonomies:
             raise NotFound("Taxonomy not found.")
@@ -996,7 +1280,10 @@ class CMS:
             body = await request.json() or {}
             terms = self.taxonomies[taxonomy_name]
             if "terms" in body:
-                terms.update({str(k): list(v) if isinstance(v, list) else v for k, v in (body.get("terms") or {}).items()})
+                terms.update({
+                    str(k): list(v) if isinstance(v, list) else v
+                    for k, v in (body.get("terms") or {}).items()
+                })
             if body.get("term"):
                 term = slugify(str(body["term"]))
                 parent = body.get("parent", "")
@@ -1006,7 +1293,10 @@ class CMS:
         return JSONResponse(self.taxonomies)
 
     async def api_comments(self, request: Request) -> Response:
-        await self._require_user(request, "admin.view_dashboard" if request.method == "GET" else "cms.moderate_comments")
+        """Handle the comments API operation."""
+        await self._require_user(
+            request, "admin.view_dashboard" if request.method == "GET" else "cms.moderate_comments"
+        )
         if request.method == "POST":
             body = await request.json() or {}
             text = str(body.get("body", "")).strip()
@@ -1029,12 +1319,16 @@ class CMS:
         return JSONResponse(self.comments)
 
     async def api_comment(self, request: Request, comment_id: str) -> Response:
+        """Handle the comment API operation."""
         await self._require_user(request, "cms.moderate_comments")
         comment = next((item for item in self.comments if item["id"] == comment_id), None)
         if comment is None:
             raise NotFound("Comment not found.")
         if request.method == "DELETE":
-            self.comments.remove(comment); self._save_resources(); await self._save_all_resources(); return JSONResponse({"deleted": True})
+            self.comments.remove(comment)
+            self._save_resources()
+            await self._save_all_resources()
+            return JSONResponse({"deleted": True})
         body = await request.json() or {}
         if "status" in body:
             status = str(body["status"])
@@ -1047,15 +1341,20 @@ class CMS:
             value = str(body[key]).strip()
             if len(value) > limit:
                 raise BadRequest(f"Comment {key} is too long.")
-            comment[key] = Sanitizer.allow_html(value) if key == "body" else (
-                Sanitizer.sanitize_email(value) if key == "author_email" else value
+            comment[key] = (
+                Sanitizer.allow_html(value)
+                if key == "body"
+                else (Sanitizer.sanitize_email(value) if key == "author_email" else value)
             )
         self._save_resources()
         await self._save_all_resources()
         return JSONResponse(comment)
 
     async def api_menu(self, request: Request, menu_name: str) -> Response:
-        await self._require_user(request, "admin.view_dashboard" if request.method == "GET" else "cms.manage_menus")
+        """Handle the menu API operation."""
+        await self._require_user(
+            request, "admin.view_dashboard" if request.method == "GET" else "cms.manage_menus"
+        )
         if request.method == "PUT":
             items = await request.json()
             if not isinstance(items, list):
@@ -1066,7 +1365,9 @@ class CMS:
         return JSONResponse({"name": menu_name, "items": self.menus.get(menu_name, [])})
 
     @staticmethod
-    def _validate_menu_items(items: list[Any], depth: int = 0, count: list[int] | None = None) -> list[dict[str, Any]]:
+    def _validate_menu_items(
+        items: list[Any], depth: int = 0, count: list[int] | None = None
+    ) -> list[dict[str, Any]]:
         """Normalize menu input and bound recursive payload size."""
         if depth > _MAX_MENU_DEPTH:
             raise BadRequest("Menu nesting is too deep.")
@@ -1093,11 +1394,14 @@ class CMS:
         return normalized
 
     async def api_history(self, request: Request, type_name: str, item_id: str) -> Response:
+        """Handle the history API operation."""
         await self._require_content_user(request, type_name, "read")
         ct = self._get_type(type_name)
         return JSONResponse({"items": ct.compare_revisions(item_id)})
 
-    async def _authorize_publication(self, request: Request, data: dict[str, Any], existing: dict[str, Any] | None = None) -> None:
+    async def _authorize_publication(
+        self, request: Request, data: dict[str, Any], existing: dict[str, Any] | None = None
+    ) -> None:
         """Enforce publication rights on every write path, not only bulk actions."""
         protected = {"approved", "scheduled", "published"}
         current = (existing or {}).get("status")
@@ -1117,7 +1421,9 @@ class CMS:
             dashboard = getattr(self.app, "_flaxon_admin_dashboard", None)
             protector = dashboard.csrf if dashboard else self.csrf
             if protector is None:
-                raise Forbidden("CMS writes require CSRF protection; configure AdminDashboard or supply csrf.")
+                raise Forbidden(
+                    "CMS writes require CSRF protection; configure AdminDashboard or supply csrf."
+                )
             if not protector.verify_token(request.headers.get("x-csrf-token", "")):
                 raise BadRequest("CSRF token missing or invalid")
         return user
@@ -1140,7 +1446,9 @@ class CMS:
             dashboard = getattr(self.app, "_flaxon_admin_dashboard", None)
             protector = dashboard.csrf if dashboard else self.csrf
             if protector is None:
-                raise Forbidden("CMS writes require CSRF protection; configure AdminDashboard or supply csrf.")
+                raise Forbidden(
+                    "CMS writes require CSRF protection; configure AdminDashboard or supply csrf."
+                )
             if not protector.verify_token(request.headers.get("x-csrf-token", "")):
                 raise BadRequest("CSRF token missing or invalid")
         return user
@@ -1149,7 +1457,9 @@ class CMS:
         if self._database_loaded or self.database is None:
             return
         await self.database.execute(
-            "CREATE TABLE IF NOT EXISTS flaxon_admin_store (namespace VARCHAR(255) NOT NULL, key VARCHAR(255) NOT NULL, value TEXT NOT NULL, PRIMARY KEY(namespace, key))"
+            "CREATE TABLE IF NOT EXISTS flaxon_admin_store (namespace VAR"
+            "CHAR(255) NOT NULL, key VARCHAR(255) NOT NULL, value TEXT NO"
+            "T NULL, PRIMARY KEY(namespace, key))"
         )
         rows = await self.database.fetch_all("SELECT namespace, key, value FROM flaxon_admin_store")
         for row in rows:
@@ -1163,7 +1473,11 @@ class CMS:
                 if ct:
                     payload = value or {}
                     revisions = payload.get("__revisions__", []) if isinstance(payload, dict) else []
-                    ct.items.update({k: v for k, v in payload.items() if k != "__revisions__"} if isinstance(payload, dict) else {})
+                    ct.items.update(
+                        {k: v for k, v in payload.items() if k != "__revisions__"}
+                        if isinstance(payload, dict)
+                        else {}
+                    )
                     ct.revisions.extend(revisions)
             elif namespace == "cms" and key == "taxonomies":
                 self.taxonomies = value or {}
@@ -1180,7 +1494,11 @@ class CMS:
             return
         encoded = json.dumps(value, default=str)
         await self.database.execute(
-            "INSERT INTO flaxon_admin_store(namespace, key, value) VALUES ($1, $2, $3) ON CONFLICT(namespace, key) DO UPDATE SET value = excluded.value",
+            (
+                "INSERT INTO flaxon_admin_store(namespace, key, value) VALUES"
+                " ($1, $2, $3) ON CONFLICT(namespace, key) DO UPDATE SET valu"
+                "e = excluded.value"
+            ),
             namespace,
             key,
             encoded,

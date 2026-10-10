@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import importlib.resources
-import os
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 
 class PackageLoader:
+    """Package loader implementation for the jinax subsystem."""
+
     def __init__(self, package_name: str, package_path: str = "templates", encoding: str = "utf-8") -> None:
         self.package_name = package_name
         self.package_path = package_path
@@ -16,6 +18,7 @@ class PackageLoader:
     def get_source(
         self, environment: Any, template: str
     ) -> tuple[str, str | None, Callable[[], bool] | None]:
+        """Return the source."""
         try:
             full_path = f"{self.package_path}/{template}"
             resource = importlib.resources.files(self.package_name).joinpath(full_path)
@@ -24,14 +27,14 @@ class PackageLoader:
                 raise FileNotFoundError(f"Template '{template}' not found in package {self.package_name}")
 
             with importlib.resources.as_file(resource) as path:
-                with open(path, encoding=self.encoding) as f:
+                with Path(path).open(encoding=self.encoding) as f:
                     source = f.read()
 
-            mtime = os.path.getmtime(path)
+            mtime = Path(path).stat().st_mtime
 
             def uptodate() -> bool:
                 try:
-                    return os.path.getmtime(path) == mtime
+                    return Path(path).stat().st_mtime == mtime
                 except OSError:
                     return False
 
@@ -43,6 +46,7 @@ class PackageLoader:
             ) from exc
 
     def list_templates(self) -> list[str]:
+        """List the templates."""
         try:
             resources = importlib.resources.files(self.package_name).joinpath(self.package_path)
             if not resources.exists():
@@ -58,6 +62,7 @@ class PackageLoader:
             return []
 
     def exists(self, template: str) -> bool:
+        """Return whether the requested entry exists."""
         try:
             resource = importlib.resources.files(self.package_name).joinpath(
                 f"{self.package_path}/{template}"

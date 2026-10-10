@@ -12,6 +12,7 @@ import zlib
 from collections.abc import Mapping
 from typing import Any, Protocol
 
+from flaxon._imports import import_attribute
 from flaxon.exceptions import BadRequest
 
 
@@ -93,9 +94,9 @@ class BodyParser:
         Raises:
             BadRequest: If the content type is not form data.
         """
-        from .form import FormData
+        form_data_type = import_attribute("flaxon.http.form", "FormData")
 
-        form = await FormData.from_request(request)
+        form = await form_data_type.from_request(request)
         data: dict[str, Any] = form.to_dict()
         return data
 
@@ -113,9 +114,9 @@ class BodyParser:
         Raises:
             BadRequest: If the content type is not multipart.
         """
-        from .form import FormData
+        form_data_type = import_attribute("flaxon.http.form", "FormData")
 
-        form = await FormData.from_request(request)
+        form = await form_data_type.from_request(request)
         data: dict[str, Any] = form.to_dict()
         return data
 

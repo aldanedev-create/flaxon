@@ -50,7 +50,7 @@ class Cache:
             if key not in self._cache:
                 return False
 
-            value, expires, _ = self._cache[key]
+            _value, expires, _ = self._cache[key]
             if expires is not None and time.time() > expires:
                 del self._cache[key]
                 return False

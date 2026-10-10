@@ -8,6 +8,7 @@ from urllib.parse import urlsplit
 
 
 class WebSocketClient:
+    """Web socket client implementation for the testing subsystem."""
 
     def __init__(self, app: Any, base_url: str = "ws://testserver") -> None:
         self.app = app
@@ -18,13 +19,11 @@ class WebSocketClient:
         self._task: asyncio.Task | None = None
         self._closed = False
 
-    async def connect(
-        self, path: str, headers: dict[str, str] | None = None
-    ) -> None:
+    async def connect(self, path: str, headers: dict[str, str] | None = None) -> None:
+        """Open the configured connection."""
         url = urlsplit(f"{self.base_url}{path}")
         raw_headers = [
-            (key.lower().encode("latin-1"), value.encode("latin-1"))
-            for key, value in (headers or {}).items()
+            (key.lower().encode("latin-1"), value.encode("latin-1")) for key, value in (headers or {}).items()
         ]
 
         scope = {
@@ -68,6 +67,7 @@ class WebSocketClient:
             raise RuntimeError("WebSocket connection rejected")
 
     async def disconnect(self, code: int = 1000) -> None:
+        """Close the configured connection."""
         self._closed = True
         if self._task:
             await self._send_queue.put({"type": "websocket.disconnect", "code": code})
@@ -80,23 +80,26 @@ class WebSocketClient:
             self._task = None
 
     async def send_text(self, text: str) -> None:
+        """Send the text."""
         await self._send_queue.put({"type": "websocket.send", "text": text})
 
     async def send_bytes(self, data: bytes) -> None:
+        """Send the bytes."""
         await self._send_queue.put({"type": "websocket.send", "bytes": data})
 
     async def send_json(self, data: Any) -> None:
-        await self.send_text(
-            json.dumps(data, ensure_ascii=False, separators=(",", ":"))
-        )
+        """Send the json."""
+        await self.send_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")))
 
     async def receive_text(self) -> str:
+        """Receive the text."""
         message = await self._receive_queue.get()
         if message.get("type") == "websocket.disconnect":
             raise RuntimeError("WebSocket disconnected")
         return message.get("text", "")
 
     async def receive_json(self) -> Any:
+        """Receive the json."""
         text = await self.receive_text()
         return json.loads(text)
 
@@ -108,6 +111,7 @@ class WebSocketClient:
 
 
 class AsyncWebSocketClient(WebSocketClient):
+    """Async web socket client implementation for the testing subsystem."""
 
     def __init__(self, app: Any, base_url: str = "ws://testserver") -> None:
         super().__init__(app, base_url)

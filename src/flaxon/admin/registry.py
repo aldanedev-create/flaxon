@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import inspect
 from typing import Any
+
+from flaxon._imports import import_attribute
 
 
 class AdminModel:
+    """Admin model implementation for the admin subsystem."""
+
     def __init__(
         self,
         model: Any,
@@ -56,21 +61,27 @@ class AdminModel:
                 self.actions[action_name] = action
 
     def get_name(self) -> str:
+        """Return the name."""
         return self._name
 
     def get_verbose_name(self) -> str:
+        """Return the verbose name."""
         return self.model.__name__
 
     def get_verbose_name_plural(self) -> str:
+        """Return the verbose name plural."""
         return f"{self.get_verbose_name()}s"
 
     def add_action(self, name: str, func: Any) -> None:
+        """Add the action."""
         self.actions[name] = func
 
     def get_actions(self) -> dict[str, Any]:
+        """Return the actions."""
         return self.actions
 
     def get_permission_hook(self, action: str) -> Any | None:
+        """Return the permission hook."""
         return self.permission_hooks.get(action)
 
     @staticmethod
@@ -80,24 +91,24 @@ class AdminModel:
             return field(obj)
         if field == "__str__":
             return str(obj)
-        if isinstance(obj, dict):
-            value = obj.get(field, "")
-        else:
-            value = getattr(obj, field, "")
+        value = obj.get(field, "") if isinstance(obj, dict) else getattr(obj, field, "")
         return value() if callable(value) else value
 
 
 class Registry:
+    """Registry implementation for the admin subsystem."""
+
     def __init__(self) -> None:
         self._models: dict[str, AdminModel] = {}
         self._model_classes: dict[Any, str] = {}
 
     def register(self, model: Any, **options: Any) -> None:
+        """Perform the register operation for registry."""
         original = model
-        from tortoise.models import Model
+        model_type = import_attribute("tortoise.models", "Model")
 
-        if isinstance(model, type) and issubclass(model, Model):
-            from flaxon.db.admin import model_adapter
+        if isinstance(model, type) and issubclass(model, model_type):
+            model_adapter = import_attribute("flaxon.db.admin", "model_adapter")
 
             model = model_adapter(model, options)
         if hasattr(model, "orm_model"):
@@ -108,21 +119,26 @@ class Registry:
         self._model_classes[original] = admin_model.get_name()
 
     def unregister(self, model: Any) -> None:
+        """Perform the unregister operation for registry."""
         name = self._model_classes.pop(model, None)
         if name:
             self._models.pop(name, None)
 
     def get(self, name: str) -> AdminModel | None:
+        """Retrieve the requested value using this object's configured behavior."""
         return self._models.get(name)
 
     def get_by_model(self, model: Any) -> AdminModel | None:
+        """Return the by model."""
         name = self._model_classes.get(model)
         return self._models.get(name) if name else None
 
     def get_all(self) -> list[AdminModel]:
+        """Return all matching stored entries."""
         return list(self._models.values())
 
     def clear(self) -> None:
+        """Remove the stored entries."""
         self._models.clear()
         self._model_classes.clear()
 
@@ -138,7 +154,6 @@ async def evaluate_permission_hook(hook, user, target=None):
     """Support both model hooks (user) and object hooks (user, object)."""
     if hook is None:
         return True
-    import inspect
 
     signature = inspect.signature(hook)
     if target is None:

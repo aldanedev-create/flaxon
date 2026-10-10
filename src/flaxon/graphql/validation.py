@@ -8,12 +8,15 @@ from .types import InterfaceType, List, NonNull, ObjectType
 
 
 class ValidationRule:
+    """Validation rule implementation for the graphql subsystem."""
+
     def __init__(self, name: str, validate_func: Any) -> None:
         self.name = name
         self.validate = validate_func
 
 
 def validate_query(schema: Any, document: Any) -> list[GraphQLValidationError]:
+    """Validate the query."""
     errors: list[GraphQLValidationError] = []
 
     rules = [
@@ -37,6 +40,7 @@ def validate_query(schema: Any, document: Any) -> list[GraphQLValidationError]:
 
 
 def validate_has_operations(schema: Any, document: Any) -> list[GraphQLValidationError]:
+    """Validate the has operations."""
     has_ops = any(
         isinstance(definition, OperationDefinition)
         or getattr(definition, "kind", "") == "OperationDefinition"
@@ -49,6 +53,7 @@ def validate_has_operations(schema: Any, document: Any) -> list[GraphQLValidatio
 
 
 def validate_operation_names_unique(schema: Any, document: Any) -> list[GraphQLValidationError]:
+    """Validate the operation names unique."""
     names: set[str] = set()
     errors: list[GraphQLValidationError] = []
 
@@ -65,36 +70,40 @@ def validate_operation_names_unique(schema: Any, document: Any) -> list[GraphQLV
     return errors
 
 
-def validate_fields_on_objects(schema: Any, document: Any) -> list[GraphQLValidationError]:
-    errors: list[GraphQLValidationError] = []
+def _check_object_selection(
+    selection_set: Any, parent_type: Any, errors: list[GraphQLValidationError]
+) -> None:
+    if not selection_set or not hasattr(selection_set, "selections"):
+        return
 
-    def check_selection_set(selection_set: Any, parent_type: Any) -> None:
-        if not selection_set or not hasattr(selection_set, "selections"):
-            return
+    for selection in selection_set.selections:
+        kind = getattr(selection, "kind", type(selection).__name__)
 
-        for selection in selection_set.selections:
-            kind = getattr(selection, "kind", type(selection).__name__)
+        if kind == "Field" or isinstance(selection, Field) or hasattr(selection, "name"):
+            field_name = selection.name.value if hasattr(selection.name, "value") else str(selection.name)
 
-            if kind == "Field" or isinstance(selection, Field) or hasattr(selection, "name"):
-                field_name = selection.name.value if hasattr(selection.name, "value") else str(selection.name)
+            # Introspection fields support
+            if field_name in ("__schema", "__typename", "__type"):
+                continue
 
-                # Introspection fields support
-                if field_name in ("__schema", "__typename", "__type"):
-                    continue
-
-                if isinstance(parent_type, (ObjectType, InterfaceType)):
-                    fields = parent_type.fields
-                    if field_name not in fields:
-                        errors.append(
-                            GraphQLValidationError(
-                                f"Cannot query field '{field_name}' on type '{parent_type.name}'."
-                            )
+            if isinstance(parent_type, (ObjectType, InterfaceType)):
+                fields = parent_type.fields
+                if field_name not in fields:
+                    errors.append(
+                        GraphQLValidationError(
+                            f"Cannot query field '{field_name}' on type '{parent_type.name}'."
                         )
-                    else:
-                        field_def = fields[field_name]
-                        unwrapped = _unwrap_type(field_def.type)
-                        if getattr(selection, "selection_set", None):
-                            check_selection_set(selection.selection_set, unwrapped)
+                    )
+                else:
+                    field_def = fields[field_name]
+                    unwrapped = _unwrap_type(field_def.type)
+                    if getattr(selection, "selection_set", None):
+                        _check_object_selection(selection.selection_set, unwrapped, errors)
+
+
+def validate_fields_on_objects(schema: Any, document: Any) -> list[GraphQLValidationError]:
+    """Validate the fields on objects."""
+    errors: list[GraphQLValidationError] = []
 
     for definition in document.definitions:
         if (
@@ -104,12 +113,13 @@ def validate_fields_on_objects(schema: Any, document: Any) -> list[GraphQLValida
             op_type = getattr(definition, "operation", "query").lower()
             root_type = getattr(schema, op_type, None)
             if root_type and getattr(definition, "selection_set", None):
-                check_selection_set(definition.selection_set, root_type)
+                _check_object_selection(definition.selection_set, root_type, errors)
 
     return errors
 
 
 def validate_fragment_targets(schema: Any, document: Any) -> list[GraphQLValidationError]:
+    """Validate the fragment targets."""
     errors: list[GraphQLValidationError] = []
     fragment_names = {
         (def_.name.value if hasattr(def_.name, "value") else str(def_.name))
@@ -141,6 +151,7 @@ def validate_fragment_targets(schema: Any, document: Any) -> list[GraphQLValidat
 
 
 def validate_fragment_types(schema: Any, document: Any) -> list[GraphQLValidationError]:
+    """Validate the fragment types."""
     errors: list[GraphQLValidationError] = []
     all_types = schema.get_types()
 
@@ -162,6 +173,7 @@ def validate_fragment_types(schema: Any, document: Any) -> list[GraphQLValidatio
 
 
 def validate_variable_types(schema: Any, document: Any) -> list[GraphQLValidationError]:
+    """Validate the variable types."""
     errors: list[GraphQLValidationError] = []
 
     for definition in document.definitions:
@@ -183,10 +195,12 @@ def validate_variable_types(schema: Any, document: Any) -> list[GraphQLValidatio
 
 
 def validate_variable_usages(schema: Any, document: Any) -> list[GraphQLValidationError]:
+    """Validate the variable usages."""
     return []
 
 
 def validate_directives(schema: Any, document: Any) -> list[GraphQLValidationError]:
+    """Validate the directives."""
     errors: list[GraphQLValidationError] = []
     valid_directives = {d.name for d in schema.get_directives()}
 

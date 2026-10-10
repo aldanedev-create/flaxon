@@ -11,9 +11,12 @@ from __future__ import annotations
 import importlib
 import importlib.util
 import logging
+import pkgutil
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+
+from flaxon._imports import import_attribute, import_module
 
 from .app import Flaxon
 
@@ -67,9 +70,7 @@ class Bootstrapper:
     def _discover_plugins(self, app: Flaxon) -> None:
         """Discover and load plugins."""
         try:
-            import pkgutil
-
-            import flaxon_plugins
+            flaxon_plugins = import_module("flaxon_plugins")
 
             for _, module_name, _ in pkgutil.iter_modules(flaxon_plugins.__path__):
                 try:
@@ -133,21 +134,21 @@ class ApplicationFactory:
         rate_limit: int = 60,
     ) -> Flaxon:
         """Create a pre-configured API application."""
-        from flaxon.middleware import CORSMiddleware
-        from flaxon.security import RateLimitMiddleware
+        corsmiddleware_type = import_attribute("flaxon.middleware", "CORSMiddleware")
+        rate_limit_middleware_type = import_attribute("flaxon.security", "RateLimitMiddleware")
 
         app = Flaxon(name, debug=debug)
 
         if cors_origins:
             app.add_middleware(
-                CORSMiddleware,
+                corsmiddleware_type,
                 allowed_origins=cors_origins,
                 allow_credentials=True,
             )
 
         if rate_limit > 0:
             app.add_middleware(
-                RateLimitMiddleware,
+                rate_limit_middleware_type,
                 requests=rate_limit,
                 window_seconds=60,
             )
@@ -162,12 +163,12 @@ class ApplicationFactory:
         template_dir: str = "templates",
     ) -> Flaxon:
         """Create a pre-configured web application with templates."""
-        from flaxon.jinax import Jinax
+        jinax_type = import_attribute("flaxon.jinax", "Jinax")
 
         app = Flaxon(name, debug=debug)
 
         app.use_templates(
-            Jinax(
+            jinax_type(
                 template_dir,
                 auto_reload=debug,
                 strict_undefined=True,

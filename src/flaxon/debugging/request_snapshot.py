@@ -5,6 +5,8 @@ from typing import Any
 
 
 class RequestSnapshot:
+    """Request snapshot implementation for the debugging subsystem."""
+
     def __init__(self, request: Any) -> None:
         self.request = request
         self.timestamp = time.time()
@@ -19,7 +21,7 @@ class RequestSnapshot:
 
     def _capture_headers(self) -> dict[str, str]:
         if hasattr(self.request, "headers"):
-            return {k: v for k, v in self.request.headers.items()}
+            return dict(self.request.headers.items())
         return {}
 
     def _capture_query(self) -> dict[str, Any]:
@@ -51,6 +53,7 @@ class RequestSnapshot:
         return None
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a dictionary representation of the current value."""
         return {
             "timestamp": self.timestamp,
             "method": self.method,
@@ -65,6 +68,7 @@ class RequestSnapshot:
 
     @classmethod
     def from_request(cls, request: Any) -> RequestSnapshot | None:
+        """Construct from the request."""
         if request is None:
             return None
         try:

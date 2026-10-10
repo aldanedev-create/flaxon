@@ -7,12 +7,14 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
+# FIX (UP042): Use StrEnum instead of subclassing (str, Enum)
+from flaxon._imports import import_attribute
+
 from .context import TaskContext
 from .exceptions import TaskError
 from .retry import RetryPolicy
 
 
-# FIX (UP042): Use StrEnum instead of subclassing (str, Enum)
 class TaskStatus(StrEnum):
     """The lifecycle states recorded by a background task."""
 
@@ -113,10 +115,11 @@ class Task:
 
     def to_result(self) -> Any:
         """Return a serializable snapshot of this task's final state."""
-        # FIX (PLC0415): Moved import to top-level if possible, or kept local if required to avoid circular dependency
-        from .result import TaskResult
+        # FIX (PLC0415): Moved import to top-level if possible, or kept local if required to avoid circular
+        # dependency
+        task_result_type = import_attribute("flaxon.tasks.result", "TaskResult")
 
-        return TaskResult(
+        return task_result_type(
             id=self.id,
             name=self.name,
             status=self.status,

@@ -5,10 +5,14 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from flaxon._imports import import_attribute
+
 from .upload import UploadedFile
 
 
 class FileStorage:
+    """File storage implementation for the files subsystem."""
+
     def __init__(self, base_path: str = "uploads", url_prefix: str = "/uploads") -> None:
         self.base_path = Path(base_path)
         self.url_prefix = url_prefix
@@ -35,6 +39,7 @@ class FileStorage:
         return resolved
 
     def generate_filename(self, original_filename: str) -> str:
+        """Generate the filename."""
         ext = ""
         if "." in original_filename:
             ext = original_filename.rsplit(".", 1)[1]
@@ -43,6 +48,7 @@ class FileStorage:
         return f"{uuid.uuid4().hex}{ext}"
 
     def save(self, file: UploadedFile, path: str | None = None, filename: str | None = None) -> str:
+        """Persist the supplied value using the configured storage."""
         if filename is None:
             filename = self.generate_filename(file.filename)
 
@@ -56,18 +62,20 @@ class FileStorage:
         return str(full_path)
 
     def save_bytes(self, data: bytes, filename: str, path: str | None = None) -> str:
+        """Save the bytes."""
         if path is None:
             path = ""
 
         full_path = self._safe_path(path, filename)
         full_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(full_path, "wb") as f:
+        with Path(full_path).open("wb") as f:
             f.write(data)
 
         return str(full_path)
 
     def delete(self, file_path: str) -> bool:
+        """Delete the specified entry from the configured store."""
         try:
             path = (
                 self._safe_path(
@@ -84,6 +92,7 @@ class FileStorage:
             return False
 
     def delete_directory(self, directory: str) -> bool:
+        """Delete the directory."""
         try:
             path = self._safe_path(directory)
             if path.exists() and path.is_dir():
@@ -94,6 +103,7 @@ class FileStorage:
             return False
 
     def exists(self, file_path: str) -> bool:
+        """Return whether the requested entry exists."""
         try:
             path = (
                 self._safe_path(Path(file_path).relative_to(self.base_path).as_posix())
@@ -105,6 +115,7 @@ class FileStorage:
         return path.exists()
 
     def get_size(self, file_path: str) -> int:
+        """Return the size."""
         path = (
             self._safe_path(Path(file_path).relative_to(self.base_path).as_posix())
             if Path(file_path).is_absolute()
@@ -115,10 +126,12 @@ class FileStorage:
         return 0
 
     def get_url(self, file_path: str) -> str:
+        """Return the url."""
         relative = Path(file_path).relative_to(self.base_path)
         return f"{self.url_prefix}/{relative.as_posix()}"
 
     def list_files(self, directory: str = "") -> list[str]:
+        """List the files."""
         path = self._safe_path(directory)
         if not path.exists():
             return []
@@ -126,6 +139,7 @@ class FileStorage:
         return [str(p) for p in path.iterdir() if p.is_file()]
 
     def get_file_info(self, file_path: str) -> dict[str, Any]:
+        """Return the file info."""
         try:
             path = (
                 self._safe_path(Path(file_path).relative_to(self.base_path).as_posix())
@@ -150,7 +164,7 @@ class FileStorage:
     def create_thumbnail(self, file_path: str, size: tuple[int, int] = (320, 240)) -> str | None:
         """Create a bounded JPEG thumbnail beside a stored image when Pillow is available."""
         try:
-            from PIL import Image
+            image_type = import_attribute("PIL", "Image")
 
             source = (
                 self._safe_path(Path(file_path).relative_to(self.base_path).as_posix())
@@ -159,7 +173,8 @@ class FileStorage:
             )
             thumbnail_path = self._safe_path("thumbnails", f"{source.stem}.jpg")
             thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
-            with Image.open(source) as image:
+            with image_type.open(source) as raw_image:
+                image = raw_image
                 image.thumbnail(size)
                 if image.mode not in {"RGB", "L"}:
                     image = image.convert("RGB")

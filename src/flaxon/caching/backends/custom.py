@@ -105,10 +105,7 @@ class CustomBackend:
                 return await result
             return result
         value = await self.get(key)
-        if value is None:
-            new_value = amount
-        else:
-            new_value = int(value) + amount
+        new_value = amount if value is None else int(value) + amount
         await self.set(key, new_value)
         return new_value
 

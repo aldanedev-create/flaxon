@@ -37,6 +37,8 @@ from .production import (
 )
 from .migrations import ADMIN_SCHEMA_DOWN, ADMIN_SCHEMA_UP, write_admin_migration
 
+from flaxon._imports import import_attribute
+
 __all__ = [
     "ADMIN_SCHEMA_DOWN",
     "ADMIN_SCHEMA_UP",
@@ -105,7 +107,7 @@ _MICROSERVICE_EXPORTS = {
 
 def __getattr__(name: str):
     if name in _MICROSERVICE_EXPORTS:
-        from . import microservices
+        microservices = import_attribute("flaxon.admin", "microservices")
 
         return getattr(microservices, name)
     raise AttributeError(name)

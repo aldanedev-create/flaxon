@@ -11,6 +11,8 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 
 class Encryptor:
+    """Encryptor implementation for the security subsystem."""
+
     def __init__(self, secret_key: str) -> None:
         self.secret_key = secret_key.encode()
 
@@ -24,6 +26,7 @@ class Encryptor:
         return kdf.derive(self.secret_key)
 
     def encrypt(self, data: bytes) -> str:
+        """Perform the encrypt operation for encryptor."""
         salt = os.urandom(16)
         key = self._derive_key(salt)
         iv = os.urandom(16)
@@ -36,6 +39,7 @@ class Encryptor:
         return base64.urlsafe_b64encode(result).decode()
 
     def decrypt(self, encrypted: str) -> bytes:
+        """Perform the decrypt operation for encryptor."""
         data = base64.urlsafe_b64decode(encrypted)
 
         salt = data[:16]
@@ -50,8 +54,11 @@ class Encryptor:
 
 
 class Hasher:
+    """Hasher implementation for the security subsystem."""
+
     @staticmethod
     def hash(data: str, salt: str | None = None) -> str:
+        """Perform the hash operation for hasher."""
         if salt is None:
             salt = os.urandom(16).hex()
         combined = salt + data
@@ -60,6 +67,7 @@ class Hasher:
 
     @staticmethod
     def verify(data: str, hashed: str) -> bool:
+        """Perform the verify operation for hasher."""
         try:
             salt, hash_value = hashed.split("$")
             combined = salt + data
@@ -70,9 +78,11 @@ class Hasher:
 
     @staticmethod
     def hmac_sign(data: str, secret: str) -> str:
+        """Perform the hmac sign operation for hasher."""
         return hmac.new(secret.encode(), data.encode(), hashlib.sha256).hexdigest()
 
     @staticmethod
     def hmac_verify(data: str, signature: str, secret: str) -> bool:
+        """Perform the hmac verify operation for hasher."""
         expected = Hasher.hmac_sign(data, secret)
         return hmac.compare_digest(expected, signature)

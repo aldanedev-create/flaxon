@@ -6,11 +6,14 @@ from flaxon.mail.message import Email
 
 
 class ConsoleAdapter:
+    """Console adapter implementation for the mail subsystem."""
+
     def __init__(self, print_body: bool = True, print_html: bool = False) -> None:
         self.print_body = print_body
         self.print_html = print_html
 
     async def send(self, email: Email) -> None:
+        """Perform the send operation for console adapter."""
         print("=" * 60)
         print(f"[{datetime.now().isoformat()}] Email sent")
         print(f"From: {email.from_address}")

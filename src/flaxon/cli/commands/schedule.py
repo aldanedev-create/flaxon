@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 from typing import Any
 
+from flaxon._imports import import_attribute
 from flaxon.cli.base import Command
 
 
 class ScheduleCommand(Command):
+    """Schedule command implementation for the cli subsystem."""
+
     def __init__(self) -> None:
         super().__init__(
             name="schedule",
@@ -23,17 +27,16 @@ class ScheduleCommand(Command):
         console.info("Starting scheduler...")
 
         try:
-            from flaxon.utils.import_string import import_string
+            import_string = import_attribute("flaxon.utils.import_string", "import_string")
+
             app = import_string(args.application)
             console.info(f"Loaded application: {app.name}")
 
-            import asyncio
+            scheduler_type = import_attribute("flaxon.tasks", "Scheduler")
+            task_queue_type = import_attribute("flaxon.tasks.queue", "TaskQueue")
 
-            from flaxon.tasks import Scheduler
-            from flaxon.tasks.queue import TaskQueue
-
-            queue = TaskQueue()
-            scheduler = Scheduler(queue)
+            queue = task_queue_type()
+            scheduler = scheduler_type(queue)
 
             async def run_once() -> None:
                 console.info("Running one scheduling pass...")

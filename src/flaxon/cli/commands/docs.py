@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 from typing import Any
 
+from flaxon._imports import import_attribute
 from flaxon.cli.base import Command
 
 
 class DocsCommand(Command):
+    """Docs command implementation for the cli subsystem."""
+
     def __init__(self) -> None:
         super().__init__(
             name="docs",
@@ -44,8 +48,8 @@ class DocsCommand(Command):
         )
 
     def _run(self, args: argparse.Namespace, console: Any) -> int:
-        from flaxon.openapi import OpenAPIGenerator
-        from flaxon.utils.import_string import import_string
+        open_apigenerator_type = import_attribute("flaxon.openapi", "OpenAPIGenerator")
+        import_string = import_attribute("flaxon.utils.import_string", "import_string")
 
         try:
             app = import_string(args.application)
@@ -54,7 +58,7 @@ class DocsCommand(Command):
             return 1
 
         title = args.title or getattr(app, "name", "Flaxon API")
-        generator = OpenAPIGenerator(title=title, version=args.version)
+        generator = open_apigenerator_type(title=title, version=args.version)
 
         try:
             spec = generator.generate_from_app(app, include_internal=args.include_internal)
@@ -66,28 +70,33 @@ class DocsCommand(Command):
         output = json.dumps(spec, indent=indent)
 
         if args.check:
-            try:
-                with open(args.output, encoding="utf-8") as file:
-                    existing = json.load(file)
-            except FileNotFoundError:
-                console.error(f"OpenAPI output does not exist: {args.output}")
-                return 1
-            except (OSError, json.JSONDecodeError) as exc:
-                console.error(f"OpenAPI output is not valid JSON: {exc}")
-                return 1
-            if existing != spec:
-                console.error(f"OpenAPI output is out of date: {args.output}")
-                return 1
-            console.success(f"OpenAPI spec is current: {args.output}")
-            return 0
+            return self._check_output(args.output, spec, console)
 
-        with open(args.output, "w", encoding="utf-8") as f:
+        with Path(args.output).open("w", encoding="utf-8") as f:
             f.write(output)
 
         path_count = len(spec.get("paths", {}))
         console.success(f"Wrote OpenAPI spec for {path_count} path(s) to {args.output}")
         console.info(
-            "Hand-edit this file for anything auto-detection can't infer, or re-run this command to regenerate the basics."
+            "Hand-edit this file for anything auto-detection can't infer,"
+            " or re-run this command to regenerate the basics."
         )
 
+        return 0
+
+    @staticmethod
+    def _check_output(output_path: str, spec: dict, console: Any) -> int:
+        try:
+            with Path(output_path).open(encoding="utf-8") as file:
+                existing = json.load(file)
+        except FileNotFoundError:
+            console.error(f"OpenAPI output does not exist: {output_path}")
+            return 1
+        except (OSError, json.JSONDecodeError) as exc:
+            console.error(f"OpenAPI output is not valid JSON: {exc}")
+            return 1
+        if existing != spec:
+            console.error(f"OpenAPI output is out of date: {output_path}")
+            return 1
+        console.success(f"OpenAPI spec is current: {output_path}")
         return 0

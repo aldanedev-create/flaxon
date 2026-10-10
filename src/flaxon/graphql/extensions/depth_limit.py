@@ -4,18 +4,20 @@ from typing import Any
 
 
 class DepthLimitExtension:
+    """Depth limit extension implementation for the graphql subsystem."""
+
     def __init__(self, max_depth: int = 10, enabled: bool = True) -> None:
         self.max_depth = max_depth
         self.enabled = enabled
 
     def calculate_depth(self, document: Any) -> int:
+        """Perform the calculate depth operation for depth limit extension."""
         max_depth = 0
 
         for definition in document.definitions:
             if hasattr(definition, "selection_set"):
                 depth = self._calculate_selection_set_depth(definition.selection_set)
-                if depth > max_depth:
-                    max_depth = depth
+                max_depth = max(max_depth, depth)
 
         return max_depth
 
@@ -26,25 +28,22 @@ class DepthLimitExtension:
             if hasattr(selection, "field"):
                 if selection.selection_set:
                     depth = self._calculate_selection_set_depth(selection.selection_set, current_depth + 1)
-                    if depth > max_depth:
-                        max_depth = depth
-                else:
-                    if current_depth + 1 > max_depth:
-                        max_depth = current_depth + 1
+                    max_depth = max(max_depth, depth)
+                elif current_depth + 1 > max_depth:
+                    max_depth = current_depth + 1
 
             elif hasattr(selection, "inline_fragment"):
                 if selection.selection_set:
                     depth = self._calculate_selection_set_depth(selection.selection_set, current_depth + 1)
-                    if depth > max_depth:
-                        max_depth = depth
+                    max_depth = max(max_depth, depth)
 
             elif hasattr(selection, "fragment_spread"):
-                if current_depth + 1 > max_depth:
-                    max_depth = current_depth + 1
+                max_depth = max(max_depth, current_depth + 1)
 
         return max_depth
 
     def validate_depth(self, document: Any) -> bool:
+        """Validate the depth."""
         if not self.enabled:
             return True
 
@@ -52,6 +51,7 @@ class DepthLimitExtension:
         return depth <= self.max_depth
 
     async def before(self, context: dict[str, Any]) -> None:
+        """Perform the before operation for depth limit extension."""
         if not self.enabled:
             return
 
@@ -65,4 +65,5 @@ class DepthLimitExtension:
             )
 
     async def after(self, context: dict[str, Any], result: dict[str, Any]) -> None:
+        """Perform the after operation for depth limit extension."""
         pass

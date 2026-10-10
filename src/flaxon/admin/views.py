@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from flaxon._imports import import_attribute
 from flaxon.exceptions import BadRequest, Conflict, Forbidden
 from flaxon.http import HTMLResponse, RedirectResponse, Request
 
@@ -10,12 +11,15 @@ from .registry import evaluate_permission_hook
 
 
 class AdminView:
+    """Admin view implementation for the admin subsystem."""
+
     def __init__(self, admin_model: Any, request: Request, dashboard: Any) -> None:
         self.admin_model = admin_model
         self.request = request
         self.dashboard = dashboard
 
     async def invalid_form(self, error, data, template, obj=None):
+        """Perform the invalid form operation for admin view."""
         adapter = self.admin_model.model
         schema = await adapter.form_schema() if hasattr(adapter, "form_schema") else {}
         context = {
@@ -53,6 +57,7 @@ class AdminView:
         return await self.dashboard.jinax.render_response(template, context, status_code=400)
 
     async def render(self) -> HTMLResponse | RedirectResponse:
+        """Render the requested content using the supplied context."""
         raise NotImplementedError
 
     @staticmethod
@@ -66,16 +71,49 @@ class AdminView:
 
 
 class ChangeListView(AdminView):
+    """Change list view implementation for the admin subsystem."""
+
+    def _filter_legacy_objects(self, objects):
+        needle = self.request.query.get("q", "").lower()
+        if needle:
+            fields = self.admin_model.search_fields or self.admin_model.fields
+            objects = [
+                obj
+                for obj in objects
+                if any(
+                    needle in str(obj.get(f) if isinstance(obj, dict) else getattr(obj, f, "")).lower()
+                    for f in fields
+                )
+            ]
+        for field in self.admin_model.list_filter:
+            value = self.request.query.get(f"filter_{field}", "")
+            if value:
+                objects = [
+                    obj
+                    for obj in objects
+                    if str(obj.get(field) if isinstance(obj, dict) else getattr(obj, field, "")) == value
+                ]
+        ordering = self.request.query.get("order_by")
+        if ordering:
+            reverse = ordering.startswith("-")
+            key = ordering.lstrip("-")
+            objects.sort(
+                key=lambda obj: obj.get(key) if isinstance(obj, dict) else getattr(obj, key, None),
+                reverse=reverse,
+            )
+        return objects
+
     async def render(self) -> HTMLResponse:
+        """Render the requested content using the supplied context."""
         model_class = self.admin_model.model
         objects: list[Any] = []
         try:
             page = max(1, int(self.request.query.get("page", "1") or 1))
             per_page = min(200, max(1, int(self.request.query.get("per_page", "25") or 25)))
         except (ValueError, TypeError) as exc:
-            from flaxon.exceptions import BadRequest
+            bad_request_type = import_attribute("flaxon.exceptions", "BadRequest")
 
-            raise BadRequest("page and per_page must be integers") from exc
+            raise bad_request_type("page and per_page must be integers") from exc
         query_result = None
         if hasattr(model_class, "query"):
             query_options = {"q": self.request.query.get("q") or None, "page": page, "per_page": per_page}
@@ -87,34 +125,7 @@ class ChangeListView(AdminView):
         elif hasattr(model_class, "get_instances"):
             result = model_class.get_instances()
             objects = list(await result if hasattr(result, "__await__") else result)
-            needle = self.request.query.get("q", "").lower()
-            if needle:
-                fields = self.admin_model.search_fields or self.admin_model.fields
-                objects = [
-                    obj
-                    for obj in objects
-                    if any(
-                        needle in str(obj.get(f) if isinstance(obj, dict) else getattr(obj, f, "")).lower()
-                        for f in fields
-                    )
-                ]
-            for field in self.admin_model.list_filter:
-                value = self.request.query.get(f"filter_{field}", "")
-                if value:
-                    objects = [
-                        obj
-                        for obj in objects
-                        if str(obj.get(field) if isinstance(obj, dict) else getattr(obj, field, ""))
-                        == value
-                    ]
-            ordering = self.request.query.get("order_by")
-            if ordering:
-                reverse = ordering.startswith("-")
-                key = ordering.lstrip("-")
-                objects.sort(
-                    key=lambda obj: obj.get(key) if isinstance(obj, dict) else getattr(obj, key, None),
-                    reverse=reverse,
-                )
+            objects = self._filter_legacy_objects(objects)
             total = len(objects)
             objects = objects[(page - 1) * per_page : page * per_page]
             query_result = {
@@ -197,11 +208,14 @@ class ChangeListView(AdminView):
 
 
 class DetailView(AdminView):
+    """Detail view implementation for the admin subsystem."""
+
     def __init__(self, admin_model: Any, request: Request, dashboard: Any, object_id: str) -> None:
         super().__init__(admin_model, request, dashboard)
         self.object_id = object_id
 
     async def render(self) -> HTMLResponse:
+        """Render the requested content using the supplied context."""
         model_class = self.admin_model.model
         obj = None
         if hasattr(model_class, "get_instance"):
@@ -227,7 +241,10 @@ class DetailView(AdminView):
 
 
 class CreateView(AdminView):
+    """Create view implementation for the admin subsystem."""
+
     async def render(self) -> HTMLResponse | RedirectResponse:
+        """Render the requested content using the supplied context."""
         if self.request.method == "POST":
             # Extract form payload for model creation logic
             form_data = await self.request.form() if hasattr(self.request, "form") else {}
@@ -277,16 +294,15 @@ class CreateView(AdminView):
 
 
 class UpdateView(AdminView):
+    """Update view implementation for the admin subsystem."""
+
     def __init__(self, admin_model: Any, request: Request, dashboard: Any, object_id: str) -> None:
         super().__init__(admin_model, request, dashboard)
         self.object_id = object_id
 
     @staticmethod
     def _value(obj: Any, field: str) -> Any:
-        if isinstance(obj, dict):
-            value = obj.get(field, "")
-        else:
-            value = getattr(obj, field, "")
+        value = obj.get(field, "") if isinstance(obj, dict) else getattr(obj, field, "")
         return value() if callable(value) else value
 
     @staticmethod
@@ -315,73 +331,11 @@ class UpdateView(AdminView):
         return await result if hasattr(result, "__await__") else result
 
     async def render(self) -> HTMLResponse | RedirectResponse:
+        """Render the requested content using the supplied context."""
         model_class = self.admin_model.model
 
         if self.request.method == "POST":
-            form_data = await self.request.form() if hasattr(self.request, "form") else {}
-            form_data = self._form_dict(form_data)
-            form_data = self.dashboard.validate_csrf(form_data)
-
-            # FormData preserves repeated values. Use the final value so a
-            # hidden false fallback plus a checked boolean is submitted safely.
-            form_data = {
-                key: value[-1] if isinstance(value, list) and value else value
-                for key, value in form_data.items()
-            }
-
-            expected_version = form_data.pop("_version", None)
-            if hasattr(model_class, "version") and not expected_version:
-                raise BadRequest("Reload the edit form before saving; its record version is required")
-            save_mode = str(form_data.pop("_save", "list"))
-            readonly_fields = set(self.admin_model.readonly_fields) | {"id"}
-            form_data = {key: value for key, value in form_data.items() if key not in readonly_fields}
-            current = await self._get_object()
-            if expected_version not in (None, "") and not hasattr(model_class, "version"):
-                current_version = (
-                    current.get("updated_at")
-                    if isinstance(current, dict)
-                    else getattr(current, "updated_at", None)
-                    if current is not None
-                    else None
-                )
-                if str(expected_version) != str(current_version):
-                    raise Conflict("This record was changed by another user. Reload before saving.")
-
-            before = self._snapshot(current)
-            result = None
-            if hasattr(model_class, "update_instance"):
-                try:
-                    result = (
-                        model_class.update_instance(
-                            self.object_id, form_data, expected_version=expected_version
-                        )
-                        if hasattr(model_class, "version")
-                        else model_class.update_instance(self.object_id, form_data)
-                    )
-                    if hasattr(result, "__await__"):
-                        result = await result
-                except BadRequest as exc:
-                    return await self.invalid_form(exc, form_data, "admin/edit.html", current)
-            after = self._snapshot(result if result is not None else await self._get_object())
-            details = {"before": before, "after": after} if before or after else {}
-            self.dashboard.record_activity(
-                "updated",
-                self.admin_model.get_name(),
-                self.request,
-                self.object_id,
-                **details,
-            )
-
-            if save_mode == "continue":
-                target = f"{self.dashboard.url_prefix}/{self.admin_model.get_name()}/{self.object_id}/edit"
-            elif save_mode == "add":
-                target = f"{self.dashboard.url_prefix}/{self.admin_model.get_name()}/add"
-            else:
-                target = f"{self.dashboard.url_prefix}/{self.admin_model.get_name()}"
-            return RedirectResponse(
-                target,
-                status_code=302,
-            )
+            return await self._render_post(model_class=model_class)
 
         obj = await self._get_object()
         field_values: dict[str, str] = {}
@@ -397,10 +351,12 @@ class UpdateView(AdminView):
                 field_values[field] = str(value)
 
         if hasattr(model_class, "relationship_fields"):
-            from tortoise.fields.relational import ManyToManyFieldInstance
+            many_to_many_field_instance_type = import_attribute(
+                "tortoise.fields.relational", "ManyToManyFieldInstance"
+            )
 
             for name, relation in model_class.relationship_fields.items():
-                if isinstance(relation, ManyToManyFieldInstance):
+                if isinstance(relation, many_to_many_field_instance_type):
                     field_values[name] = json.dumps([str(row.pk) for row in await getattr(obj, name).all()])
         entries = [
             item.to_dict()
@@ -447,13 +403,80 @@ class UpdateView(AdminView):
         }
         return await self.dashboard.jinax.render_response("admin/edit.html", context)
 
+    async def _render_post(self, *, model_class):
+        """Handle post behavior for render."""
+        form_data = await self.request.form() if hasattr(self.request, "form") else {}
+        form_data = self._form_dict(form_data)
+        form_data = self.dashboard.validate_csrf(form_data)
+
+        # FormData preserves repeated values. Use the final value so a
+        # hidden false fallback plus a checked boolean is submitted safely.
+        form_data = {
+            key: value[-1] if isinstance(value, list) and value else value for key, value in form_data.items()
+        }
+
+        expected_version = form_data.pop("_version", None)
+        if hasattr(model_class, "version") and not expected_version:
+            raise BadRequest("Reload the edit form before saving; its record version is required")
+        save_mode = str(form_data.pop("_save", "list"))
+        readonly_fields = set(self.admin_model.readonly_fields) | {"id"}
+        form_data = {key: value for key, value in form_data.items() if key not in readonly_fields}
+        current = await self._get_object()
+        if expected_version not in (None, "") and not hasattr(model_class, "version"):
+            current_version = (
+                current.get("updated_at")
+                if isinstance(current, dict)
+                else getattr(current, "updated_at", None)
+                if current is not None
+                else None
+            )
+            if str(expected_version) != str(current_version):
+                raise Conflict("This record was changed by another user. Reload before saving.")
+
+        before = self._snapshot(current)
+        result = None
+        if hasattr(model_class, "update_instance"):
+            try:
+                result = (
+                    model_class.update_instance(self.object_id, form_data, expected_version=expected_version)
+                    if hasattr(model_class, "version")
+                    else model_class.update_instance(self.object_id, form_data)
+                )
+                if hasattr(result, "__await__"):
+                    result = await result
+            except BadRequest as exc:
+                return await self.invalid_form(exc, form_data, "admin/edit.html", current)
+        after = self._snapshot(result if result is not None else await self._get_object())
+        details = {"before": before, "after": after} if before or after else {}
+        self.dashboard.record_activity(
+            "updated",
+            self.admin_model.get_name(),
+            self.request,
+            self.object_id,
+            **details,
+        )
+
+        if save_mode == "continue":
+            target = f"{self.dashboard.url_prefix}/{self.admin_model.get_name()}/{self.object_id}/edit"
+        elif save_mode == "add":
+            target = f"{self.dashboard.url_prefix}/{self.admin_model.get_name()}/add"
+        else:
+            target = f"{self.dashboard.url_prefix}/{self.admin_model.get_name()}"
+        return RedirectResponse(
+            target,
+            status_code=302,
+        )
+
 
 class DeleteView(AdminView):
+    """Delete view implementation for the admin subsystem."""
+
     def __init__(self, admin_model: Any, request: Request, dashboard: Any, object_id: str) -> None:
         super().__init__(admin_model, request, dashboard)
         self.object_id = object_id
 
     async def render(self) -> HTMLResponse | RedirectResponse:
+        """Render the requested content using the supplied context."""
         if self.request.method == "POST":
             form_data = await self.request.form()
             self.dashboard.validate_csrf(self._form_dict(form_data))

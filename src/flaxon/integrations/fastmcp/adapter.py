@@ -76,6 +76,7 @@ def mount_fastmcp(
 
 def _lifespan_factory(mounted_app: Any, lifespan: Callable[..., Any]) -> Callable[[], Any]:
     """Create the zero-argument lifecycle factory expected by Flaxon."""
+
     def factory() -> Any:
         return lifespan(mounted_app)
 

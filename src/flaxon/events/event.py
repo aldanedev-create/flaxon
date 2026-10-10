@@ -8,6 +8,8 @@ from typing import Any
 
 @dataclass
 class Event:
+    """Event implementation for the events subsystem."""
+
     name: str
     data: Any = None
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
@@ -20,6 +22,7 @@ class Event:
             self.metadata = {}
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a dictionary representation of the current value."""
         return {
             "id": self.id,
             "name": self.name,
@@ -31,6 +34,7 @@ class Event:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Event:
+        """Construct an instance from its dictionary representation."""
         created_at = data.get("created_at")
         if isinstance(created_at, str):
             created_at = datetime.fromisoformat(created_at)
@@ -45,30 +49,39 @@ class Event:
 
 
 class DomainEvent(Event):
+    """Domain event implementation for the events subsystem."""
+
     def __init__(self, name: str, aggregate_id: str, data: Any = None, **kwargs: Any) -> None:
         super().__init__(name, data, **kwargs)
         self.aggregate_id = aggregate_id
         self.metadata["aggregate_id"] = aggregate_id
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a dictionary representation of the current value."""
         result = super().to_dict()
         result["aggregate_id"] = self.aggregate_id
         return result
 
 
 class IntegrationEvent(Event):
+    """Integration event implementation for the events subsystem."""
+
     def __init__(self, name: str, data: Any = None, **kwargs: Any) -> None:
         super().__init__(name, data, **kwargs)
         self.metadata["event_type"] = "integration"
 
 
 class CommandEvent(Event):
+    """Command event implementation for the events subsystem."""
+
     def __init__(self, name: str, data: Any = None, **kwargs: Any) -> None:
         super().__init__(name, data, **kwargs)
         self.metadata["event_type"] = "command"
 
 
 class QueryEvent(Event):
+    """Query event implementation for the events subsystem."""
+
     def __init__(self, name: str, data: Any = None, **kwargs: Any) -> None:
         super().__init__(name, data, **kwargs)
         self.metadata["event_type"] = "query"

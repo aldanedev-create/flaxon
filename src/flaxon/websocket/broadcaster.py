@@ -23,7 +23,6 @@ class Broadcaster(ABC):
     Example:
         ```python
         class RedisBroadcaster(Broadcaster):
-
             async def publish(self, channel: str, message: Any) -> None:
                 await self.redis.publish(channel, json.dumps(message))
 
@@ -104,9 +103,7 @@ class MemoryBroadcaster(Broadcaster):
         finally:
             async with self._lock:
                 if channel in self._subscribers:
-                    self._subscribers[channel] = [
-                        q for q in self._subscribers[channel] if q != queue
-                    ]
+                    self._subscribers[channel] = [q for q in self._subscribers[channel] if q != queue]
                     if not self._subscribers[channel]:
                         del self._subscribers[channel]
 

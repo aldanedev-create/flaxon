@@ -4,16 +4,21 @@ import asyncio
 import signal
 from typing import Any
 
+from flaxon._imports import import_module
+
 from .configuration import ServerConfig
 from .processes import ProcessManager
 
 
 class ProductionServer:
+    """Production server implementation for the server subsystem."""
+
     def __init__(self, config: ServerConfig) -> None:
         self.config = config
         self.process_manager = ProcessManager(config.workers)
 
     def run(self, app: Any) -> None:
+        """Run the configured operation."""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
@@ -25,7 +30,8 @@ class ProductionServer:
             loop.close()
 
     async def run_async(self, app: Any) -> None:
-        import uvicorn
+        """Perform the run async operation for production server."""
+        uvicorn = import_module("uvicorn")
 
         if self.config.workers > 1:
             self.process_manager.start(app, self.config)

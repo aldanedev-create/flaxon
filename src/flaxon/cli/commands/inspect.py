@@ -4,10 +4,13 @@ import argparse
 import json
 from typing import Any
 
+from flaxon._imports import import_attribute, import_module
 from flaxon.cli.base import Command
 
 
 class InspectCommand(Command):
+    """Inspect command implementation for the cli subsystem."""
+
     def __init__(self) -> None:
         super().__init__(
             name="inspect",
@@ -25,7 +28,7 @@ class InspectCommand(Command):
         )
 
     def _run(self, args: argparse.Namespace, console: Any) -> int:
-        from flaxon.utils.import_string import import_string
+        import_string = import_attribute("flaxon.utils.import_string", "import_string")
 
         try:
             app = import_string(args.application)
@@ -45,22 +48,26 @@ class InspectCommand(Command):
             print(json.dumps(data, indent=2, default=str))
         elif args.format == "yaml":
             try:
-                import yaml
+                yaml = import_module("yaml")
 
                 print(yaml.dump(data))
             except ImportError:
                 console.warning("yaml not installed, falling back to json")
                 print(json.dumps(data, indent=2, default=str))
         else:
-            console.info(f"Application: {data['name']}")
-            console.info(f"Debug: {data['debug']}")
-            if args.middleware and "middleware" in data:
-                console.info("Middleware:")
-                for m in data["middleware"]:
-                    console.info(f"  - {m}")
-            if args.config and "config" in data:
-                console.info("Config:")
-                for k, v in data["config"].items():
-                    console.info(f"  {k}: {v}")
+            self._print_summary(args, console, data)
 
         return 0
+
+    @staticmethod
+    def _print_summary(args, console, data):
+        console.info(f"Application: {data['name']}")
+        console.info(f"Debug: {data['debug']}")
+        if args.middleware and "middleware" in data:
+            console.info("Middleware:")
+            for m in data["middleware"]:
+                console.info(f"  - {m}")
+        if args.config and "config" in data:
+            console.info("Config:")
+            for k, v in data["config"].items():
+                console.info(f"  {k}: {v}")

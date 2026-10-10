@@ -10,6 +10,8 @@ from typing import Any
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
+from flaxon._imports import import_attribute
+
 management_mode: ContextVar[bool] = ContextVar("flaxon_management_mode", default=False)
 
 
@@ -17,14 +19,17 @@ class Environment:
     """Read environment values; explicit environment variables override .env."""
 
     def load(self, path: str | Path) -> None:
-        from dotenv import load_dotenv
+        """Load the requested resource using the configured source."""
+        load_dotenv = import_attribute("dotenv", "load_dotenv")
 
         load_dotenv(path, override=False)
 
     def str(self, name: str, default: Any = None) -> Any:
+        """Perform the str operation for environment."""
         return os.environ.get(name, default)
 
     def bool(self, name: str, default: bool = False) -> bool:
+        """Perform the bool operation for environment."""
         value = os.environ.get(name)
         if value is None:
             return default
@@ -36,6 +41,7 @@ class Environment:
         raise ValueError(f"{name} must be a boolean (true/false or 1/0)")
 
     def list(self, name: str, default: list[str] | None = None) -> list[str]:
+        """Return the matching entries."""
         value = os.environ.get(name)
         return (
             list(default or [])
@@ -77,6 +83,7 @@ class Settings:
             raise AttributeError(key) from exc
 
     def validate(self) -> None:
+        """Check the supplied value against the configured constraints."""
         if self.JSON_SERIALIZER not in {"modern", "legacy"}:
             raise ValueError("JSON_SERIALIZER must be modern or legacy")
         if self.ADMIN_STORE_BACKEND not in {"sqlite", "orm"}:
@@ -99,15 +106,20 @@ class Settings:
                 raise ValueError("CSRF_TRUSTED_ORIGINS must contain complete origins without paths")
         ZoneInfo(self.TIME_ZONE)
         if not self.DEBUG:
-            secret = self.values.get("SECRET_KEY")
-            if not isinstance(secret, str) or len(secret) < 32:
-                raise ValueError(
-                    "Set FLAXON_SECRET_KEY to a persistent secret of at least 32 characters in production"
-                )
-            if "*" in self.ALLOWED_HOSTS:
-                raise ValueError("Use explicit ALLOWED_HOSTS in production")
+            self._validate_debug()
+
+    def _validate_debug(self):
+        """Apply debug changes for validate."""
+        secret = self.values.get("SECRET_KEY")
+        if not isinstance(secret, str) or len(secret) < 32:
+            raise ValueError(
+                "Set FLAXON_SECRET_KEY to a persistent secret of at least 32 characters in production"
+            )
+        if "*" in self.ALLOWED_HOSTS:
+            raise ValueError("Use explicit ALLOWED_HOSTS in production")
 
     def prepare_database_directory(self) -> None:
+        """Perform the prepare database directory operation for settings."""
         url = str(self.DATABASE_URL)
         if url.startswith("sqlite://") and url != "sqlite://:memory:":
             path = Path(url.removeprefix("sqlite://"))

@@ -10,6 +10,7 @@ from tortoise.context import TortoiseContext, _current_context
 
 
 def optional_module(name: str) -> bool:
+    """Perform the optional module operation for this subsystem."""
     try:
         return importlib.util.find_spec(name) is not None
     except ModuleNotFoundError as exc:
@@ -28,6 +29,7 @@ class Database:
         self.initialized = False
 
     def configuration(self) -> dict[str, Any]:
+        """Perform the configuration operation for database."""
         apps = {}
         if optional_module("models"):
             apps["models"] = {
@@ -65,6 +67,7 @@ class Database:
     def bind(self):
         # Tortoise 1.1 uses a ContextVar. Set/reset with a local token rather than
         # sharing Context.__enter__'s token between concurrent ASGI requests.
+        """Bind the supplied values to this object's context."""
         token = _current_context.set(self.context)
         try:
             yield self.context
@@ -72,12 +75,14 @@ class Database:
             _current_context.reset(token)
 
     async def initialize(self) -> None:
+        """Prepare the configured resources for use."""
         self.settings.prepare_database_directory()
         with self.bind():
             await self.context.init(config=self.configuration())
         self.initialized = True
 
     async def close(self) -> None:
+        """Release the resources held by this object."""
         with self.bind():
             await self.context.close_connections()
         self.initialized = False
@@ -96,10 +101,13 @@ class Database:
 
 
 class DatabaseMiddleware:
+    """Database middleware implementation for the db subsystem."""
+
     def __init__(self, app: Any, database: Database) -> None:
         self.app = app
         self.database = database
 
     async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        """Handle the supplied call using this object's configured behavior."""
         with self.database.bind():
             await self.app(scope, receive, send)

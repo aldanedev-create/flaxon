@@ -13,6 +13,7 @@ from inspect import isawaitable
 from typing import Any
 from urllib.parse import quote
 
+from flaxon._imports import import_attribute, import_module
 from flaxon.exceptions import Forbidden, Unauthorized
 from flaxon.http import Request, Response
 from flaxon.security import PasswordHasher, PasswordValidator, RateLimiter, SessionBackend, User
@@ -23,6 +24,8 @@ from .authorization import AuthorizationProvider, DefaultAuthorizationProvider
 
 @dataclass
 class AdminActivity:
+    """Admin activity implementation for the admin subsystem."""
+
     action: str
     resource: str
     record_id: str | None = None
@@ -31,6 +34,7 @@ class AdminActivity:
     details: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a dictionary representation of the current value."""
         return {
             "action": self.action,
             "resource": self.resource,
@@ -44,7 +48,7 @@ class AdminActivity:
 class AdminAuth:
     """Small injectable admin auth service backed by Flaxon's token backend."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0917 - preserve existing positional API
         self,
         users: list[dict[str, Any]] | None = None,
         backend: SessionBackend | None = None,
@@ -93,6 +97,7 @@ class AdminAuth:
             self.store.set("auth", "trusted_devices", self._trusted_devices)
 
     def add_user(self, raw: dict[str, Any]) -> dict[str, Any]:
+        """Add the user."""
         username = str(raw.get("username", "")).strip()
         if not username:
             raise ValueError("Admin users require a username")
@@ -104,9 +109,17 @@ class AdminAuth:
         else:
             # Keep the legacy default for existing applications. New
             # deployments can opt into exact, least-privilege defaults.
-            record["permissions"] = ["admin.view_dashboard", "admin.manage_profile"] if self.strict_permissions else [
-                "admin:read", "admin:write", "admin:users", "admin:settings", "admin:media",
-            ]
+            record["permissions"] = (
+                ["admin.view_dashboard", "admin.manage_profile"]
+                if self.strict_permissions
+                else [
+                    "admin:read",
+                    "admin:write",
+                    "admin:users",
+                    "admin:settings",
+                    "admin:media",
+                ]
+            )
         if record.get("password") and not record.get("password_hash"):
             password = str(record.pop("password"))
             errors = self.password_validator.validate(password)
@@ -117,18 +130,36 @@ class AdminAuth:
         return record
 
     def public(self, record: dict[str, Any]) -> dict[str, Any]:
-        return {k: v for k, v in record.items() if k not in {"password", "password_hash", "mfa_secret", "mfa_pending_secret", "mfa_pending_recovery_codes", "mfa_recovery_codes", "trusted_devices"}}
+        """Perform the public operation for admin auth."""
+        return {
+            k: v
+            for k, v in record.items()
+            if k
+            not in {
+                "password",
+                "password_hash",
+                "mfa_secret",
+                "mfa_pending_secret",
+                "mfa_pending_recovery_codes",
+                "mfa_recovery_codes",
+                "trusted_devices",
+            }
+        }
 
     def user(self, username: str) -> User | None:
+        """Perform the user operation for admin auth."""
         record = self.users.get(username)
         return User.from_dict(self.public(record)) if record else None
 
     def verify(self, username: str, password: str) -> User | None:
+        """Perform the verify operation for admin auth."""
         record = self.users.get(username)
         # Always run a hash verification, even for a nonexistent user or
         # one without a password_hash, using a fixed dummy hash -- so the
         # time this takes doesn't depend on whether the username is real.
-        password_hash = record["password_hash"] if record and record.get("password_hash") else self._dummy_password_hash
+        password_hash = (
+            record["password_hash"] if record and record.get("password_hash") else self._dummy_password_hash
+        )
         password_matches = self.hasher.verify(password, password_hash)
         if not record or record.get("active", True) is False or not record.get("password_hash"):
             return None
@@ -138,11 +169,12 @@ class AdminAuth:
         return self.user(username) if password_matches else None
 
     def validate_password(self, password: str) -> None:
+        """Validate the password."""
         errors = self.password_validator.validate(password)
         if errors:
             raise ValueError(errors[0])
 
-    async def login(
+    async def login(  # noqa: PLR0917 - preserve existing positional API
         self,
         username: str,
         password: str,
@@ -151,12 +183,12 @@ class AdminAuth:
         trusted_device: str | None = None,
         expires_in: int | None = None,
     ) -> str | None:
+        """Establish an authenticated session for the supplied credentials."""
         keys = {username.strip().lower(), f"ip:{client_key}" if client_key else ""}
         keys.discard("")
         now = time.time()
         failures = {
-            key: [stamp for stamp in self._login_failures.get(key, []) if stamp > now - 300]
-            for key in keys
+            key: [stamp for stamp in self._login_failures.get(key, []) if stamp > now - 300] for key in keys
         }
         if any(len(values) >= 10 for values in failures.values()):
             return None
@@ -170,7 +202,11 @@ class AdminAuth:
         if record.get("mfa_secret"):
             code = otp or ""
             trusted = self.consume_trusted_device(username, trusted_device) if trusted_device else False
-            if not trusted and not self.verify_otp(record["mfa_secret"], code) and not self.consume_recovery_code(username, code):
+            if (
+                not trusted
+                and not self.verify_otp(record["mfa_secret"], code)
+                and not self.consume_recovery_code(username, code)
+            ):
                 for key, values in failures.items():
                     values.append(now)
                     self._login_failures[key] = values
@@ -182,10 +218,12 @@ class AdminAuth:
 
     @staticmethod
     def generate_mfa_secret() -> str:
+        """Generate the mfa secret."""
         return base64.b32encode(secrets.token_bytes(20)).decode("ascii").rstrip("=")
 
     @staticmethod
     def verify_otp(secret: str, code: str, timestamp: int | None = None) -> bool:
+        """Verify the otp."""
         if not code or not secret:
             return False
         try:
@@ -195,7 +233,7 @@ class AdminAuth:
                 message = (counter + offset).to_bytes(8, "big")
                 digest = hmac.new(key, message, hashlib.sha1).digest()
                 position = digest[-1] & 0x0F
-                number = (int.from_bytes(digest[position:position + 4], "big") & 0x7FFFFFFF) % 1000000
+                number = (int.from_bytes(digest[position : position + 4], "big") & 0x7FFFFFFF) % 1000000
                 if hmac.compare_digest(f"{number:06d}", str(code).strip()):
                     return True
         except (ValueError, TypeError):
@@ -203,6 +241,7 @@ class AdminAuth:
         return False
 
     def begin_mfa_setup(self, username: str, issuer: str = "Flaxon Admin") -> tuple[str, list[str]]:
+        """Begin the mfa setup."""
         record = self.users.get(username)
         if record is None:
             raise ValueError("User not found")
@@ -216,6 +255,7 @@ class AdminAuth:
         return uri, recovery_codes
 
     def confirm_mfa_setup(self, username: str, code: str) -> bool:
+        """Confirm the mfa setup."""
         record = self.users.get(username)
         secret = record.get("mfa_pending_secret") if record else None
         if not secret or not self.verify_otp(secret, code):
@@ -226,6 +266,7 @@ class AdminAuth:
         return True
 
     def consume_recovery_code(self, username: str, code: str) -> bool:
+        """Consume the recovery code."""
         record = self.users.get(username)
         if not record or not code:
             return False
@@ -236,18 +277,28 @@ class AdminAuth:
                 return True
         return False
 
-    def issue_trusted_device(self, username: str, label: str = "Browser", expires_in: int = 30 * 24 * 3600) -> str:
+    def issue_trusted_device(
+        self, username: str, label: str = "Browser", expires_in: int = 30 * 24 * 3600
+    ) -> str:
         """Issue an opaque trusted-device token after a successful MFA check."""
         if username not in self.users or not self.users[username].get("mfa_secret"):
             raise ValueError("MFA must be enabled before issuing a trusted device")
         token = secrets.token_urlsafe(32)
         devices = self._trusted_devices.setdefault(username, [])
-        devices.append({"id": secrets.token_hex(8), "label": str(label)[:120], "hash": hashlib.sha256(token.encode()).hexdigest(), "created_at": time.time(), "expires_at": time.time() + max(60, expires_in), "last_used_at": None})
+        devices.append({
+            "id": secrets.token_hex(8),
+            "label": str(label)[:120],
+            "hash": hashlib.sha256(token.encode()).hexdigest(),
+            "created_at": time.time(),
+            "expires_at": time.time() + max(60, expires_in),
+            "last_used_at": None,
+        })
         self._trusted_devices[username] = devices[-10:]
         self._persist_auth_tokens()
         return token
 
     def consume_trusted_device(self, username: str, token: str | None) -> bool:
+        """Consume the trusted device."""
         if not token:
             return False
         digest = hashlib.sha256(token.encode()).hexdigest()
@@ -267,10 +318,16 @@ class AdminAuth:
         return matched
 
     def list_trusted_devices(self, username: str) -> list[dict[str, Any]]:
+        """List the trusted devices."""
         now = time.time()
-        return [{key: value for key, value in item.items() if key != "hash"} for item in self._trusted_devices.get(username, []) if item.get("expires_at", 0) >= now]
+        return [
+            {key: value for key, value in item.items() if key != "hash"}
+            for item in self._trusted_devices.get(username, [])
+            if item.get("expires_at", 0) >= now
+        ]
 
     def revoke_trusted_device(self, username: str, device_id: str) -> bool:
+        """Revoke the trusted device."""
         devices = self._trusted_devices.get(username, [])
         kept = [item for item in devices if item.get("id") != device_id]
         changed = len(kept) != len(devices)
@@ -280,6 +337,7 @@ class AdminAuth:
         return changed
 
     def revoke_all_trusted_devices(self, username: str) -> int:
+        """Revoke the all trusted devices."""
         removed = len(self._trusted_devices.get(username, []))
         self._trusted_devices[username] = []
         if removed:
@@ -287,6 +345,7 @@ class AdminAuth:
         return removed
 
     def regenerate_mfa_recovery_codes(self, username: str, count: int = 10) -> list[str]:
+        """Perform the regenerate mfa recovery codes operation for admin auth."""
         record = self.users.get(username)
         if record is None or not record.get("mfa_secret"):
             raise ValueError("MFA is not enabled")
@@ -296,6 +355,7 @@ class AdminAuth:
         return codes
 
     def disable_mfa(self, username: str) -> None:
+        """Perform the disable mfa operation for admin auth."""
         record = self.users.get(username)
         if record is None:
             raise ValueError("User not found")
@@ -340,6 +400,7 @@ class AdminAuth:
     async def current_user(self, request: Request) -> User:
         # Authenticate through the Admin backend rather than accepting a user
         # installed by unrelated application authentication middleware.
+        """Perform the current user operation for admin auth."""
         user = await self.backend.authenticate(request)
         if user is None:
             raise Unauthorized("Authentication required")
@@ -355,13 +416,22 @@ class AdminAuth:
         return user
 
     async def logout(self, request: Request) -> None:
+        """End the current authenticated session."""
         token = request.cookies.get("session_id")
         if token:
             await self.backend.revoke_token(token)
 
     def request_password_reset(self, identifier: str, expires_in: int = 3600) -> str | None:
+        """Request the password reset."""
         value = identifier.strip().lower()
-        record = next((item for item in self.users.values() if item.get("username", "").lower() == value or item.get("email", "").lower() == value), None)
+        record = next(
+            (
+                item
+                for item in self.users.values()
+                if item.get("username", "").lower() == value or item.get("email", "").lower() == value
+            ),
+            None,
+        )
         if record is None or record.get("active", True) is False:
             return None
         token = secrets.token_urlsafe(32)
@@ -370,6 +440,7 @@ class AdminAuth:
         return token
 
     def reset_password(self, token: str, password: str) -> bool:
+        """Reset the password."""
         entry = self._reset_tokens.get(token)
         if isinstance(entry, (tuple, list)):
             entry = {"username": entry[0], "expires_at": entry[1]}
@@ -395,6 +466,7 @@ class AdminAuth:
             self.store.set("users", username, record)
 
     def request_email_verification(self, username: str, expires_in: int = 86400) -> str | None:
+        """Request the email verification."""
         record = self.users.get(username)
         if record is None or not record.get("email") or record.get("email_verified"):
             return None
@@ -404,6 +476,7 @@ class AdminAuth:
         return token
 
     def verify_email(self, token: str) -> bool:
+        """Verify the email."""
         entry = self._verification_tokens.pop(token, None)
         if isinstance(entry, (tuple, list)):
             entry = {"username": entry[0], "expires_at": entry[1]}
@@ -417,10 +490,14 @@ class AdminAuth:
         return True
 
     def attach_cookie(self, response: Response, token: str, max_age: int = 86400) -> None:
+        """Perform the attach cookie operation for admin auth."""
         secure = "; Secure" if self.cookie_secure else ""
-        response.headers.add("set-cookie", f"session_id={token}; Max-Age={max_age}; Path=/; HttpOnly; SameSite=Lax{secure}")
+        response.headers.add(
+            "set-cookie", f"session_id={token}; Max-Age={max_age}; Path=/; HttpOnly; SameSite=Lax{secure}"
+        )
 
     def clear_cookie(self, response: Response) -> None:
+        """Clear the cookie."""
         secure = "; Secure" if self.cookie_secure else ""
         response.headers.add("set-cookie", f"session_id=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax{secure}")
 
@@ -436,8 +513,16 @@ class AdminStore:
     def __init__(self, path: str = "flaxon-admin.sqlite3") -> None:
         self.path = path
         with self._connect() as db:
-            db.execute("CREATE TABLE IF NOT EXISTS flaxon_admin_store (namespace TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY(namespace, key))")
-            db.execute("CREATE TABLE IF NOT EXISTS flaxon_admin_operations (id TEXT PRIMARY KEY, kind TEXT NOT NULL, payload TEXT NOT NULL, created_at REAL NOT NULL)")
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS flaxon_admin_store (namespace TEX"
+                "T NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY "
+                "KEY(namespace, key))"
+            )
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS flaxon_admin_operations (id TEXT "
+                "PRIMARY KEY, kind TEXT NOT NULL, payload TEXT NOT NULL, crea"
+                "ted_at REAL NOT NULL)"
+            )
 
     def _connect(self) -> sqlite3.Connection:
         db = sqlite3.connect(self.path, timeout=30, isolation_level="IMMEDIATE")
@@ -446,20 +531,33 @@ class AdminStore:
         return db
 
     def get(self, namespace: str, key: str, default: Any = None) -> Any:
+        """Retrieve the requested value using this object's configured behavior."""
         with self._connect() as db:
-            row = db.execute("SELECT value FROM flaxon_admin_store WHERE namespace=? AND key=?", (namespace, key)).fetchone()
+            row = db.execute(
+                "SELECT value FROM flaxon_admin_store WHERE namespace=? AND key=?", (namespace, key)
+            ).fetchone()
         return json.loads(row[0]) if row else default
 
     def set(self, namespace: str, key: str, value: Any) -> None:
+        """Store the supplied value under its key."""
         encoded = json.dumps(value, default=str)
         with self._connect() as db:
-            db.execute("INSERT INTO flaxon_admin_store(namespace,key,value) VALUES(?,?,?) ON CONFLICT(namespace,key) DO UPDATE SET value=excluded.value", (namespace, key, encoded))
+            db.execute(
+                (
+                    "INSERT INTO flaxon_admin_store(namespace,key,value) VALUES(?"
+                    ",?,?) ON CONFLICT(namespace,key) DO UPDATE SET value=exclude"
+                    "d.value"
+                ),
+                (namespace, key, encoded),
+            )
 
     def mutate(self, namespace: str, key: str, callback: Any, default: Any = None) -> Any:
         """Atomically read, transform, and persist one JSON value."""
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
-            row = db.execute("SELECT value FROM flaxon_admin_store WHERE namespace=? AND key=?", (namespace, key)).fetchone()
+            row = db.execute(
+                "SELECT value FROM flaxon_admin_store WHERE namespace=? AND key=?", (namespace, key)
+            ).fetchone()
             value = json.loads(row[0]) if row else default
             result = callback(value)
             db.execute(
@@ -470,26 +568,47 @@ class AdminStore:
             return result
 
     def delete(self, namespace: str, key: str) -> None:
+        """Delete the specified entry from the configured store."""
         with self._connect() as db:
             db.execute("DELETE FROM flaxon_admin_store WHERE namespace=? AND key=?", (namespace, key))
 
     def list(self, namespace: str) -> dict[str, Any]:
+        """Return the matching entries."""
         with self._connect() as db:
-            rows = db.execute("SELECT key,value FROM flaxon_admin_store WHERE namespace=?", (namespace,)).fetchall()
+            rows = db.execute(
+                "SELECT key,value FROM flaxon_admin_store WHERE namespace=?", (namespace,)
+            ).fetchall()
         return {key: json.loads(value) for key, value in rows}
 
     def record_operation(self, kind: str, payload: dict[str, Any], operation_id: str | None = None) -> str:
+        """Record the operation."""
         operation_id = operation_id or secrets.token_hex(8)
         with self._connect() as db:
-            db.execute("INSERT OR REPLACE INTO flaxon_admin_operations(id, kind, payload, created_at) VALUES(?,?,?,?)", (operation_id, kind, json.dumps(payload, default=str), time.time()))
+            db.execute(
+                (
+                    "INSERT OR REPLACE INTO flaxon_admin_operations(id, kind, pay"
+                    "load, created_at) VALUES(?,?,?,?)"
+                ),
+                (operation_id, kind, json.dumps(payload, default=str), time.time()),
+            )
         return operation_id
 
     def list_operations(self, limit: int = 100) -> list[dict[str, Any]]:
+        """List the operations."""
         with self._connect() as db:
-            rows = db.execute("SELECT id, kind, payload, created_at FROM flaxon_admin_operations ORDER BY created_at DESC LIMIT ?", (max(1, min(limit, 5000)),)).fetchall()
-        return [{"id": row[0], "kind": row[1], "timestamp": row[3], **(json.loads(row[2]) or {})} for row in rows]
+            rows = db.execute(
+                (
+                    "SELECT id, kind, payload, created_at FROM flaxon_admin_opera"
+                    "tions ORDER BY created_at DESC LIMIT ?"
+                ),
+                (max(1, min(limit, 5000)),),
+            ).fetchall()
+        return [
+            {"id": row[0], "kind": row[1], "timestamp": row[3], **(json.loads(row[2]) or {})} for row in rows
+        ]
 
     def prune_operations(self, before: float) -> int:
+        """Perform the prune operations operation for admin store."""
         with self._connect() as db:
             result = db.execute("DELETE FROM flaxon_admin_operations WHERE created_at < ?", (before,))
             return result.rowcount
@@ -505,9 +624,10 @@ class PostgreSQLAdminStore:
     """
 
     def __init__(self, dsn: str) -> None:
+        """Perform the   init   operation for postgre sqladmin store."""
         self.dsn = dsn
         try:
-            import psycopg
+            psycopg = import_module("psycopg")
         except ImportError as exc:  # pragma: no cover - optional dependency
             raise RuntimeError("PostgreSQLAdminStore requires psycopg.") from exc
         self._psycopg = psycopg
@@ -528,24 +648,27 @@ class PostgreSQLAdminStore:
         return self._db
 
     def close(self) -> None:
+        """Release the resources held by this object."""
         if not self._db.closed:
             self._db.close()
 
     def get(self, namespace: str, key: str, default: Any = None) -> Any:
+        """Retrieve the requested value using this object's configured behavior."""
         db = self._connect()
         row = db.execute(
-                "SELECT value FROM flaxon_admin_store WHERE namespace=%s AND key=%s",
-                (namespace, key),
-            ).fetchone()
+            "SELECT value FROM flaxon_admin_store WHERE namespace=%s AND key=%s",
+            (namespace, key),
+        ).fetchone()
         return json.loads(row[0]) if row else default
 
     def set(self, namespace: str, key: str, value: Any) -> None:
+        """Store the supplied value under its key."""
         db = self._connect()
         db.execute(
-                "INSERT INTO flaxon_admin_store(namespace, key, value) VALUES(%s, %s, %s) "
-                "ON CONFLICT(namespace, key) DO UPDATE SET value=excluded.value",
-                (namespace, key, json.dumps(value, default=str)),
-            )
+            "INSERT INTO flaxon_admin_store(namespace, key, value) VALUES(%s, %s, %s) "
+            "ON CONFLICT(namespace, key) DO UPDATE SET value=excluded.value",
+            (namespace, key, json.dumps(value, default=str)),
+        )
 
     def mutate(self, namespace: str, key: str, callback: Any, default: Any = None) -> Any:
         """Atomically transform one JSON value in a PostgreSQL transaction."""
@@ -564,40 +687,51 @@ class PostgreSQLAdminStore:
             return result
 
     def delete(self, namespace: str, key: str) -> None:
+        """Delete the specified entry from the configured store."""
         db = self._connect()
         db.execute(
-                "DELETE FROM flaxon_admin_store WHERE namespace=%s AND key=%s",
-                (namespace, key),
-            )
+            "DELETE FROM flaxon_admin_store WHERE namespace=%s AND key=%s",
+            (namespace, key),
+        )
 
     def list(self, namespace: str) -> dict[str, Any]:
+        """Return the matching entries."""
         db = self._connect()
         rows = db.execute(
-                "SELECT key, value FROM flaxon_admin_store WHERE namespace=%s",
-                (namespace,),
-            ).fetchall()
+            "SELECT key, value FROM flaxon_admin_store WHERE namespace=%s",
+            (namespace,),
+        ).fetchall()
         return {key: json.loads(value) for key, value in rows}
 
     def record_operation(self, kind: str, payload: dict[str, Any], operation_id: str | None = None) -> str:
+        """Record the operation."""
         operation_id = operation_id or secrets.token_hex(8)
         db = self._connect()
         db.execute(
-                "INSERT INTO flaxon_admin_operations(id, kind, payload, created_at) VALUES(%s, %s, %s, %s) "
-                "ON CONFLICT(id) DO UPDATE SET kind=excluded.kind, payload=excluded.payload, created_at=excluded.created_at",
-                (operation_id, kind, json.dumps(payload, default=str), time.time()),
-            )
+            (
+                "INSERT INTO flaxon_admin_operations(id, kind, payload, creat"
+                "ed_at) VALUES(%s, %s, %s, %s) ON CONFLICT(id) DO UPDATE SET "
+                "kind=excluded.kind, payload=excluded.payload, created_at=exc"
+                "luded.created_at"
+            ),
+            (operation_id, kind, json.dumps(payload, default=str), time.time()),
+        )
         return operation_id
 
     def list_operations(self, limit: int = 100) -> list[dict[str, Any]]:
+        """List the operations."""
         db = self._connect()
         rows = db.execute(
-                "SELECT id, kind, payload, created_at FROM flaxon_admin_operations "
-                "ORDER BY created_at DESC LIMIT %s",
-                (max(1, min(limit, 5000)),),
-            ).fetchall()
-        return [{"id": row[0], "kind": row[1], "timestamp": row[3], **(json.loads(row[2]) or {})} for row in rows]
+            "SELECT id, kind, payload, created_at FROM flaxon_admin_operations "
+            "ORDER BY created_at DESC LIMIT %s",
+            (max(1, min(limit, 5000)),),
+        ).fetchall()
+        return [
+            {"id": row[0], "kind": row[1], "timestamp": row[3], **(json.loads(row[2]) or {})} for row in rows
+        ]
 
     def prune_operations(self, before: float) -> int:
+        """Perform the prune operations operation for postgre sqladmin store."""
         db = self._connect()
         result = db.execute("DELETE FROM flaxon_admin_operations WHERE created_at < %s", (before,))
         return result.rowcount
@@ -612,15 +746,30 @@ class AdminStoreSessionBackend:
         self.idle_timeout = idle_timeout
 
     async def create_token(self, user: User, expires_in: int | None = None) -> str:
+        """Create the token."""
         token = secrets.token_urlsafe(32)
         now = time.time()
-        self.store.set(self.prefix, token, {"user": user.to_dict(), "created_at": now, "last_seen": now, "expires_at": now + (expires_in or 86400)})
+        self.store.set(
+            self.prefix,
+            token,
+            {
+                "user": user.to_dict(),
+                "created_at": now,
+                "last_seen": now,
+                "expires_at": now + (expires_in or 86400),
+            },
+        )
         return token
 
     async def validate_token(self, token: str) -> User | None:
+        """Validate the token."""
         session = self.store.get(self.prefix, token)
         now = time.time()
-        if not session or session.get("expires_at", 0) < now or (self.idle_timeout and session.get("last_seen", now) + self.idle_timeout < now):
+        if (
+            not session
+            or session.get("expires_at", 0) < now
+            or (self.idle_timeout and session.get("last_seen", now) + self.idle_timeout < now)
+        ):
             if session:
                 self.store.delete(self.prefix, token)
             return None
@@ -629,13 +778,16 @@ class AdminStoreSessionBackend:
         return User.from_dict(session["user"])
 
     async def authenticate(self, request: Request) -> User | None:
+        """Resolve a user or identity using the configured authentication backend."""
         token = request.cookies.get("session_id")
         return await self.validate_token(token) if token else None
 
     async def revoke_token(self, token: str) -> None:
+        """Revoke the token."""
         self.store.delete(self.prefix, token)
 
     async def revoke_all(self, user_id: str | int) -> int:
+        """Revoke the all."""
         removed = 0
         for token, session in self.store.list(self.prefix).items():
             if str(session.get("user", {}).get("id")) == str(user_id):
@@ -647,7 +799,16 @@ class AdminStoreSessionBackend:
 class AdminRateLimit:
     """Rate-limit mutating requests under an admin prefix."""
 
-    def __init__(self, app: Any, prefix: str = "/admin", requests: int = 120, window_seconds: int = 60, redis_url: str | None = None, redis_protocol: int = 2, redis_max_connections: int = 100) -> None:
+    def __init__(  # noqa: PLR0917 - preserve existing positional API
+        self,
+        app: Any,
+        prefix: str = "/admin",
+        requests: int = 120,
+        window_seconds: int = 60,
+        redis_url: str | None = None,
+        redis_protocol: int = 2,
+        redis_max_connections: int = 100,
+    ) -> None:
         self.app = app
         self.prefix = prefix.rstrip("/")
         self.limiter = RateLimiter(requests=requests, window_seconds=window_seconds)
@@ -658,22 +819,38 @@ class AdminRateLimit:
         self._distributed = None
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        """Handle the supplied call using this object's configured behavior."""
         path = str(scope.get("path", ""))
         method = str(scope.get("method", "GET")).upper()
-        if scope.get("type") == "http" and path.startswith(self.prefix) and method not in {"GET", "HEAD", "OPTIONS"}:
+        if (
+            scope.get("type") == "http"
+            and path.startswith(self.prefix)
+            and method not in {"GET", "HEAD", "OPTIONS"}
+        ):
             if self.redis_url:
                 if self._redis is None:
-                    import redis.asyncio as redis
-                    self._redis = redis.from_url(self.redis_url, decode_responses=True, protocol=self.redis_protocol, max_connections=self.redis_max_connections)
+                    redis = import_module("redis.asyncio")
+
+                    self._redis = redis.from_url(
+                        self.redis_url,
+                        decode_responses=True,
+                        protocol=self.redis_protocol,
+                        max_connections=self.redis_max_connections,
+                    )
                     self._distributed = DistributedRateLimiter(self._redis, prefix="flaxon:admin:requests")
                 client = scope.get("client")
                 ip = str(client[0]) if isinstance(client, (tuple, list)) and client else "unknown"
-                allowed = await self._distributed.check(f"{ip}:{path}", self.limiter.requests, self.limiter.window_seconds)
+                allowed = await self._distributed.check(
+                    f"{ip}:{path}", self.limiter.requests, self.limiter.window_seconds
+                )
             else:
                 allowed = await self.limiter.check(scope)
             if not allowed:
-                from flaxon.http import JSONResponse
-                await JSONResponse({"error": "Too many admin requests"}, status_code=429)(scope, receive, send)
+                jsonresponse_type = import_attribute("flaxon.http", "JSONResponse")
+
+                await jsonresponse_type({"error": "Too many admin requests"}, status_code=429)(
+                    scope, receive, send
+                )
                 return
         await self.app(scope, receive, send)
 
@@ -703,7 +880,8 @@ class RedisAdminSessionBackend:
 
     async def _client(self) -> Any:
         if self.client is None:
-            import redis.asyncio as redis
+            redis = import_module("redis.asyncio")
+
             self.client = redis.from_url(
                 self.redis_url,
                 decode_responses=True,
@@ -717,17 +895,25 @@ class RedisAdminSessionBackend:
         return f"{self.prefix}:{token}"
 
     async def create_token(self, user: User, expires_in: int | None = None) -> str:
+        """Create the token."""
         token = uuid.uuid4().hex
         now = time.time()
-        payload = {"user": user.to_dict(), "created_at": now, "last_seen": now, "expires_at": now + (expires_in or 86400)}
+        payload = {
+            "user": user.to_dict(),
+            "created_at": now,
+            "last_seen": now,
+            "expires_at": now + (expires_in or 86400),
+        }
         await (await self._client()).setex(self._key(token), expires_in or 86400, json.dumps(payload))
         return token
 
     async def authenticate(self, request: Request) -> User | None:
+        """Resolve a user or identity using the configured authentication backend."""
         token = request.cookies.get("session_id")
         return await self.validate_token(token) if token else None
 
     async def validate_token(self, token: str) -> User | None:
+        """Validate the token."""
         value = await (await self._client()).get(self._key(token))
         if not value:
             return None
@@ -735,7 +921,9 @@ class RedisAdminSessionBackend:
         if "user" not in payload:
             payload = {"user": payload, "expires_at": time.time() + 86400, "last_seen": time.time()}
         now = time.time()
-        if payload.get("expires_at", 0) < now or (self.idle_timeout and payload.get("last_seen", now) + self.idle_timeout < now):
+        if payload.get("expires_at", 0) < now or (
+            self.idle_timeout and payload.get("last_seen", now) + self.idle_timeout < now
+        ):
             await (await self._client()).delete(self._key(token))
             return None
         payload["last_seen"] = now
@@ -745,9 +933,11 @@ class RedisAdminSessionBackend:
         return User.from_dict(payload["user"])
 
     async def revoke_token(self, token: str) -> None:
+        """Revoke the token."""
         await (await self._client()).delete(self._key(token))
 
     async def revoke_all(self, user_id: str | int) -> int:
+        """Revoke the all."""
         client = await self._client()
         removed = 0
         async for key in client.scan_iter(match=f"{self.prefix}:*"):

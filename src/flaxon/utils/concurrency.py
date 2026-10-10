@@ -61,8 +61,10 @@ def async_to_sync(coro: Any) -> Any:
 
 def sync_to_async(func: Callable) -> Callable:
     """Convert a sync function to async."""
+
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
         return await run_in_executor(func, *args, **kwargs)
+
     return wrapper
 
 

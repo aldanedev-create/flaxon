@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 import subprocess
+from pathlib import Path
 from typing import Any
 
 from flaxon.cli.base import Command
 
 
 class TestCommand(Command):
+    """Test command implementation for the cli subsystem."""
+
     def __init__(self) -> None:
         super().__init__(
             name="test",
@@ -37,7 +41,7 @@ class TestCommand(Command):
         console.info(f"Running: {' '.join(cmd)}")
 
         try:
-            result = subprocess.run(cmd)
+            result = subprocess.run(cmd, check=False)  # noqa: S603 - local CLI argument list; no shell interpolation
             returncode = result.returncode
         except FileNotFoundError:
             console.error("pytest is not installed. Run: pip install pytest")
@@ -52,8 +56,6 @@ class TestCommand(Command):
         return returncode
 
     def _cleanup_test_artifacts(self, console: Any) -> None:
-        import shutil
-        from pathlib import Path
 
         removed = []
         for name in (".pytest_cache", ".coverage", "htmlcov"):

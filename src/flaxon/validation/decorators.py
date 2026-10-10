@@ -12,6 +12,8 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 
 def validate(schema_class: type[Schema]) -> Callable[[F], F]:
+    """Check the supplied value against the configured constraints."""
+
     def decorator(func: F) -> F:
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -23,16 +25,16 @@ def validate(schema_class: type[Schema]) -> Callable[[F], F]:
                 param = sig.parameters[name]
                 annotation = param.annotation
 
-                if annotation is not inspect.Parameter.empty:
-                    if isinstance(annotation, type) and issubclass(
-                        annotation, Schema
-                    ):
-                        if isinstance(value, dict):
-                            bound_args.arguments[name] = annotation.load(value)
-                        elif isinstance(value, annotation):
-                            bound_args.arguments[name] = value
-                        else:
-                            bound_args.arguments[name] = annotation.load(value)
+                if (
+                    annotation is not inspect.Parameter.empty
+                    and (isinstance(annotation, type) and issubclass(annotation, Schema))
+                    and isinstance(value, dict)
+                ):
+                    bound_args.arguments[name] = annotation.load(value)
+                elif isinstance(value, annotation):
+                    bound_args.arguments[name] = value
+                else:
+                    bound_args.arguments[name] = annotation.load(value)
 
             if inspect.iscoroutinefunction(func):
                 return await func(*bound_args.args, **bound_args.kwargs)
@@ -44,6 +46,8 @@ def validate(schema_class: type[Schema]) -> Callable[[F], F]:
 
 
 def validate_body(schema_class: type[Schema]) -> Callable[[F], F]:
+    """Validate the body."""
+
     def decorator(func: F) -> F:
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -55,16 +59,16 @@ def validate_body(schema_class: type[Schema]) -> Callable[[F], F]:
                 param = sig.parameters[name]
                 annotation = param.annotation
 
-                if annotation is not inspect.Parameter.empty:
-                    if isinstance(annotation, type) and issubclass(
-                        annotation, Schema
-                    ):
-                        if value is None:
-                            bound_args.arguments[name] = None
-                        elif isinstance(value, dict):
-                            bound_args.arguments[name] = annotation.load(value)
-                        else:
-                            bound_args.arguments[name] = annotation.load(value)
+                if (
+                    annotation is not inspect.Parameter.empty
+                    and (isinstance(annotation, type) and issubclass(annotation, Schema))
+                    and (value is None)
+                ):
+                    bound_args.arguments[name] = None
+                elif isinstance(value, dict):
+                    bound_args.arguments[name] = annotation.load(value)
+                else:
+                    bound_args.arguments[name] = annotation.load(value)
 
             if inspect.iscoroutinefunction(func):
                 return await func(*bound_args.args, **bound_args.kwargs)
@@ -76,6 +80,8 @@ def validate_body(schema_class: type[Schema]) -> Callable[[F], F]:
 
 
 def validate_query(schema_class: type[Schema]) -> Callable[[F], F]:
+    """Validate the query."""
+
     def decorator(func: F) -> F:
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -85,7 +91,7 @@ def validate_query(schema_class: type[Schema]) -> Callable[[F], F]:
                     request = arg
                     break
             if request is None:
-                for name, value in kwargs.items():
+                for _name, value in kwargs.items():
                     if hasattr(value, "query"):
                         request = value
                         break
@@ -105,6 +111,8 @@ def validate_query(schema_class: type[Schema]) -> Callable[[F], F]:
 
 
 def validate_params(schema_class: type[Schema]) -> Callable[[F], F]:
+    """Validate the params."""
+
     def decorator(func: F) -> F:
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -114,7 +122,7 @@ def validate_params(schema_class: type[Schema]) -> Callable[[F], F]:
                     request = arg
                     break
             if request is None:
-                for name, value in kwargs.items():
+                for _name, value in kwargs.items():
                     if hasattr(value, "path_params"):
                         request = value
                         break
@@ -133,7 +141,23 @@ def validate_params(schema_class: type[Schema]) -> Callable[[F], F]:
     return decorator
 
 
+def _coercion_types(signature, declared_types):
+    param_names = list(signature.parameters.keys())
+    type_mapping = {}
+
+    for idx, param_name in enumerate(param_names):
+        if idx < len(declared_types):
+            type_mapping[param_name] = declared_types[idx]
+        elif param_name in signature.parameters:
+            annotation = signature.parameters[param_name].annotation
+            if annotation is not inspect.Parameter.empty:
+                type_mapping[param_name] = annotation
+    return type_mapping
+
+
 def coerce_params(*types: type) -> Callable[[F], F]:
+    """Convert arguments using explicit types or function parameter annotations."""
+
     def decorator(func: F) -> F:
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -141,23 +165,20 @@ def coerce_params(*types: type) -> Callable[[F], F]:
             bound_args = sig.bind_partial(*args, **kwargs)
             bound_args.apply_defaults()
 
-            param_names = list(sig.parameters.keys())
-            type_mapping = {}
-
-            for idx, param_name in enumerate(param_names):
-                if idx < len(types):
-                    type_mapping[param_name] = types[idx]
-                elif param_name in sig.parameters:
-                    annotation = sig.parameters[param_name].annotation
-                    if annotation is not inspect.Parameter.empty:
-                        type_mapping[param_name] = annotation
+            type_mapping = _coercion_types(sig, types)
 
             for name, value in bound_args.arguments.items():
                 if name in type_mapping and value is not None:
                     target_type = type_mapping[name]
-                    if not isinstance(value, target_type):
-                        if target_type in (str, int, float, bool, list, dict):
-                            bound_args.arguments[name] = coerce(value, target_type)
+                    if not isinstance(value, target_type) and target_type in (
+                        str,
+                        int,
+                        float,
+                        bool,
+                        list,
+                        dict,
+                    ):
+                        bound_args.arguments[name] = coerce(value, target_type)
 
             if inspect.iscoroutinefunction(func):
                 return await func(*bound_args.args, **bound_args.kwargs)
@@ -169,6 +190,8 @@ def coerce_params(*types: type) -> Callable[[F], F]:
 
 
 def revalidate(func: F) -> F:
+    """Perform the revalidate operation for this subsystem."""
+
     @wraps(func)
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
         result = func(*args, **kwargs)

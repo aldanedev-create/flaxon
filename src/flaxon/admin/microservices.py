@@ -53,6 +53,7 @@ class ServiceRecord:
     updated_at: float = field(default_factory=_now)
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a dictionary representation of the current value."""
         return {**self.__dict__, "name": self.name, "display_name": self.display_name}
 
 
@@ -88,6 +89,7 @@ class ServiceRegistry:
             return result
 
     def register(self, service: dict[str, Any] | ServiceRecord) -> dict[str, Any]:
+        """Perform the register operation for service registry."""
         raw = service.to_dict() if isinstance(service, ServiceRecord) else dict(service)
         name = _slug(str(raw.get("name") or raw.get("display_name") or "service"))
         if not name:
@@ -99,48 +101,64 @@ class ServiceRegistry:
                 raise BadRequest("Service base_url must use http:// or https:// and include a host.")
             raw["base_url"] = base_url.rstrip("/")
         raw.update(name=name, display_name=str(raw.get("display_name") or name), updated_at=_now())
+
         def save(values: dict[str, Any]) -> dict[str, Any]:
             values[name] = raw
             return values
+
         current = self._mutate("services", save, {})
         return dict(current.get(name, raw))
 
     def unregister(self, name: str) -> bool:
+        """Perform the unregister operation for service registry."""
+
         def remove(values: dict[str, Any]) -> bool:
             return values.pop(name, None) is not None
+
         return bool(self._mutate("services", remove, {}))
 
     def get(self, name: str) -> dict[str, Any] | None:
+        """Retrieve the requested value using this object's configured behavior."""
         value = self._get("services", {}).get(name)
         return dict(value) if isinstance(value, dict) else None
 
     def list(self) -> list[dict[str, Any]]:
+        """Return the matching entries."""
         values = self._get("services", {})
         return sorted((dict(item) for item in values.values()), key=lambda item: item.get("name", ""))
 
     def set_instance(self, service: str, instance: dict[str, Any]) -> dict[str, Any]:
+        """Set the instance."""
         raw = dict(instance)
         instance_id = str(raw.get("id") or secrets.token_hex(8))
         raw.update(id=instance_id, service=service, updated_at=_now())
+
         def save(values: dict[str, Any]) -> dict[str, Any]:
+            """Persist the supplied value using the configured storage."""
             values[instance_id] = raw
             return values
+
         self._mutate("instances", save, {})
         return raw
 
     def instances(self, service: str | None = None) -> list[dict[str, Any]]:
+        """Perform the instances operation for service registry."""
         values = self._get("instances", {})
         result = [dict(item) for item in values.values()]
         return [item for item in result if service is None or item.get("service") == service]
 
     def set_dependencies(self, service: str, dependencies: list[str]) -> list[dict[str, str]]:
+        """Set the dependencies."""
+
         def replace(values: list[dict[str, str]]) -> list[dict[str, str]]:
             values[:] = [item for item in values if item.get("service") != service]
             values.extend({"service": service, "depends_on": name} for name in dependencies)
             return values
+
         return list(self._mutate("dependencies", replace, []))
 
     def dependencies(self, service: str | None = None) -> list[dict[str, str]]:
+        """Perform the dependencies operation for service registry."""
         values = self._get("dependencies", [])
         return [dict(item) for item in values if service is None or item.get("service") == service]
 
@@ -153,9 +171,19 @@ class ServiceTokenManager:
         self.namespace = "control_plane_security"
         self._memory: dict[str, dict[str, Any]] = {}
 
-    def issue(self, subject: str, scopes: list[str] | None = None, *, label: str = "") -> tuple[str, dict[str, Any]]:
+    def issue(
+        self, subject: str, scopes: list[str] | None = None, *, label: str = ""
+    ) -> tuple[str, dict[str, Any]]:
+        """Perform the issue operation for service token manager."""
         token = "fxs_" + secrets.token_urlsafe(32)
-        record = {"id": secrets.token_hex(8), "subject": subject, "label": label, "scopes": scopes or [], "created_at": _now(), "last_used_at": None}
+        record = {
+            "id": secrets.token_hex(8),
+            "subject": subject,
+            "label": label,
+            "scopes": scopes or [],
+            "created_at": _now(),
+            "last_used_at": None,
+        }
         records = self.store.get(self.namespace, "tokens", {}) if self.store else self._memory
         records = dict(records or {})
         records[self.digest(token)] = record
@@ -167,9 +195,11 @@ class ServiceTokenManager:
 
     @staticmethod
     def digest(token: str) -> str:
+        """Perform the digest operation for service token manager."""
         return hashlib.sha256(token.encode()).hexdigest()
 
     def verify(self, token: str, scope: str | None = None) -> dict[str, Any] | None:
+        """Perform the verify operation for service token manager."""
         records = self.store.get(self.namespace, "tokens", {}) if self.store else self._memory
         record = records.get(self.digest(token)) if isinstance(records, dict) else None
         if not isinstance(record, dict) or (scope and scope not in record.get("scopes", [])):
@@ -180,12 +210,21 @@ class ServiceTokenManager:
         return record
 
     def list(self) -> list[dict[str, Any]]:
+        """Return the matching entries."""
         records = self.store.get(self.namespace, "tokens", {}) if self.store else self._memory
         return [{"token_id": key[:16], **value} for key, value in (records or {}).items()]
 
     def revoke(self, token_id: str) -> bool:
+        """Perform the revoke operation for service token manager."""
         records = self.store.get(self.namespace, "tokens", {}) if self.store else self._memory
-        key = next((key for key, value in (records or {}).items() if key.startswith(token_id) or value.get("id") == token_id), None)
+        key = next(
+            (
+                key
+                for key, value in (records or {}).items()
+                if key.startswith(token_id) or value.get("id") == token_id
+            ),
+            None,
+        )
         if key is None:
             return False
         records.pop(key, None)
@@ -205,22 +244,32 @@ class EventBus:
         self._memory: list[dict[str, Any]] = []
 
     def publish(self, topic: str, payload: dict[str, Any], *, event_id: str | None = None) -> dict[str, Any]:
-        event = {"id": event_id or secrets.token_hex(12), "topic": topic, "payload": payload, "created_at": _now(), "status": "pending"}
+        """Perform the publish operation for event bus."""
+        event = {
+            "id": event_id or secrets.token_hex(12),
+            "topic": topic,
+            "payload": payload,
+            "created_at": _now(),
+            "status": "pending",
+        }
         if self.store and hasattr(self.store, "mutate"):
+
             def append(values: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 values.append(event)
                 del values[:-5000]
                 return values
+
             self.store.mutate(self.namespace, "outbox", append, [])
         elif self.store:
             values = self.store.get(self.namespace, "outbox", []) or []
-            self.store.set(self.namespace, "outbox", (values + [event])[-5000:])
+            self.store.set(self.namespace, "outbox", ([*values, event])[-5000:])
         else:
             self._memory.append(event)
             self._memory = self._memory[-5000:]
         return event
 
     def list(self, topic: str | None = None) -> list[dict[str, Any]]:
+        """Return the matching entries."""
         events = self.store.get(self.namespace, "outbox", []) if self.store else self._memory
         result = list(events or [])
         if topic:
@@ -235,7 +284,7 @@ class RemoteServiceError(RuntimeError):
 class _NoServiceRedirect(urllib.request.HTTPRedirectHandler):
     """Prevent service credentials from being forwarded to redirect targets."""
 
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: PLR0917 - stdlib redirect-handler signature
         return None
 
 
@@ -247,7 +296,9 @@ class RemoteServiceClient:
     replace it with their preferred async HTTP transport.
     """
 
-    def __init__(self, base_url: str, *, token: str | None = None, timeout: float = 5.0, retries: int = 2) -> None:
+    def __init__(
+        self, base_url: str, *, token: str | None = None, timeout: float = 5.0, retries: int = 2
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         parsed = urlparse(self.base_url)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
@@ -258,7 +309,10 @@ class RemoteServiceClient:
         self._failures = 0
         self._open_until = 0.0
 
-    async def request(self, method: str, path: str = "/", *, body: Any = None, headers: dict[str, str] | None = None) -> Any:
+    async def request(
+        self, method: str, path: str = "/", *, body: Any = None, headers: dict[str, str] | None = None
+    ) -> Any:
+        """Perform the request operation for remote service client."""
         if self._open_until > _now():
             raise RemoteServiceError("Remote service circuit is open.")
         url = self.base_url + (path if path.startswith("/") else "/" + path)
@@ -271,7 +325,9 @@ class RemoteServiceClient:
             request_headers.setdefault("authorization", f"Bearer {self.token}")
 
         def send() -> Any:
-            request = urllib.request.Request(url, data=data, headers=request_headers, method=method.upper())
+            request = urllib.request.Request(  # noqa: S310 - HTTP(S) URLs validated; redirects disabled
+                url, data=data, headers=request_headers, method=method.upper()
+            )
             opener = urllib.request.build_opener(_NoServiceRedirect())
             with opener.open(request, timeout=self.timeout) as response:
                 raw = response.read()
@@ -295,15 +351,19 @@ class RemoteServiceClient:
         raise RemoteServiceError(f"Request to {url} failed: {error}") from error
 
     async def get(self, path: str = "/") -> Any:
+        """Retrieve the requested value using this object's configured behavior."""
         return await self.request("GET", path)
 
     async def post(self, path: str, body: Any = None) -> Any:
+        """Register or issue an HTTP POST operation."""
         return await self.request("POST", path, body=body)
 
     async def patch(self, path: str, body: Any = None) -> Any:
+        """Register or issue an HTTP PATCH operation."""
         return await self.request("PATCH", path, body=body)
 
     async def delete(self, path: str) -> Any:
+        """Delete the specified entry from the configured store."""
         return await self.request("DELETE", path)
 
 
@@ -315,19 +375,24 @@ class RemoteModelAdapter:
         self.resource = resource.strip("/")
 
     async def get_instances(self) -> list[dict[str, Any]]:
+        """Return the instances."""
         payload = await self.client.get(f"/{self.resource}")
         return payload.get("items", payload) if isinstance(payload, dict) else payload
 
     async def get_instance(self, object_id: str) -> dict[str, Any] | None:
+        """Return the instance."""
         return await self.client.get(f"/{self.resource}/{object_id}")
 
     async def create_instance(self, data: dict[str, Any]) -> Any:
+        """Create the instance."""
         return await self.client.post(f"/{self.resource}", data)
 
     async def update_instance(self, object_id: str, data: dict[str, Any]) -> Any:
+        """Update the instance."""
         return await self.client.patch(f"/{self.resource}/{object_id}", data)
 
     async def delete_instance(self, object_id: str) -> Any:
+        """Delete the instance."""
         return await self.client.delete(f"/{self.resource}/{object_id}")
 
 
@@ -372,17 +437,41 @@ class AdminControlPlane:
     }
 
     PERMISSIONS: ClassVar[dict[str, tuple[str, str, str]]] = {
-        "admin.manage_services": ("Manage services", "Service management", "Register services and instances."),
+        "admin.manage_services": (
+            "Manage services",
+            "Service management",
+            "Register services and instances.",
+        ),
         "admin.view_fleet": ("View fleet operations", "Operations", "Read health, metrics, logs and queues."),
-        "admin.manage_releases": ("Manage releases", "Operations", "Manage deployments, flags and maintenance."),
+        "admin.manage_releases": (
+            "Manage releases",
+            "Operations",
+            "Manage deployments, flags and maintenance.",
+        ),
         "admin.manage_security": ("Manage security", "Security", "Manage service accounts, keys and access."),
         "admin.manage_platform": ("Manage platform", "Platform", "Manage storage, backups and migrations."),
         "admin.view_audit": ("View audit log", "Security", "Review cross-service audit events."),
     }
     PERSISTED_COLLECTIONS: ClassVar[set[str]] = {
-        "config", "secrets", "flags", "deployments", "environments", "maintenance",
-        "alerts", "alerts-rules", "logs", "traces", "webhooks", "rate-limits",
-        "migrations", "databases", "cache", "storage", "backups", "transfers", "permissions",
+        "config",
+        "secrets",
+        "flags",
+        "deployments",
+        "environments",
+        "maintenance",
+        "alerts",
+        "alerts-rules",
+        "logs",
+        "traces",
+        "webhooks",
+        "rate-limits",
+        "migrations",
+        "databases",
+        "cache",
+        "storage",
+        "backups",
+        "transfers",
+        "permissions",
     }
 
     def __init__(self, dashboard: Any) -> None:
@@ -397,22 +486,31 @@ class AdminControlPlane:
 
     def _register_permissions(self) -> None:
         for key, (label, category, description) in self.PERMISSIONS.items():
-            self.dashboard.register_permission(key, label, category, description, dangerous=key != "admin.view_fleet")
+            self.dashboard.register_permission(
+                key, label, category, description, dangerous=key != "admin.view_fleet"
+            )
 
     def _register_routes(self) -> None:
         router = self.app.router
         page_methods = {"GET"}
         for section in self.PAGE_SECTIONS:
             handler = self._page_handler(section)
-            router.route(f"{self.url_prefix}/{section}", methods=page_methods, name=f"admin_{_slug(section)}")(handler)
+            router.route(
+                f"{self.url_prefix}/{section}", methods=page_methods, name=f"admin_{_slug(section)}"
+            )(handler)
         router.get(f"{self.url_prefix}/services/new")(self.new_service_page)
         router.get(f"{self.url_prefix}/services/<service_name>")(self.service_page)
         router.get(f"{self.url_prefix}/users/<username>/access")(self.access_page)
-        router.route(f"{self.url_prefix}/api/control-plane/<path:resource>", methods={"GET", "POST", "PATCH", "PUT", "DELETE"}, name="admin_control_plane_api")(self.api)
+        router.route(
+            f"{self.url_prefix}/api/control-plane/<path:resource>",
+            methods={"GET", "POST", "PATCH", "PUT", "DELETE"},
+            name="admin_control_plane_api",
+        )(self.api)
 
     def _page_handler(self, section: str) -> Callable[..., Any]:
         async def handler(request: Request) -> Response:
             return await self.page(request, section)
+
         handler.__name__ = f"control_plane_{section.replace('/', '_')}_page"
         return handler
 
@@ -420,6 +518,7 @@ class AdminControlPlane:
         return await self.dashboard._require_user(request, permission)
 
     async def page(self, request: Request, section: str) -> Response:
+        """Perform the page operation for admin control plane."""
         permission = "admin.view_fleet"
         if section in {"services", "instances", "service-accounts"}:
             permission = "admin.manage_services"
@@ -441,53 +540,98 @@ class AdminControlPlane:
                 rows.extend(item if isinstance(item, dict) else {"value": item} for item in value)
         if not rows and isinstance(payload.get("records"), dict):
             rows = [{"key": key, "value": value} for key, value in payload["records"].items()]
-        return await self.dashboard.jinax.render_response("admin/control_plane.html", {
-            "section": section, "page_title": title, "page_description": description,
-            "control_plane": self, "snapshot": payload, "rows": rows, "models": self.dashboard.registry.get_all(), "user": user,
-        })
+        return await self.dashboard.jinax.render_response(
+            "admin/control_plane.html",
+            {
+                "section": section,
+                "page_title": title,
+                "page_description": description,
+                "control_plane": self,
+                "snapshot": payload,
+                "rows": rows,
+                "models": self.dashboard.registry.get_all(),
+                "user": user,
+            },
+        )
 
     async def new_service_page(self, request: Request) -> Response:
+        """Render the new service page for the current request."""
         return await self.page(request, "services")
 
     async def service_page(self, request: Request, service_name: str) -> Response:
+        """Render the service page for the current request."""
         user = await self._user(request, "admin.manage_services")
         service = self.registry.get(service_name)
         if service is None:
             raise NotFound("Service not found.")
-        return await self.dashboard.jinax.render_response("admin/control_plane.html", {
-            "section": "services", "page_title": service.get("display_name", service_name),
-            "page_description": f"Service detail for {service_name}.", "control_plane": self,
-            "snapshot": {"services": [service], "instances": self.registry.instances(service_name), "dependencies": self.registry.dependencies(service_name)},
-            "rows": [*self.registry.instances(service_name)], "models": self.dashboard.registry.get_all(), "user": user,
-        })
+        return await self.dashboard.jinax.render_response(
+            "admin/control_plane.html",
+            {
+                "section": "services",
+                "page_title": service.get("display_name", service_name),
+                "page_description": f"Service detail for {service_name}.",
+                "control_plane": self,
+                "snapshot": {
+                    "services": [service],
+                    "instances": self.registry.instances(service_name),
+                    "dependencies": self.registry.dependencies(service_name),
+                },
+                "rows": [*self.registry.instances(service_name)],
+                "models": self.dashboard.registry.get_all(),
+                "user": user,
+            },
+        )
 
     async def access_page(self, request: Request, username: str) -> Response:
+        """Render the access page for the current request."""
         await self._user(request, "admin.manage_security")
         access = {"username": username, "roles": [], "permissions": [], "sessions": []}
         record = self.dashboard.auth.users.get(username)
         if record:
             access.update({"roles": record.get("roles", []), "permissions": record.get("permissions", [])})
-        return await self.dashboard.jinax.render_response("admin/control_plane.html", {
-            "section": "permissions", "page_title": f"Access: {username}", "page_description": "Effective permissions for this Admin account.",
-            "control_plane": self, "snapshot": access, "models": self.dashboard.registry.get_all(), "user": getattr(request, "user", None),
-        })
+        return await self.dashboard.jinax.render_response(
+            "admin/control_plane.html",
+            {
+                "section": "permissions",
+                "page_title": f"Access: {username}",
+                "page_description": "Effective permissions for this Admin account.",
+                "control_plane": self,
+                "snapshot": access,
+                "models": self.dashboard.registry.get_all(),
+                "user": getattr(request, "user", None),
+            },
+        )
 
     def _snapshot(self, section: str) -> dict[str, Any]:
         services = self.registry.list()
         if section in {"services", "health", "metrics", "api-docs"}:
-            return {"services": services, "instances": self.registry.instances(), "dependencies": self.registry.dependencies()}
+            return {
+                "services": services,
+                "instances": self.registry.instances(),
+                "dependencies": self.registry.dependencies(),
+            }
         if section == "instances":
             return {"instances": self.registry.instances()}
-        if section == "service-accounts" or section == "api-keys":
+        if section in {"service-accounts", "api-keys"}:
             return {"keys": self.tokens.list()}
         if section == "events":
             return {"events": self.events.list()}
         if section in {"queues", "queues/dead", "schedules"}:
             jobs = self.dashboard.job_store.list() if self.dashboard.job_store else []
             return {"jobs": [job.to_dict() for job in jobs]}
+        return self._operational_snapshot(section, services)
+
+    def _operational_snapshot(self, section, services):
         if section == "audit":
-            entries = self.dashboard.store.get("audit", "entries", []) if self.dashboard.store and self.dashboard.audit_log else []
-            return {"valid": self.dashboard.audit_log.verify() if self.dashboard.audit_log else False, "events": entries}
+            entries = (
+                self.dashboard.store.get("audit", "entries", [])
+                if self.dashboard.store and self.dashboard.audit_log
+                else []
+            )
+            return {
+                "valid": self.dashboard.audit_log.verify() if self.dashboard.audit_log else False,
+                "events": entries,
+            }
         if section == "sessions":
             backend = self.dashboard.auth.backend
             return {"backend": type(backend).__name__, "persistent": backend is not None}
@@ -501,7 +645,12 @@ class AdminControlPlane:
         collection = section.replace("/", "-")
         if collection in self.PERSISTED_COLLECTIONS:
             return {"items": self._collection(collection)}
-        return {"services": services, "records": self.dashboard.store.list("control_plane") if self.dashboard.store and hasattr(self.dashboard.store, "list") else {}}
+        return {
+            "services": services,
+            "records": self.dashboard.store.list("control_plane")
+            if self.dashboard.store and hasattr(self.dashboard.store, "list")
+            else {},
+        }
 
     def _collection(self, name: str) -> list[dict[str, Any]]:
         if self.dashboard.store is not None:
@@ -529,8 +678,15 @@ class AdminControlPlane:
             base_url = str(current.get("base_url", "")).strip()
             if base_url:
                 try:
-                    result = await RemoteServiceClient(base_url, timeout=1.0, retries=0).get(str(current.get("health_url", "/health/ready")))
-                    current["status"] = "healthy" if not isinstance(result, dict) or str(result.get("status", "ok")).lower() in {"ok", "healthy", "ready"} else str(result.get("status"))
+                    result = await RemoteServiceClient(base_url, timeout=1.0, retries=0).get(
+                        str(current.get("health_url", "/health/ready"))
+                    )
+                    current["status"] = (
+                        "healthy"
+                        if not isinstance(result, dict)
+                        or str(result.get("status", "ok")).lower() in {"ok", "healthy", "ready"}
+                        else str(result.get("status"))
+                    )
                     current["health"] = result
                 except (RemoteServiceError, ValueError) as exc:
                     current["status"] = "down"
@@ -551,14 +707,23 @@ class AdminControlPlane:
             return {"items": self.events.list()}
         if resource in {"audit", "security"}:
             return self._snapshot("audit")
+        return self._collection_resource_payload(resource)
+
+    def _collection_resource_payload(self, resource):
         if resource in {"jobs", "queues", "schedules"}:
-            return {"items": [job.to_dict() for job in (self.dashboard.job_store.list() if self.dashboard.job_store else [])]}
+            return {
+                "items": [
+                    job.to_dict()
+                    for job in (self.dashboard.job_store.list() if self.dashboard.job_store else [])
+                ]
+            }
         collection = resource.replace("/", "-")
         if collection in self.PERSISTED_COLLECTIONS:
             return {"items": self._collection(collection)}
         return self._snapshot(resource)
 
     async def api(self, request: Request, resource: str) -> Response:
+        """Handle a request to this subsystem's API."""
         root = resource.strip("/").split("/")
         name = root[0] if root else "overview"
         if root[:2] == ["alerts", "rules"]:
@@ -568,10 +733,70 @@ class AdminControlPlane:
             collection_name = name
             collection_depth = 1
         detail_id = root[collection_depth] if len(root) > collection_depth else None
+        permission = self._resource_permission(name)
+        await self._user(request, permission)
+        if request.method in {"POST", "PUT", "PATCH", "DELETE"} and not self.dashboard.csrf.verify_token(
+            request.headers.get("x-csrf-token", "")
+        ):
+            raise Forbidden("CSRF token missing or invalid")
+        if request.method == "GET":
+            return await self._read_resource(
+                resource, name=name, root=root, collection_name=collection_name, detail_id=detail_id
+            )
+        body = (
+            await request.json()
+            if request.headers.get("content-type", "").startswith("application/json")
+            else {}
+        )
+        body = body if isinstance(body, dict) else {}
+        handlers = {
+            "services": lambda: self._write_service(request, body, detail_id),
+            "instances": lambda: JSONResponse(
+                self.registry.set_instance(str(body.get("service", "")), body), status_code=201
+            ),
+            "dependencies": lambda: JSONResponse({
+                "items": self.registry.set_dependencies(
+                    str(body.get("service", "")), [str(item) for item in body.get("depends_on", [])]
+                )
+            }),
+            "service-accounts": lambda: self._write_tokens(request, body, detail_id),
+            "api-keys": lambda: self._write_tokens(request, body, detail_id),
+            "events": lambda: JSONResponse(
+                self.events.publish(str(body.get("topic", "CustomEvent")), body), status_code=201
+            ),
+        }
+        if name in handlers:
+            return handlers[name]()
+        if collection_name in self.PERSISTED_COLLECTIONS:
+            return self._write_collection(
+                request, body, collection_name=collection_name, detail_id=detail_id, resource=resource
+            )
+        return JSONResponse({"accepted": True, "resource": resource, "payload": body}, status_code=202)
+
+    def _write_tokens(self, request, body, detail_id):
+        if detail_id and request.method == "DELETE":
+            return JSONResponse({"deleted": self.tokens.revoke(detail_id)})
+        token, record = self.tokens.issue(
+            str(body.get("subject", "service")),
+            [str(item) for item in body.get("scopes", [])],
+            label=str(body.get("label", "")),
+        )
+        return JSONResponse({"token": token, **record}, status_code=201)
+
+    @staticmethod
+    def _resource_permission(name):
         permission = "admin.view_fleet"
         if name in {"services", "instances", "dependencies"}:
             permission = "admin.manage_services"
-        elif name in {"api-keys", "service-accounts", "permissions", "sessions", "security", "webhooks", "secrets"}:
+        elif name in {
+            "api-keys",
+            "service-accounts",
+            "permissions",
+            "sessions",
+            "security",
+            "webhooks",
+            "secrets",
+        }:
             permission = "admin.manage_security"
         elif name in {"config", "deployments", "flags", "environments", "maintenance", "alerts"}:
             permission = "admin.manage_releases"
@@ -579,78 +804,64 @@ class AdminControlPlane:
             permission = "admin.manage_platform"
         elif name == "audit":
             permission = "admin.view_audit"
-        await self._user(request, permission)
-        if request.method in {"POST", "PUT", "PATCH", "DELETE"} and not self.dashboard.csrf.verify_token(request.headers.get("x-csrf-token", "")):
-            raise Forbidden("CSRF token missing or invalid")
-        if request.method == "GET":
-            if name == "overview":
-                return JSONResponse(self._snapshot("status"))
-            if name == "health":
-                return JSONResponse(await self._snapshot_async("health"))
-            if name == "services" and len(root) > 1:
-                record = self.registry.get(root[1])
-                if record is None:
-                    raise NotFound("Service not found.")
-                return JSONResponse(record)
-            if collection_name in self.PERSISTED_COLLECTIONS and detail_id:
-                record = next((item for item in self._collection(collection_name) if str(item.get("id")) == detail_id), None)
-                if record is None:
-                    raise NotFound(f"{resource} record not found.")
-                return JSONResponse(record)
-            return JSONResponse(self._resource_payload(collection_name))
-        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
-        body = body if isinstance(body, dict) else {}
-        if name == "services":
-            if detail_id:
-                if request.method == "DELETE":
-                    return JSONResponse({"deleted": self.registry.unregister(detail_id)})
-                current = self.registry.get(detail_id)
-                if current is None:
-                    raise NotFound("Service not found.")
-                current.update(body)
-                current["name"] = detail_id
-                return JSONResponse(self.registry.register(current))
-            record = self.registry.register(body)
-            self.events.publish("ServiceRegistered", record)
-            return JSONResponse(record, status_code=201)
-        if name == "dependencies" and request.method == "GET":
-            return JSONResponse({"items": self.registry.dependencies()})
-        if name == "instances":
-            record = self.registry.set_instance(str(body.get("service", "")), body)
-            return JSONResponse(record, status_code=201)
-        if name == "dependencies":
-            service = str(body.get("service", ""))
-            return JSONResponse({"items": self.registry.set_dependencies(service, [str(item) for item in body.get("depends_on", [])])})
-        if name in {"service-accounts", "api-keys"}:
-            if detail_id and request.method == "DELETE":
-                return JSONResponse({"deleted": self.tokens.revoke(detail_id)})
-            token, record = self.tokens.issue(str(body.get("subject", "service")), [str(item) for item in body.get("scopes", [])], label=str(body.get("label", "")))
-            return JSONResponse({"token": token, **record}, status_code=201)
-        if name == "events":
-            return JSONResponse(self.events.publish(str(body.get("topic", "CustomEvent")), body), status_code=201)
-        if collection_name in self.PERSISTED_COLLECTIONS:
-            values = self._collection(collection_name)
-            record_id = str(body.get("id") or secrets.token_hex(10))
-            if detail_id:
-                target_id = detail_id
-                current = next((item for item in values if str(item.get("id")) == target_id), None)
-                if current is None:
-                    raise NotFound(f"{resource} record not found.")
-                if request.method == "DELETE":
-                    values = [item for item in values if str(item.get("id")) != target_id]
-                    self._save_collection(collection_name, values)
-                    return JSONResponse({"deleted": True})
-                current.update(body, updated_at=_now())
+        return permission
+
+    def _write_collection(self, request, body, *, collection_name, detail_id, resource):
+        values = self._collection(collection_name)
+        record_id = str(body.get("id") or secrets.token_hex(10))
+        if detail_id:
+            target_id = detail_id
+            current = next((item for item in values if str(item.get("id")) == target_id), None)
+            if current is None:
+                raise NotFound(f"{resource} record not found.")
+            if request.method == "DELETE":
+                values = [item for item in values if str(item.get("id")) != target_id]
                 self._save_collection(collection_name, values)
-                return JSONResponse(current)
-            if collection_name == "secrets":
-                body = {key: value for key, value in body.items() if key not in {"value", "secret", "plaintext"}}
-                body["has_value"] = bool(body.get("has_value", True))
-            body.update(id=record_id, created_at=_now(), updated_at=_now())
-            values.append(body)
+                return JSONResponse({"deleted": True})
+            current.update(body, updated_at=_now())
             self._save_collection(collection_name, values)
-            return JSONResponse(body, status_code=201)
-        return JSONResponse({"accepted": True, "resource": resource, "payload": body}, status_code=202)
+            return JSONResponse(current)
+        if collection_name == "secrets":
+            body = {key: value for key, value in body.items() if key not in {"value", "secret", "plaintext"}}
+            body["has_value"] = bool(body.get("has_value", True))
+        body.update(id=record_id, created_at=_now(), updated_at=_now())
+        values.append(body)
+        self._save_collection(collection_name, values)
+        return JSONResponse(body, status_code=201)
+
+    def _write_service(self, request, body, detail_id):
+        if detail_id:
+            if request.method == "DELETE":
+                return JSONResponse({"deleted": self.registry.unregister(detail_id)})
+            current = self.registry.get(detail_id)
+            if current is None:
+                raise NotFound("Service not found.")
+            current.update(body)
+            current["name"] = detail_id
+            return JSONResponse(self.registry.register(current))
+        record = self.registry.register(body)
+        self.events.publish("ServiceRegistered", record)
+        return JSONResponse(record, status_code=201)
+
+    async def _read_resource(self, resource, *, name, root, collection_name, detail_id):
+        if name == "overview":
+            return JSONResponse(self._snapshot("status"))
+        if name == "health":
+            return JSONResponse(await self._snapshot_async("health"))
+        if name == "services" and len(root) > 1:
+            record = self.registry.get(root[1])
+            if record is None:
+                raise NotFound("Service not found.")
+            return JSONResponse(record)
+        if collection_name in self.PERSISTED_COLLECTIONS and detail_id:
+            record = next(
+                (item for item in self._collection(collection_name) if str(item.get("id")) == detail_id),
+                None,
+            )
+            if record is None:
+                raise NotFound(f"{resource} record not found.")
+            return JSONResponse(record)
+        return JSONResponse(self._resource_payload(collection_name))
 
 
 class AdminControlPlaneModule(FlaxonModule):
@@ -661,6 +872,13 @@ class AdminControlPlaneModule(FlaxonModule):
 
 
 __all__ = [
-    "AdminControlPlane", "AdminControlPlaneModule", "EventBus", "RemoteModelAdapter",
-    "RemoteServiceClient", "RemoteServiceError", "ServiceRecord", "ServiceRegistry", "ServiceTokenManager",
+    "AdminControlPlane",
+    "AdminControlPlaneModule",
+    "EventBus",
+    "RemoteModelAdapter",
+    "RemoteServiceClient",
+    "RemoteServiceError",
+    "ServiceRecord",
+    "ServiceRegistry",
+    "ServiceTokenManager",
 ]

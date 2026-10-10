@@ -5,10 +5,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from flaxon._imports import import_attribute
 from flaxon.http import HTMLResponse
 
 
 class Jinax:
+    """Jinax implementation for the jinax subsystem."""
+
     def __init__(
         self,
         template_directory: str | Path = "templates",
@@ -20,7 +23,11 @@ class Jinax:
         filters: dict[str, Callable[..., Any]] | None = None,
     ) -> None:
         try:
-            from jinja2 import Environment, FileSystemLoader, StrictUndefined, Undefined, select_autoescape
+            environment_type = import_attribute("jinja2", "Environment")
+            file_system_loader_type = import_attribute("jinja2", "FileSystemLoader")
+            strict_undefined_type = import_attribute("jinja2", "StrictUndefined")
+            undefined_type = import_attribute("jinja2", "Undefined")
+            select_autoescape = import_attribute("jinja2", "select_autoescape")
         except ImportError as exc:
             raise RuntimeError(
                 "Jinax requires Jinja2. Install it with: pip install 'flaxon-framework[templates]'"
@@ -31,9 +38,9 @@ class Jinax:
                 raise ValueError("Pass either template_directory or template_dir, not both")
             template_directory = template_dir
 
-        undefined = StrictUndefined if strict_undefined else Undefined
-        self.environment = Environment(
-            loader=FileSystemLoader(str(template_directory)),
+        undefined = strict_undefined_type if strict_undefined else undefined_type
+        self.environment = environment_type(
+            loader=file_system_loader_type(str(template_directory)),
             autoescape=select_autoescape(("html", "htm", "xml")),
             enable_async=True,
             auto_reload=auto_reload,
@@ -45,6 +52,7 @@ class Jinax:
 
     @staticmethod
     def currency(value: Any, code: str = "USD") -> str:
+        """Perform the currency operation for jinax."""
         try:
             amount = float(value)
         except (TypeError, ValueError):
@@ -52,12 +60,15 @@ class Jinax:
         return f"{code} {amount:,.2f}"
 
     def add_global(self, name: str, value: Any) -> None:
+        """Add the global."""
         self.environment.globals[name] = value
 
     def add_filter(self, name: str, func: Callable[..., Any]) -> None:
+        """Add the filter."""
         self.environment.filters[name] = func
 
     async def render(self, template_name: str, context: dict[str, Any] | None = None) -> str:
+        """Render the requested content using the supplied context."""
         template = self.environment.get_template(template_name)
         return await template.render_async(**(context or {}))
 
@@ -69,5 +80,6 @@ class Jinax:
         status_code: int = 200,
         headers: dict[str, str] | None = None,
     ) -> HTMLResponse:
+        """Render the response."""
         html = await self.render(template_name, context)
         return HTMLResponse(html, status_code=status_code, headers=headers)

@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import json
+import uuid
 from typing import Any
+
+from flaxon._imports import import_module
 
 
 class RedisSubscriptionBackend:
+    """Provide redis subscription storage for graphql operations."""
+
     def __init__(
         self, redis_url: str = "redis://localhost:6379/0", prefix: str = "graphql:subscription"
     ) -> None:
@@ -16,8 +21,9 @@ class RedisSubscriptionBackend:
         self._sub_map: dict[str, str] = {}
 
     async def connect(self) -> None:
+        """Open the configured connection."""
         try:
-            import redis.asyncio as redis
+            redis = import_module("redis.asyncio")
 
             self._client = redis.from_url(self.redis_url, decode_responses=True)
             self._pub = redis.from_url(self.redis_url, decode_responses=True)
@@ -28,6 +34,7 @@ class RedisSubscriptionBackend:
             ) from exc
 
     async def disconnect(self) -> None:
+        """Close the configured connection."""
         if self._client:
             await self._client.close()
             self._client = None
@@ -42,8 +49,7 @@ class RedisSubscriptionBackend:
         return f"{self.prefix}:{operation_id}"
 
     async def subscribe(self, operation_id: str, context: Any, variables: dict[str, Any]) -> str:
-        import uuid
-
+        """Register a subscription for the supplied event or operation."""
         subscription_id = str(uuid.uuid4())
         self._sub_map[subscription_id] = operation_id
 
@@ -63,11 +69,13 @@ class RedisSubscriptionBackend:
         return subscription_id
 
     async def unsubscribe(self, subscription_id: str) -> None:
+        """Remove the requested subscription."""
         operation_id = self._sub_map.pop(subscription_id, "")
         if operation_id and self._client:
             await self._client.hdel(self._key(operation_id), subscription_id)
 
     async def publish(self, operation_id: str, data: Any) -> None:
+        """Perform the publish operation for redis subscription backend."""
         if self._pub:
             await self._pub.publish(
                 self._key(operation_id),
@@ -75,6 +83,7 @@ class RedisSubscriptionBackend:
             )
 
     async def next(self, subscription_id: str) -> Any:
+        """Perform the next operation for redis subscription backend."""
         operation_id = self._sub_map.get(subscription_id, "")
         if not operation_id or not self._sub:
             return None

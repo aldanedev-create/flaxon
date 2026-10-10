@@ -66,12 +66,16 @@ from .secrets import (
 from .sessions import Session, SessionManager
 
 
+from flaxon._imports import import_attribute
+
+
 def __getattr__(name: str) -> object:
     """Load optional cryptography-backed helpers only when requested."""
     if name in {"Encryptor", "Hasher"}:
-        from .encryption import Encryptor, Hasher
+        encryptor_type = import_attribute("flaxon.security.encryption", "Encryptor")
+        hasher_type = import_attribute("flaxon.security.encryption", "Hasher")
 
-        return {"Encryptor": Encryptor, "Hasher": Hasher}[name]
+        return {"Encryptor": encryptor_type, "Hasher": hasher_type}[name]
     raise AttributeError(f"module 'flaxon.security' has no attribute {name!r}")
 
 

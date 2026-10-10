@@ -5,8 +5,12 @@ import hmac
 import secrets
 import string
 
+from flaxon._imports import import_attribute
+
 
 class PasswordHasher:
+    """Password hasher implementation for the security subsystem."""
+
     def __init__(self, algorithm: str = "argon2", iterations: int = 600000) -> None:
         if algorithm not in {"argon2", "pbkdf2_sha256"}:
             raise ValueError("Unsupported password hashing algorithm")
@@ -17,28 +21,24 @@ class PasswordHasher:
         self._argon2 = None
         if algorithm == "argon2":
             try:
-                from argon2 import PasswordHasher as Argon2Hasher
+                argon2_hasher_type = import_attribute("argon2", "PasswordHasher")
             except ImportError as exc:  # pragma: no cover - optional dependency
                 raise RuntimeError("PasswordHasher(algorithm='argon2') requires argon2-cffi.") from exc
-            self._argon2 = Argon2Hasher(time_cost=2, memory_cost=19456, parallelism=1)
+            self._argon2 = argon2_hasher_type(time_cost=2, memory_cost=19456, parallelism=1)
 
     def hash(self, password: str) -> str:
+        """Perform the hash operation for password hasher."""
         if self._argon2 is not None:
             return self._argon2.hash(password)
         salt = self._generate_salt()
         return self._hash_with_salt(password, salt)
 
     def verify(self, password: str, hashed: str) -> bool:
+        """Verify an Argon2 or PBKDF2 hash without accepting malformed hashes."""
         if not isinstance(password, str) or not isinstance(hashed, str):
             return False
         if hashed.startswith("$argon2"):
-            from argon2 import PasswordHasher as Argon2Hasher
-            from argon2.exceptions import InvalidHashError, VerificationError
-            verifier = self._argon2 or Argon2Hasher(time_cost=2, memory_cost=19456, parallelism=1)
-            try:
-                return bool(verifier.verify(hashed, password))
-            except (VerificationError, InvalidHashError, ValueError, TypeError):
-                return False
+            return self._verify_argon2(password, hashed)
         try:
             algorithm, iterations, salt, hash_value = hashed.split("$")
             if algorithm != "pbkdf2_sha256" or not salt:
@@ -51,19 +51,32 @@ class PasswordHasher:
         except (ValueError, TypeError):
             return False
 
+    def _verify_argon2(self, password: str, hashed: str) -> bool:
+        argon2_hasher_type = import_attribute("argon2", "PasswordHasher")
+        invalid_hash_error_type = import_attribute("argon2.exceptions", "InvalidHashError")
+        verification_error_type = import_attribute("argon2.exceptions", "VerificationError")
+
+        verifier = self._argon2 or argon2_hasher_type(time_cost=2, memory_cost=19456, parallelism=1)
+        try:
+            return bool(verifier.verify(hashed, password))
+        except (verification_error_type, invalid_hash_error_type, ValueError, TypeError):
+            return False
+
     def needs_rehash(self, hashed: str) -> bool:
+        """Perform the needs rehash operation for password hasher."""
         if not isinstance(hashed, str):
             return True
         if hashed.startswith("$argon2"):
             if self._argon2 is None:
                 return self.algorithm != "argon2"
-            from argon2.exceptions import InvalidHashError
+            invalid_hash_error_type = import_attribute("argon2.exceptions", "InvalidHashError")
+
             try:
                 return bool(self._argon2.check_needs_rehash(hashed))
-            except InvalidHashError:
+            except invalid_hash_error_type:
                 return True
         try:
-            algorithm, iterations, salt, hash_value = hashed.split("$")
+            algorithm, iterations, _salt, _hash_value = hashed.split("$")
             return algorithm != self.algorithm or int(iterations) < self.iterations
         except ValueError:
             return True
@@ -81,7 +94,9 @@ class PasswordHasher:
 
 
 class PasswordValidator:
-    def __init__(
+    """Password validator implementation for the security subsystem."""
+
+    def __init__(  # noqa: PLR0917 - preserve existing positional API
         self,
         min_length: int = 8,
         require_uppercase: bool = True,
@@ -98,6 +113,7 @@ class PasswordValidator:
         self.require_special = require_special
 
     def validate(self, password: str) -> list[str]:
+        """Check the supplied value against the configured constraints."""
         errors = []
 
         if len(password) < self.min_length:
@@ -127,10 +143,12 @@ class PasswordValidator:
         return errors
 
     def is_valid(self, password: str) -> bool:
+        """Return whether valid holds for the current value."""
         return len(self.validate(password)) == 0
 
 
 def generate_password(length: int = 16) -> str:
+    """Generate the password."""
     alphabet = string.ascii_letters + string.digits + string.punctuation
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
@@ -139,12 +157,15 @@ _password_hasher = PasswordHasher()
 
 
 def hash_password(password: str) -> str:
+    """Perform the hash password operation for this subsystem."""
     return _password_hasher.hash(password)
 
 
 def verify_password(password: str, hashed: str) -> bool:
+    """Verify the password."""
     return _password_hasher.verify(password, hashed)
 
 
 def needs_rehash(hashed: str) -> bool:
+    """Perform the needs rehash operation for this subsystem."""
     return _password_hasher.needs_rehash(hashed)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import time
 from pathlib import Path
@@ -44,7 +45,7 @@ class FileSystemBackend:
             return None
 
         try:
-            with open(path, encoding="utf-8") as f:
+            with Path(path).open(encoding="utf-8") as f:
                 data = json.load(f)
             return data.get("value")
         except (json.JSONDecodeError, OSError):
@@ -62,7 +63,7 @@ class FileSystemBackend:
             "ttl": ttl,
         }
 
-        with open(path, "w", encoding="utf-8") as f:
+        with Path(path).open("w", encoding="utf-8") as f:
             json.dump(data, f, default=str, ensure_ascii=False)
 
     async def delete(self, key: str) -> None:
@@ -75,10 +76,8 @@ class FileSystemBackend:
         """Remove cache entries managed by this backend."""
         self._ensure_dir()
         for path in self.cache_dir.glob("*.cache"):
-            try:
+            with contextlib.suppress(OSError):
                 path.unlink(missing_ok=True)
-            except OSError:
-                pass
 
     async def exists(self, key: str) -> bool:
         """Check whether a key has an unexpired cache entry."""
@@ -94,10 +93,10 @@ class FileSystemBackend:
             return
 
         try:
-            with open(path, encoding="utf-8") as f:
+            with Path(path).open(encoding="utf-8") as f:
                 data = json.load(f)
             data["ttl"] = ttl
-            with open(path, "w", encoding="utf-8") as f:
+            with Path(path).open("w", encoding="utf-8") as f:
                 json.dump(data, f, default=str, ensure_ascii=False)
         except (json.JSONDecodeError, OSError):
             pass
@@ -125,10 +124,7 @@ class FileSystemBackend:
         """Increase a numeric cache value by the requested amount."""
         async with self._lock:
             value = await self.get(key)
-            if value is None:
-                new_value = amount
-            else:
-                new_value = int(value) + amount
+            new_value = amount if value is None else int(value) + amount
             await self.set(key, new_value)
             return new_value
 

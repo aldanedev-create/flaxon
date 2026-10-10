@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import argparse
+import secrets
+from pathlib import Path
 from typing import Any
 
+from flaxon._imports import import_attribute
 from flaxon.cli.base import Command
 
 
 class DoctorCommand(Command):
+    """Doctor command implementation for the cli subsystem."""
+
     def __init__(self) -> None:
         super().__init__(
             name="doctor",
@@ -20,7 +25,7 @@ class DoctorCommand(Command):
         parser.add_argument("--fix", action="store_true", help="Attempt to fix issues")
 
     def _run(self, args: argparse.Namespace, console: Any) -> int:
-        from flaxon.utils.import_string import import_string
+        import_string = import_attribute("flaxon.utils.import_string", "import_string")
 
         try:
             app = import_string(args.application)
@@ -61,22 +66,26 @@ class DoctorCommand(Command):
         console.info(f"Result: {len(warnings)} warning(s), {len(failures)} failure(s)")
 
         if args.fix:
-            if weak_secret_key:
-                self._fix_secret_key(console)
-            elif not (warnings or failures):
-                console.info("Nothing to fix.")
-
-            if failures:
-                console.warning(
-                    "Duplicate routes can't be fixed automatically -- "
-                    "edit your route definitions to remove the conflict."
-                )
+            self._run_fix(
+                console=console, failures=failures, warnings=warnings, weak_secret_key=weak_secret_key
+            )
 
         return 1 if failures else 0
 
+    def _run_fix(self, *, console, failures, warnings, weak_secret_key):
+        """Apply fix changes for run."""
+        if weak_secret_key:
+            self._fix_secret_key(console)
+        elif not (warnings or failures):
+            console.info("Nothing to fix.")
+
+        if failures:
+            console.warning(
+                "Duplicate routes can't be fixed automatically -- "
+                "edit your route definitions to remove the conflict."
+            )
+
     def _fix_secret_key(self, console: Any) -> None:
-        import secrets
-        from pathlib import Path
 
         env_path = Path(".env")
         existing = env_path.read_text(encoding="utf-8") if env_path.exists() else ""

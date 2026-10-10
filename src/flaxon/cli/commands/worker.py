@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 from typing import Any
 
+from flaxon._imports import import_attribute
 from flaxon.cli.base import Command
 
 
 class WorkerCommand(Command):
+    """Worker command implementation for the cli subsystem."""
+
     def __init__(self) -> None:
         super().__init__(
             name="worker",
@@ -25,17 +29,16 @@ class WorkerCommand(Command):
         console.info(f"Concurrency: {args.concurrency}")
 
         try:
-            from flaxon.utils.import_string import import_string
+            import_string = import_attribute("flaxon.utils.import_string", "import_string")
+
             app = import_string(args.application)
             console.info(f"Loaded application: {app.name}")
 
-            import asyncio
+            worker_type = import_attribute("flaxon.tasks", "Worker")
+            task_registry_type = import_attribute("flaxon.tasks.registry", "TaskRegistry")
 
-            from flaxon.tasks import Worker
-            from flaxon.tasks.registry import TaskRegistry
-
-            registry = TaskRegistry()
-            worker = Worker(registry, concurrency=args.concurrency, queue_name=args.queue)
+            registry = task_registry_type()
+            worker = worker_type(registry, concurrency=args.concurrency, queue_name=args.queue)
 
             console.info("Worker started. Press Ctrl+C to stop.")
 

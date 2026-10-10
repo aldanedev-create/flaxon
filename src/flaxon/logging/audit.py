@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from flaxon._imports import import_attribute
 from flaxon.http import Request
 
 from .formatters import AuditFormatter
@@ -24,7 +25,7 @@ class AuditLogger:
         self.logger.setLevel(logging.INFO)
         self.logger.propagate = False
 
-    def log(
+    def log(  # noqa: PLR0917 - preserve existing positional API
         self,
         action: str,
         user_id: str | int | None = None,
@@ -128,13 +129,14 @@ class AuditMiddleware:
         self.logger = logger or AuditLogger()
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        """Handle the supplied call using this object's configured behavior."""
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return
 
-        from flaxon.http import Request
+        request_type = import_attribute("flaxon.http", "Request")
 
-        request = Request(scope, receive, None)
+        request = request_type(scope, receive, None)
 
         user_id = None
         if hasattr(request, "user") and request.user:

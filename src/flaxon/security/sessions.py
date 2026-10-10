@@ -12,7 +12,9 @@ from flaxon.http import Cookies, Request, Response
 
 
 class Session:
-    def __init__(
+    """Session implementation for the security subsystem."""
+
+    def __init__(  # noqa: PLR0917 - preserve existing positional API
         self,
         session_id: str,
         data: dict[str, Any] | None = None,
@@ -51,42 +53,53 @@ class Session:
         return key in self._data
 
     def get(self, key: str, default: Any = None) -> Any:
+        """Retrieve the requested value using this object's configured behavior."""
         return self._data.get(key, default)
 
     def setdefault(self, key: str, default: Any) -> Any:
+        """Perform the setdefault operation for session."""
         if key not in self._data:
             self._data[key] = default
             self._dirty = True
         return self._data[key]
 
     def update(self, data: dict[str, Any]) -> None:
+        """Apply the supplied changes to the requested entry."""
         self._data.update(data)
         self._dirty = True
 
     def clear(self) -> None:
+        """Remove the stored entries."""
         self._data.clear()
         self._dirty = True
 
     def pop(self, key: str, default: Any = None) -> Any:
+        """Perform the pop operation for session."""
         value = self._data.pop(key, default)
         self._dirty = True
         return value
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a dictionary representation of the current value."""
         return dict(self._data)
 
     def is_expired(self) -> bool:
+        """Return whether expired holds for the current value."""
         return time.time() - self._created > self.ttl
 
     def is_dirty(self) -> bool:
+        """Return whether dirty holds for the current value."""
         return self._dirty
 
     def mark_clean(self) -> None:
+        """Mark the clean."""
         self._dirty = False
 
 
 class SessionManager:
-    def __init__(
+    """Session manager implementation for the security subsystem."""
+
+    def __init__(  # noqa: PLR0917 - preserve existing positional API
         self,
         secret_key: str,
         cookie_name: str = "session",
@@ -133,36 +146,31 @@ class SessionManager:
             if not self._verify(data, signature):
                 return None
             payload = json.loads(data)
-            if not isinstance(payload, dict) or not isinstance(payload.get("id"), str):
-                return None
-            if not isinstance(payload.get("data", {}), dict):
-                return None
-            created = payload.get("created")
-            ttl = payload.get("ttl")
-            if (
-                isinstance(created, bool)
-                or not isinstance(created, (int, float))
-                or not math.isfinite(created)
-            ):
-                return None
-            if (
-                isinstance(ttl, bool)
-                or not isinstance(ttl, (int, float))
-                or not math.isfinite(ttl)
-                or ttl <= 0
-            ):
-                return None
-            now = time.time()
-            if created > now or created + min(ttl, self.ttl) <= now:
+            if not self._valid_cookie_payload(payload):
                 return None
             return payload, True
         except (json.JSONDecodeError, ValueError, TypeError):
             return None
 
+    def _valid_cookie_payload(self, payload: Any) -> bool:
+        if not isinstance(payload, dict) or not isinstance(payload.get("id"), str):
+            return False
+        if not isinstance(payload.get("data", {}), dict):
+            return False
+        created = payload.get("created")
+        ttl = payload.get("ttl")
+        if isinstance(created, bool) or not isinstance(created, (int, float)) or not math.isfinite(created):
+            return False
+        if isinstance(ttl, bool) or not isinstance(ttl, (int, float)) or not math.isfinite(ttl) or ttl <= 0:
+            return False
+        now = time.time()
+        return not (created > now or created + min(ttl, self.ttl) <= now)
+
     def _generate_session_id(self) -> str:
         return uuid.uuid4().hex[:32]
 
     def get_session(self, request: Request) -> Session:
+        """Return the session."""
         cookies = request.cookies
         session = None
 
@@ -199,6 +207,7 @@ class SessionManager:
         return session
 
     def save_session(self, session: Session, response: Response) -> None:
+        """Save the session."""
         if session.is_dirty():
             cookie_value = self._encode(session)
             cookies = Cookies()

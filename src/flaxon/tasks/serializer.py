@@ -7,6 +7,8 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
+from flaxon.tasks._pickle import load_value
+
 
 class Serializer:
     """Convert task values and encode JSON or trusted pickle payloads."""
@@ -31,9 +33,9 @@ class Serializer:
             lambda v: {k: self.serialize(v) for k, v in v.items()},
             lambda v: {k: self.deserialize(v) for k, v in v.items()},
         )
-        self.register(datetime, lambda v: v.isoformat(), lambda v: datetime.fromisoformat(v))
-        self.register(date, lambda v: v.isoformat(), lambda v: date.fromisoformat(v))
-        self.register(Decimal, lambda v: float(v), lambda v: Decimal(str(v)))
+        self.register(datetime, lambda v: v.isoformat(), datetime.fromisoformat)
+        self.register(date, lambda v: v.isoformat(), date.fromisoformat)
+        self.register(Decimal, float, lambda v: Decimal(str(v)))
 
     def register(
         self, type_: type, serializer: Callable[[Any], Any], deserializer: Callable[[Any], Any]
@@ -71,7 +73,7 @@ class Serializer:
         if isinstance(value, dict):
             return {k: self.deserialize(v) for k, v in value.items()}
 
-        for type_, deserializer in self._deserializers.items():
+        for deserializer in self._deserializers.values():
             try:
                 return deserializer(value)
             except (ValueError, TypeError):
@@ -91,9 +93,15 @@ class Serializer:
         """Encode a Python value using pickle for trusted internal storage."""
         return pickle.dumps(value)
 
-    def from_pickle(self, data: bytes) -> Any:
-        """Load a pickle payload; the input must come from a trusted source."""
-        return pickle.loads(data)
+    def from_pickle(self, data: bytes, *, trusted: bool = False) -> Any:
+        """Decode ordinary values safely; trusted=True permits application-defined classes.
+
+        The trusted mode can execute code and must never receive user-controlled
+        or unauthenticated payloads. Prefer JSON for shared queues and APIs.
+        """
+        if trusted:
+            return pickle.loads(data)  # noqa: S301 - explicit trusted-only compatibility mode
+        return load_value(data)
 
 
 _default_serializer = Serializer()

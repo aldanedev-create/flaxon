@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from typing import Any, Generic, TypeVar
 
+from flaxon.database.sql import Assignments, Columns, Parameters, statement
+
 from .manager import DatabaseManager
 
 T = TypeVar("T")
@@ -11,7 +13,8 @@ _IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def _safe_identifier(name: str, kind: str = "identifier") -> str:
-    """Validate a string intended for use as a table/column name in a raw
+    """Validate a string intended for use as a table/column name in a raw.
+
     SQL string. Table and column names can't be parameterized as bind
     values (SQL doesn't support that), so this allowlist check is the
     real defense against SQL injection via identifiers -- without it,
@@ -28,77 +31,113 @@ def _safe_identifier(name: str, kind: str = "identifier") -> str:
 
 
 class Repository(Generic[T]):
+    """Repository implementation for the database subsystem."""
+
     def __init__(self, db: DatabaseManager, table_name: str) -> None:
         self.db = db
         self.table_name = _safe_identifier(table_name, "table name")
 
     async def create(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Create a new entry from the supplied values."""
         safe_keys = [_safe_identifier(k, "column name") for k in data]
-        columns = ", ".join(safe_keys)
-        placeholders = ", ".join(f"${i+1}" for i in range(len(data)))
-        query = f"INSERT INTO {self.table_name} ({columns}) VALUES ({placeholders}) RETURNING *"
+        ", ".join(safe_keys)
+        ", ".join(f"${i + 1}" for i in range(len(data)))
+        query = statement(
+            "INSERT INTO {name_0} ({name_1}) VALUES ({name_2}) RETURNING *",
+            name_0=self.table_name,
+            name_1=Columns(safe_keys),
+            name_2=Parameters(len(data)),
+        )
         return await self.db.fetch_one(query, *data.values())
 
     async def get(self, id: Any, id_column: str = "id") -> dict[str, Any] | None:
+        """Retrieve the requested value using this object's configured behavior."""
         id_column = _safe_identifier(id_column, "column name")
-        query = f"SELECT * FROM {self.table_name} WHERE {id_column} = $1"
+        query = statement(
+            "SELECT * FROM {name_0} WHERE {name_1} = $1", name_0=self.table_name, name_1=id_column
+        )
         return await self.db.fetch_one(query, id)
 
     async def get_all(self, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
-        query = f"SELECT * FROM {self.table_name} LIMIT ${1} OFFSET ${2}"
+        """Return all matching stored entries."""
+        query = statement("SELECT * FROM {name_0} LIMIT $1 OFFSET $2", name_0=self.table_name)
         return await self.db.fetch_all(query, limit, offset)
 
     async def update(self, id: Any, data: dict[str, Any], id_column: str = "id") -> dict[str, Any] | None:
+        """Apply the supplied changes to the requested entry."""
         id_column = _safe_identifier(id_column, "column name")
-        set_clause = ", ".join(
-            f"{_safe_identifier(key, 'column name')} = ${i+2}" for i, key in enumerate(data.keys())
+        ", ".join(f"{_safe_identifier(key, 'column name')} = ${i + 2}" for i, key in enumerate(data.keys()))
+        query = statement(
+            "UPDATE {name_0} SET {name_1} WHERE {name_2} = $1 RETURNING *",
+            name_0=self.table_name,
+            name_1=Assignments(data, start=2),
+            name_2=id_column,
         )
-        query = f"UPDATE {self.table_name} SET {set_clause} WHERE {id_column} = $1 RETURNING *"
         return await self.db.fetch_one(query, id, *data.values())
 
     async def delete(self, id: Any, id_column: str = "id") -> bool:
+        """Delete the specified entry from the configured store."""
         id_column = _safe_identifier(id_column, "column name")
-        query = f"DELETE FROM {self.table_name} WHERE {id_column} = $1"
+        query = statement(
+            "DELETE FROM {name_0} WHERE {name_1} = $1", name_0=self.table_name, name_1=id_column
+        )
         await self.db.execute(query, id)
         return True
 
     async def count(self) -> int:
-        query = f"SELECT COUNT(*) FROM {self.table_name}"
+        """Return the number of matching entries."""
+        query = statement("SELECT COUNT(*) FROM {name_0}", name_0=self.table_name)
         return await self.db.fetch_val(query)
 
     async def exists(self, id: Any, id_column: str = "id") -> bool:
+        """Return whether the requested entry exists."""
         id_column = _safe_identifier(id_column, "column name")
-        query = f"SELECT EXISTS(SELECT 1 FROM {self.table_name} WHERE {id_column} = $1)"
+        query = statement(
+            "SELECT EXISTS(SELECT 1 FROM {name_0} WHERE {name_1} = $1)",
+            name_0=self.table_name,
+            name_1=id_column,
+        )
         return bool(await self.db.fetch_val(query, id))
 
     async def find_by(self, column: str, value: Any) -> list[dict[str, Any]]:
+        """Find the by."""
         column = _safe_identifier(column, "column name")
-        query = f"SELECT * FROM {self.table_name} WHERE {column} = $1"
+        query = statement("SELECT * FROM {name_0} WHERE {name_1} = $1", name_0=self.table_name, name_1=column)
         return await self.db.fetch_all(query, value)
 
     async def find_one_by(self, column: str, value: Any) -> dict[str, Any] | None:
+        """Find the one by."""
         column = _safe_identifier(column, "column name")
-        query = f"SELECT * FROM {self.table_name} WHERE {column} = $1 LIMIT 1"
+        query = statement(
+            "SELECT * FROM {name_0} WHERE {name_1} = $1 LIMIT 1", name_0=self.table_name, name_1=column
+        )
         return await self.db.fetch_one(query, value)
 
     async def bulk_create(self, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Perform the bulk create operation for repository."""
         if not items:
             return []
 
-        columns = [_safe_identifier(k, "column name") for k in items[0].keys()]
-        column_str = ", ".join(columns)
-        placeholders = ", ".join(f"${i+1}" for i in range(len(columns)))
+        columns = [_safe_identifier(k, "column name") for k in items[0]]
+        ", ".join(columns)
+        ", ".join(f"${i + 1}" for i in range(len(columns)))
 
         results = []
         for item in items:
             values = [item.get(col) for col in columns]
-            query = f"INSERT INTO {self.table_name} ({column_str}) VALUES ({placeholders}) RETURNING *"
+            query = statement(
+                "INSERT INTO {name_0} ({name_1}) VALUES ({name_2}) RETURNING *",
+                name_0=self.table_name,
+                name_1=Columns(columns),
+                name_2=Parameters(len(columns)),
+            )
             result = await self.db.fetch_one(query, *values)
             results.append(result)
 
         return results
 
     async def bulk_update(self, items: list[dict[str, Any]], id_column: str = "id") -> list[dict[str, Any]]:
+        """Perform the bulk update operation for repository."""
         id_column = _safe_identifier(id_column, "column name")
         results = []
         for item in items:
@@ -111,11 +150,13 @@ class Repository(Generic[T]):
         return results
 
     async def delete_all(self) -> int:
-        query = f"DELETE FROM {self.table_name}"
+        """Delete the all."""
+        query = statement("DELETE FROM {name_0}", name_0=self.table_name)
         await self.db.execute(query)
         return 0
 
     async def paginate(self, page: int = 1, per_page: int = 20) -> dict[str, Any]:
+        """Return a page of entries with pagination metadata."""
         offset = (page - 1) * per_page
         items = await self.get_all(per_page, offset)
         total = await self.count()

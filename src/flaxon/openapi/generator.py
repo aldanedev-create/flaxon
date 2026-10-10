@@ -11,6 +11,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
+from flaxon._imports import import_attribute
 from flaxon.routing import MISSING, Query
 from flaxon.routing.execution import is_scalar_query
 
@@ -41,12 +42,15 @@ class OpenAPIGenerator:
         self._servers: list[dict[str, str]] = []
 
     def add_path(self, path: str, method: str, operation: dict[str, Any]) -> None:
+        """Add the path."""
         self._paths.setdefault(path, {})[method.lower()] = operation
 
     def add_schema(self, name: str, schema: dict[str, Any]) -> None:
+        """Add the schema."""
         self._schemas[name] = schema
 
     def add_tag(self, name: str, description: str | None = None) -> None:
+        """Add the tag."""
         tag = {"name": name}
         if description:
             tag["description"] = description
@@ -54,18 +58,22 @@ class OpenAPIGenerator:
             self._tags.append(tag)
 
     def add_server(self, url: str, description: str | None = None) -> None:
+        """Add the server."""
         server = {"url": url}
         if description:
             server["description"] = description
         self._servers.append(server)
 
     def add_security(self, scheme: str, scopes: list[str] | None = None) -> None:
+        """Add the security."""
         self._security.append({scheme: scopes or []})
 
     def add_info(self, key: str, value: Any) -> None:
+        """Add the info."""
         self._info[key] = value
 
     def generate(self) -> dict[str, Any]:
+        """Perform the generate operation for open apigenerator."""
         document: dict[str, Any] = {
             "openapi": "3.1.0",
             "info": self._info,
@@ -105,77 +113,8 @@ class OpenAPIGenerator:
         for method in sorted(route.methods):
             builder = OperationBuilder(openapi_path, method.lower())
             operation = builder.build()
-            if summary:
-                operation["summary"] = summary
-            if description:
-                operation["description"] = description
-            if route.operation_id:
-                operation["operationId"] = route.operation_id
-            elif route.name:
-                operation["operationId"] = route.name
-            if route.tags:
-                operation["tags"] = list(route.tags)
-            if route.deprecated:
-                operation["deprecated"] = True
-            if route.security is not None:
-                operation["security"] = route.security
-
-            parameters: list[dict[str, Any]] = []
-            converter_types = {
-                "int": "integer",
-                "float": "number",
-                "str": "string",
-                "path": "string",
-                "uuid": "string",
-            }
-            for name, converter_name in getattr(route, "parameters", []):
-                parameter: dict[str, Any] = {
-                    "name": name,
-                    "in": "path",
-                    "required": True,
-                    "schema": {"type": converter_types.get(converter_name, "string")},
-                }
-                if converter_name == "uuid":
-                    parameter["schema"]["format"] = "uuid"
-                parameters.append(parameter)
-
-            for name, parameter in signature.parameters.items():
-                declaration = parameter.default
-                annotation = hints.get(name, parameter.annotation)
-                if not isinstance(declaration, Query):
-                    path_names = {item[0] for item in getattr(route, "parameters", [])}
-                    if (
-                        name in path_names
-                        or name in {"request", "socket", "websocket"}
-                        or not is_scalar_query(annotation)
-                    ):
-                        continue
-                    default = MISSING if parameter.default is inspect.Parameter.empty else parameter.default
-                    declaration = Query(default=default)
-                query_schema = self._schema_for_annotation(hints.get(name, parameter.annotation))
-                if query_schema == {}:
-                    query_schema = {"type": "string"}
-                if declaration.default is not MISSING:
-                    query_schema["default"] = declaration.default
-                if declaration.ge is not None:
-                    query_schema["minimum"] = declaration.ge
-                if declaration.le is not None:
-                    query_schema["maximum"] = declaration.le
-                if declaration.min_length is not None:
-                    query_schema["minLength"] = declaration.min_length
-                if declaration.max_length is not None:
-                    query_schema["maxLength"] = declaration.max_length
-                item: dict[str, Any] = {
-                    "name": declaration.alias or name,
-                    "in": "query",
-                    "required": declaration.default is MISSING,
-                    "schema": query_schema,
-                }
-                if declaration.description:
-                    item["description"] = declaration.description
-                if declaration.deprecated:
-                    item["deprecated"] = True
-                parameters.append(item)
+            self._apply_route_metadata(operation, route, summary=summary, description=description)
+            parameters = self._route_parameters(route, signature, hints)
             if parameters:
                 operation["parameters"] = parameters
 
@@ -193,6 +132,87 @@ class OpenAPIGenerator:
 
             self._apply_responses(operation, getattr(route, "responses", None))
             self.add_path(openapi_path, method, operation)
+
+    @staticmethod
+    def _apply_route_metadata(operation, route, *, summary, description):
+        if summary:
+            operation["summary"] = summary
+        if description:
+            operation["description"] = description
+        if route.operation_id:
+            operation["operationId"] = route.operation_id
+        elif route.name:
+            operation["operationId"] = route.name
+        if route.tags:
+            operation["tags"] = list(route.tags)
+        if route.deprecated:
+            operation["deprecated"] = True
+        if route.security is not None:
+            operation["security"] = route.security
+
+    def _route_parameters(self, route, signature, hints):
+
+        parameters: list[dict[str, Any]] = []
+        converter_types = {
+            "int": "integer",
+            "float": "number",
+            "str": "string",
+            "path": "string",
+            "uuid": "string",
+        }
+        for name, converter_name in getattr(route, "parameters", []):
+            parameter: dict[str, Any] = {
+                "name": name,
+                "in": "path",
+                "required": True,
+                "schema": {"type": converter_types.get(converter_name, "string")},
+            }
+            if converter_name == "uuid":
+                parameter["schema"]["format"] = "uuid"
+            parameters.append(parameter)
+
+        for name, parameter in signature.parameters.items():
+            declaration = parameter.default
+            annotation = hints.get(name, parameter.annotation)
+            if not isinstance(declaration, Query):
+                path_names = {item[0] for item in getattr(route, "parameters", [])}
+                if (
+                    name in path_names
+                    or name in {"request", "socket", "websocket"}
+                    or not is_scalar_query(annotation)
+                ):
+                    continue
+                default = MISSING if parameter.default is inspect.Parameter.empty else parameter.default
+                declaration = Query(default=default)
+            query_schema = self._schema_for_annotation(hints.get(name, parameter.annotation))
+            if query_schema == {}:
+                query_schema = {"type": "string"}
+            self._apply_query_constraints(query_schema, declaration)
+            item: dict[str, Any] = {
+                "name": declaration.alias or name,
+                "in": "query",
+                "required": declaration.default is MISSING,
+                "schema": query_schema,
+            }
+            if declaration.description:
+                item["description"] = declaration.description
+            if declaration.deprecated:
+                item["deprecated"] = True
+            parameters.append(item)
+        return parameters
+
+    @staticmethod
+    def _apply_query_constraints(query_schema, declaration):
+        if declaration.default is not MISSING:
+            query_schema["default"] = declaration.default
+        if declaration.ge is not None:
+            query_schema["minimum"] = declaration.ge
+        if declaration.le is not None:
+            query_schema["maximum"] = declaration.le
+        if declaration.min_length is not None:
+            query_schema["minLength"] = declaration.min_length
+        if declaration.max_length is not None:
+            query_schema["maxLength"] = declaration.max_length
 
     def _find_body_schema(
         self, signature: inspect.Signature, hints: dict[str, Any], route: Any
@@ -213,14 +233,16 @@ class OpenAPIGenerator:
         if not isinstance(annotation, type):
             return False
         try:
-            from flaxon.validation import Schema
+            schema_type = import_attribute("flaxon.validation", "Schema")
 
-            if issubclass(annotation, Schema):
+            if issubclass(annotation, schema_type):
                 return True
         except (ImportError, TypeError):
             pass
         try:
-            from flaxon.integrations.pydantic import is_pydantic_model_type
+            is_pydantic_model_type = import_attribute(
+                "flaxon.integrations.pydantic", "is_pydantic_model_type"
+            )
 
             return is_pydantic_model_type(annotation)
         except ImportError:
@@ -232,16 +254,32 @@ class OpenAPIGenerator:
         if isinstance(annotation, str):
             return {"type": "string"}
         origin = typing.get_origin(annotation)
-        args = typing.get_args(annotation)
+        if origin is not None:
+            return self._generic_annotation_schema(origin, typing.get_args(annotation))
+        if not isinstance(annotation, type):
+            return {}
+        schemas = {
+            list: {"type": "array", "items": {}},
+            tuple: {"type": "array", "items": {}},
+            set: {"type": "array", "items": {}},
+            frozenset: {"type": "array", "items": {}},
+            dict: {"type": "object", "additionalProperties": {}},
+            bool: {"type": "boolean"},
+            int: {"type": "integer"},
+            float: {"type": "number"},
+            str: {"type": "string"},
+            date: {"type": "string", "format": "date"},
+            datetime: {"type": "string", "format": "date-time"},
+            Decimal: {"type": "number"},
+            UUID: {"type": "string", "format": "uuid"},
+        }
+        return schemas[annotation] if annotation in schemas else self._registered_model_schema(annotation)
+
+    def _generic_annotation_schema(self, origin: Any, args: tuple[Any, ...]) -> dict[str, Any]:
         if origin is typing.Annotated:
             return self._schema_for_annotation(args[0])
         if origin in (typing.Union, types.UnionType):
-            non_null = [item for item in args if item is not type(None)]
-            schema = self._schema_for_annotation(non_null[0]) if non_null else {}
-            if len(non_null) == 1 and len(non_null) != len(args):
-                schema = dict(schema)
-                schema["nullable"] = True
-            return schema
+            return self._union_annotation_schema(args)
         if origin in (list, tuple, set, frozenset):
             return {"type": "array", "items": self._schema_for_annotation(args[0]) if args else {}}
         if origin is dict:
@@ -254,46 +292,34 @@ class OpenAPIGenerator:
             schema = self._schema_for_annotation(type(values[0])) if values else {"type": "string"}
             schema["enum"] = values
             return schema
-        if annotation is Any:
-            return {}
-        if annotation in (list, tuple, set, frozenset):
-            return {"type": "array", "items": {}}
-        if annotation is dict:
-            return {"type": "object", "additionalProperties": {}}
-        if annotation is bool:
-            return {"type": "boolean"}
-        if annotation is int:
-            return {"type": "integer"}
-        if annotation is float:
-            return {"type": "number"}
-        if annotation is str:
-            return {"type": "string"}
-        if annotation is date:
-            return {"type": "string", "format": "date"}
-        if annotation is datetime:
-            return {"type": "string", "format": "date-time"}
-        if annotation is Decimal:
-            return {"type": "number"}
-        if annotation is UUID:
-            return {"type": "string", "format": "uuid"}
-        if isinstance(annotation, type):
-            native = self._native_model_schema(annotation)
-            if native is not None:
-                name = annotation.__name__
-                self._schemas[name] = native
-                return {"$ref": f"#/components/schemas/{name}"}
-            pydantic = self._pydantic_model_schema(annotation)
-            if pydantic is not None:
-                name, schema = pydantic
-                self._schemas[name] = schema
-                return {"$ref": f"#/components/schemas/{name}"}
+        return {}
+
+    def _union_annotation_schema(self, args: tuple[Any, ...]) -> dict[str, Any]:
+        non_null = [item for item in args if item is not type(None)]
+        schema = self._schema_for_annotation(non_null[0]) if non_null else {}
+        if len(non_null) == 1 and len(non_null) != len(args):
+            schema = dict(schema)
+            schema["nullable"] = True
+        return schema
+
+    def _registered_model_schema(self, annotation: type[Any]) -> dict[str, Any]:
+        native = self._native_model_schema(annotation)
+        if native is not None:
+            name = annotation.__name__
+            self._schemas[name] = native
+            return {"$ref": f"#/components/schemas/{name}"}
+        pydantic = self._pydantic_model_schema(annotation)
+        if pydantic is not None:
+            name, schema = pydantic
+            self._schemas[name] = schema
+            return {"$ref": f"#/components/schemas/{name}"}
         return {}
 
     def _native_model_schema(self, model: type[Any]) -> dict[str, Any] | None:
         try:
-            from flaxon.validation import Schema
+            schema_type = import_attribute("flaxon.validation", "Schema")
 
-            if not issubclass(model, Schema):
+            if not issubclass(model, schema_type):
                 return None
         except (ImportError, TypeError):
             return None
@@ -318,7 +344,9 @@ class OpenAPIGenerator:
 
     def _pydantic_model_schema(self, model: type[Any]) -> tuple[str, dict[str, Any]] | None:
         try:
-            from flaxon.integrations.pydantic import is_pydantic_model_type
+            is_pydantic_model_type = import_attribute(
+                "flaxon.integrations.pydantic", "is_pydantic_model_type"
+            )
 
             if not is_pydantic_model_type(model):
                 return None
@@ -338,7 +366,8 @@ class OpenAPIGenerator:
         if not configured:
             return
         responses = operation.setdefault("responses", {})
-        for status, value in configured.items():
+        for status, raw_value in configured.items():
+            value = raw_value
             key = str(status)
             if isinstance(value, str):
                 responses[key] = {"description": value}
@@ -381,4 +410,5 @@ def _replace_definition_refs(value: Any) -> Any:
 
 
 def generate_openapi(app: Any, title: str = "Flaxon API", version: str = "1.0.0") -> dict[str, Any]:
+    """Generate the openapi."""
     return OpenAPIGenerator(title, version).generate_from_app(app)

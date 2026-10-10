@@ -60,8 +60,8 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install -e ".[standard,admin,pydantic]" pytest pytest-asyncio pytest-timeout httpx ruff==0.16.10 "mypy==1.20.2"
-      - run: python -m pytest -o addopts='' tests/unit/test_release_tooling.py tests/unit/test_json_contract.py tests/unit/test_router_index.py tests/unit/test_exception_boundaries.py tests/unit/test_quality_budget.py tests/unit/test_context_isolation.py tests/security tests/expanded/security tests/expanded/state tests/integration/test_authentication.py -q
-      - run: ruff check --select E9,F63,F7,F82 src/flaxon
+      - run: python -m pytest -o addopts='' tests/unit/test_release_tooling.py tests/unit/test_json_contract.py tests/unit/test_router_index.py tests/unit/test_exception_boundaries.py tests/unit/test_quality_budget.py tests/unit/test_context_isolation.py tests/test_quality_cleanup_security.py tests/security tests/expanded/security tests/expanded/state tests/integration/test_authentication.py -q
+      - run: ruff check src/flaxon
       - run: python scripts/check_lint_budget.py
       - run: python scripts/typecheck.py
 

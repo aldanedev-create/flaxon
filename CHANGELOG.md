@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Complete the configured Ruff cleanup and reduce the active lint baseline to zero. Keep all configured rules enabled, with documented local exceptions for established positional APIs and explicit trusted boundaries.
+- Split Admin, CMS, ORM adapters, GraphQL, OpenAPI, module mounting, and management commands into focused helpers; retain lazy optional imports.
+- Validate SQL identifiers before composing database statements; restrict task pickle loading by default. Application-defined pickle classes require `from_pickle(data, trusted=True)` and authenticated, trusted payloads.
+- Fix synchronous cache writes/invalidation and keep notification delivery tasks referenced until completion.
+
 - Reduce Ruff findings from 3,442 to 2,973 without disabling rules; document cache, dependency, task, and logging APIs and tighten the per-file/rule CI budget.
 - Isolate request, logging, task, and dependency context values across concurrent tasks; copy logging configuration handlers and repair rotating file handler options. Add regression tests and expand strict typing checks to 15 core modules.
 

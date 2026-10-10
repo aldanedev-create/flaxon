@@ -20,6 +20,7 @@ class ReDoc:
         self.asset_url = asset_url
 
     def render(self) -> HTMLResponse:
+        """Render the requested content using the supplied context."""
         title = html.escape(self.title, quote=True)
         openapi_url = html.escape(self.openapi_url, quote=True)
         asset_url = html.escape(self.asset_url, quote=True)
@@ -40,4 +41,5 @@ class ReDoc:
 
 
 def create_redoc(openapi_url: str = "/openapi.json", title: str = "Flaxon API") -> HTMLResponse:
+    """Create the redoc."""
     return ReDoc(openapi_url, title).render()

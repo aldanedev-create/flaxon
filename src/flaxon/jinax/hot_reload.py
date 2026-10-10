@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import logging
-import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 
 class HotReloader:
+    """Hot reloader implementation for the jinax subsystem."""
+
     def __init__(self, template_dir: str | Path, check_interval: float = 1.0) -> None:
         self.template_dir = Path(template_dir)
         self.check_interval = check_interval
@@ -17,19 +19,23 @@ class HotReloader:
         self._task = None
 
     def watch(self) -> None:
+        """Perform the watch operation for hot reloader."""
         self._running = True
         self._scan_templates()
 
     def stop(self) -> None:
+        """Stop the configured service."""
         self._running = False
         if self._task:
             self._task.cancel()
             self._task = None
 
     def add_listener(self, listener: Callable[[str], None]) -> None:
+        """Add the listener."""
         self._listeners.append(listener)
 
     def remove_listener(self, listener: Callable[[str], None]) -> None:
+        """Remove the listener."""
         if listener in self._listeners:
             self._listeners.remove(listener)
 
@@ -65,8 +71,7 @@ class HotReloader:
                 )
 
     async def run(self) -> None:
-        import asyncio
-
+        """Run the configured operation."""
         self.watch()
 
         while self._running:
@@ -75,30 +80,34 @@ class HotReloader:
 
 
 class HotReloadMiddleware:
+    """Hot reload middleware implementation for the jinax subsystem."""
+
     def __init__(self, app: Any, template_dir: str | Path, check_interval: float = 1.0) -> None:
         self.app = app
         self.reloader = HotReloader(template_dir, check_interval)
         self._reload_task = None
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        """Handle the supplied call using this object's configured behavior."""
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return
 
         if self._reload_task is None:
-            import asyncio
-
             self._reload_task = asyncio.create_task(self.reloader.run())
 
         await self.app(scope, receive, send)
 
 
 class TemplateWatcher:
+    """Template watcher implementation for the jinax subsystem."""
+
     def __init__(self, template_dir: str | Path) -> None:
         self.template_dir = Path(template_dir)
         self._watched_files: dict[str, float] = {}
 
     def check_changes(self) -> list[str]:
+        """Check the changes."""
         changed = []
 
         if not self.template_dir.exists():
@@ -122,11 +131,13 @@ class TemplateWatcher:
         return changed
 
     def reset(self) -> None:
+        """Perform the reset operation for template watcher."""
         self._watched_files.clear()
 
     def add_file(self, path: str) -> None:
+        """Add the file."""
         try:
-            mtime = os.path.getmtime(path)
+            mtime = Path(path).stat().st_mtime
             self._watched_files[path] = mtime
         except OSError:
             pass

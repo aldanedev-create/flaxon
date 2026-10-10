@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from inspect import isawaitable
 from typing import Any, Protocol
 
+from flaxon._imports import import_module
+
 
 @dataclass(frozen=True, slots=True)
 class PermissionDefinition:
@@ -201,21 +203,26 @@ class PermissionCatalog:
         return definitions
 
     def get(self, key: str) -> PermissionDefinition | None:
+        """Retrieve the requested value using this object's configured behavior."""
         return self._definitions.get(self._aliases.get(key, key))
 
     def resolve(self, key: str) -> str:
+        """Perform the resolve operation for permission catalog."""
         return self._aliases.get(key, key)
 
     def list_all(self) -> list[PermissionDefinition]:
+        """List the all."""
         return list(self._definitions.values())
 
     def grouped(self) -> dict[str, list[PermissionDefinition]]:
+        """Perform the grouped operation for permission catalog."""
         grouped: dict[str, list[PermissionDefinition]] = {}
         for definition in self._definitions.values():
             grouped.setdefault(definition.category, []).append(definition)
         return grouped
 
     def permission_choices(self) -> list[dict[str, Any]]:
+        """Perform the permission choices operation for permission catalog."""
         return [
             {
                 "key": item.key,
@@ -289,6 +296,7 @@ class DefaultAuthorizationProvider:
         self.strict = strict
 
     def has_permission(self, user: Any, permission: str, resource: Any = None) -> bool:
+        """Return whether the requested permission is available."""
         if user is None:
             return False
         direct = set(getattr(user, "permissions", []) or [])
@@ -310,26 +318,26 @@ class DefaultAuthorizationProvider:
             return True
         if self.strict:
             return False
-        if permission == "admin.view_dashboard":
-            return "admin:read" in values
-        if permission in {"admin.manage_users", "admin.manage_groups"}:
-            return "admin:users" in values
-        if permission == "admin.manage_settings":
-            return "admin:settings" in values
-        if permission == "media.manage_library":
-            return "admin:media" in values
-        if permission == "admin.manage_profile":
-            return "admin:write" in values
-        if permission.startswith("cms.") and permission not in {"cms.export_content"}:
+        return self._legacy_permission(permission, values)
+
+    @staticmethod
+    def _legacy_permission(permission: str, values: set[str]) -> bool:
+        legacy = {
+            "admin.view_dashboard": "admin:read",
+            "admin.manage_users": "admin:users",
+            "admin.manage_groups": "admin:users",
+            "admin.manage_settings": "admin:settings",
+            "media.manage_library": "admin:media",
+            "admin.manage_profile": "admin:write",
+        }.get(permission)
+        if legacy is not None:
+            return legacy in values
+        if permission.startswith("cms.") and permission != "cms.export_content":
             return "admin:write" in values
         if ".view_" in permission or permission.endswith(":read"):
             return "admin:read" in values
-        if any(
-            token in permission
-            for token in (".add_", ".change_", ".delete_", ":create", ":update", ":delete")
-        ):
-            return "admin:write" in values
-        return False
+        writes = (".add_", ".change_", ".delete_", ":create", ":update", ":delete")
+        return any(token in permission for token in writes) and "admin:write" in values
 
 
 class CasbinAuthorizationProvider:
@@ -347,6 +355,7 @@ class CasbinAuthorizationProvider:
         self.enforcer = enforcer
 
     def has_permission(self, user: Any, permission: str, resource: Any = None) -> bool:
+        """Return whether the requested permission is available."""
         if user is None:
             return False
         subject_candidates = [
@@ -394,7 +403,7 @@ class RedisPolicySynchronizer:
 
     async def _client(self) -> Any:
         if self.redis_client is None:
-            import redis.asyncio as redis
+            redis = import_module("redis.asyncio")
 
             self.redis_client = redis.from_url(
                 self.redis_url,
@@ -405,14 +414,17 @@ class RedisPolicySynchronizer:
         return self.redis_client
 
     async def publish(self) -> int:
+        """Perform the publish operation for redis policy synchronizer."""
         client = await self._client()
         return int(await client.publish(self.channel, json.dumps({"event": "policy_changed"})))
 
     async def reload(self) -> Any:
+        """Perform the reload operation for redis policy synchronizer."""
         result = self.enforcer.load_policy()
         return await result if isawaitable(result) else result
 
     async def listen_once(self, timeout: float = 1.0) -> bool:
+        """Perform the listen once operation for redis policy synchronizer."""
         client = await self._client()
         if self._pubsub is None:
             self._pubsub = client.pubsub()
@@ -424,10 +436,12 @@ class RedisPolicySynchronizer:
         return True
 
     async def listen(self, stop_event: Any | None = None, timeout: float = 1.0) -> None:
+        """Perform the listen operation for redis policy synchronizer."""
         while stop_event is None or not stop_event.is_set():
             await self.listen_once(timeout)
 
     async def close(self) -> None:
+        """Release the resources held by this object."""
         if self._pubsub is not None:
             close = getattr(self._pubsub, "aclose", None) or getattr(self._pubsub, "close", None)
             if close:

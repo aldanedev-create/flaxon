@@ -28,6 +28,7 @@ class MemorySubscriptionBackend:
         self._operation_subs.clear()
 
     async def subscribe(self, operation_id: str, context: Any, variables: dict[str, Any]) -> str:
+        """Register a subscription for the supplied event or operation."""
         subscription_id = str(uuid.uuid4())
         self._sub_map[subscription_id] = operation_id
         self._operation_subs.setdefault(operation_id, set()).add(subscription_id)
@@ -35,6 +36,7 @@ class MemorySubscriptionBackend:
         return subscription_id
 
     async def unsubscribe(self, subscription_id: str) -> None:
+        """Remove the requested subscription."""
         operation_id = self._sub_map.pop(subscription_id, "")
         if operation_id in self._operation_subs:
             self._operation_subs[operation_id].discard(subscription_id)
@@ -45,12 +47,14 @@ class MemorySubscriptionBackend:
             await queue.put(None)
 
     async def publish(self, operation_id: str, data: Any) -> None:
+        """Perform the publish operation for memory subscription backend."""
         for subscription_id in self._operation_subs.get(operation_id, set()):
             queue = self._queues.get(subscription_id)
             if queue is not None:
                 await queue.put(data)
 
     async def next(self, subscription_id: str) -> Any:
+        """Perform the next operation for memory subscription backend."""
         queue = self._queues.get(subscription_id)
         if queue is None:
             return None

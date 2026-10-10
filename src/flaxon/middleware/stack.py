@@ -49,10 +49,7 @@ class MiddlewareStack:
         Args:
             middleware_class: The middleware class to remove.
         """
-        self._middleware = [
-            (cls, opts) for cls, opts in self._middleware
-            if cls != middleware_class
-        ]
+        self._middleware = [(cls, opts) for cls, opts in self._middleware if cls != middleware_class]
 
     def clear(self) -> None:
         """Clear all middleware from the stack."""
@@ -81,9 +78,7 @@ class MiddlewareStack:
             receive: The ASGI receive callable.
             send: The ASGI send callable.
         """
-        raise RuntimeError(
-            "MiddlewareStack must be built before calling. Use build() first."
-        )
+        raise RuntimeError("MiddlewareStack must be built before calling. Use build() first.")
 
     def __len__(self) -> int:
         """Get the number of middleware in the stack."""

@@ -1,16 +1,22 @@
 from __future__ import annotations
 
 import json
+import platform
+import sys
 import time
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 
 class ReportGenerator:
+    """Report generator implementation for the debugging subsystem."""
+
     def __init__(self) -> None:
         self._reports: list[dict[str, Any]] = []
 
     def generate_error_report(self, error_data: dict[str, Any]) -> dict[str, Any]:
+        """Generate the error report."""
         return {
             "report_id": error_data.get("error_id"),
             "generated_at": datetime.now().isoformat(),
@@ -28,6 +34,7 @@ class ReportGenerator:
         }
 
     def generate_summary_report(self, errors: list[dict[str, Any]]) -> dict[str, Any]:
+        """Generate the summary report."""
         types = {}
         paths = {}
 
@@ -47,6 +54,7 @@ class ReportGenerator:
         }
 
     def generate_performance_report(self, metrics: dict[str, Any]) -> dict[str, Any]:
+        """Generate the performance report."""
         return {
             "generated_at": datetime.now().isoformat(),
             "performance": metrics,
@@ -54,8 +62,6 @@ class ReportGenerator:
         }
 
     def _get_system_info(self) -> dict[str, Any]:
-        import platform
-        import sys
 
         return {
             "python_version": sys.version,
@@ -64,13 +70,14 @@ class ReportGenerator:
         }
 
     def to_json(self, report: dict[str, Any], pretty: bool = True) -> str:
+        """Convert to the json."""
         if pretty:
             return json.dumps(report, indent=2, default=str)
         return json.dumps(report, default=str)
 
     def save_report(self, report: dict[str, Any], filename: str) -> None:
-        import os
-        os.makedirs("reports", exist_ok=True)
-        path = os.path.join("reports", filename)
-        with open(path, "w", encoding="utf-8") as f:
+        """Save the report."""
+        Path("reports").mkdir(parents=True, exist_ok=True)
+        path = str(Path("reports") / filename)
+        with Path(path).open("w", encoding="utf-8") as f:
             json.dump(report, f, indent=2, default=str)

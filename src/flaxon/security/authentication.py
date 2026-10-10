@@ -2,19 +2,24 @@ from __future__ import annotations
 
 import hashlib
 import time
+import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from functools import wraps
-from typing import Any
+from typing import Any, ClassVar
 
+from flaxon._imports import import_attribute
 from flaxon.exceptions import Unauthorized
 from flaxon.http import Request
+from flaxon.security._request import endpoint_request
 
 from .jwt import JWT
 
 
 class User:
-    def __init__(
+    """User implementation for the security subsystem."""
+
+    def __init__(  # noqa: PLR0917 - preserve existing positional API
         self,
         id: str | int,
         username: str | None = None,
@@ -31,12 +36,15 @@ class User:
         self.metadata = metadata or {}
 
     def has_role(self, role: str) -> bool:
+        """Return whether the requested role is available."""
         return role in self.roles
 
     def has_permission(self, permission: str) -> bool:
+        """Return whether the requested permission is available."""
         return permission in self.permissions
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a dictionary representation of the current value."""
         return {
             "id": self.id,
             "username": self.username,
@@ -48,6 +56,7 @@ class User:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> User:
+        """Construct an instance from its dictionary representation."""
         return cls(
             id=data["id"],
             username=data.get("username"),
@@ -59,25 +68,33 @@ class User:
 
 
 class AuthenticationBackend(ABC):
+    """Provide authentication storage for flaxon operations."""
+
     @abstractmethod
     async def authenticate(self, request: Request) -> User | None:
+        """Resolve a user or identity using the configured authentication backend."""
         pass
 
     @abstractmethod
     async def create_token(self, user: User, expires_in: int | None = None) -> str:
+        """Create the token."""
         pass
 
     @abstractmethod
     async def validate_token(self, token: str) -> User | None:
+        """Validate the token."""
         pass
 
     @abstractmethod
     async def revoke_token(self, token: str) -> None:
+        """Revoke the token."""
         pass
 
 
 class JWTBackend(AuthenticationBackend):
-    _instances: list[JWTBackend] = []
+    """Provide jwt storage for flaxon operations."""
+
+    _instances: ClassVar[list[JWTBackend]] = []
 
     def __init__(self, secret_key: str, algorithm: str = "HS256", **options: Any) -> None:
         self.jwt = JWT(secret_key, algorithm, **options)
@@ -87,6 +104,7 @@ class JWTBackend(AuthenticationBackend):
         self._instances.append(self)
 
     async def authenticate(self, request: Request) -> User | None:
+        """Resolve a user or identity using the configured authentication backend."""
         auth_header = request.headers.get("authorization")
         if not auth_header:
             return None
@@ -98,9 +116,11 @@ class JWTBackend(AuthenticationBackend):
         return await self.validate_token(token)
 
     async def create_token(self, user: User, expires_in: int | None = None) -> str:
+        """Create the token."""
         return self.jwt.encode(user.to_dict(), expires_in=3600 if expires_in is None else expires_in)
 
     async def validate_token(self, token: str) -> User | None:
+        """Validate the token."""
         now = time.time()
         self._revoked = {key: expiry for key, expiry in self._revoked.items() if expiry > now}
         if hashlib.sha256(token.encode()).hexdigest() in self._revoked:
@@ -120,13 +140,16 @@ class JWTBackend(AuthenticationBackend):
 
 
 class SessionBackend(AuthenticationBackend):
-    _instances: list[SessionBackend] = []
+    """Provide session storage for flaxon operations."""
+
+    _instances: ClassVar[list[SessionBackend]] = []
 
     def __init__(self, session_store: dict[str, dict[str, Any]] | None = None) -> None:
         self.sessions: dict[str, dict[str, Any]] = session_store or {}
         self._instances.append(self)
 
     async def authenticate(self, request: Request) -> User | None:
+        """Resolve a user or identity using the configured authentication backend."""
         session_id = request.cookies.get("session_id")
         if not session_id:
             return None
@@ -142,7 +165,7 @@ class SessionBackend(AuthenticationBackend):
         return User.from_dict(session.get("user", {}))
 
     async def create_token(self, user: User, expires_in: int | None = None) -> str:
-        import uuid
+        """Create the token."""
         expires_in = expires_in or 86400
         session_id = uuid.uuid4().hex[:32]
         self.sessions[session_id] = {
@@ -153,6 +176,7 @@ class SessionBackend(AuthenticationBackend):
         return session_id
 
     async def validate_token(self, token: str) -> User | None:
+        """Validate the token."""
         session = self.sessions.get(token)
         if not session:
             return None
@@ -162,10 +186,13 @@ class SessionBackend(AuthenticationBackend):
         return User.from_dict(session.get("user", {}))
 
     async def revoke_token(self, token: str) -> None:
+        """Revoke the token."""
         self.sessions.pop(token, None)
 
 
 class AuthenticationMiddleware:
+    """Authentication middleware implementation for the security subsystem."""
+
     def __init__(
         self,
         app: Any,
@@ -177,6 +204,7 @@ class AuthenticationMiddleware:
         self.exclude_paths = exclude_paths or ["/health", "/auth/login", "/auth/register"]
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        """Handle the supplied call using this object's configured behavior."""
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return
@@ -187,8 +215,9 @@ class AuthenticationMiddleware:
                 await self.app(scope, receive, send)
                 return
 
-        from flaxon.http import Request
-        request = Request(scope, receive, None)
+        request_type = import_attribute("flaxon.http", "Request")
+
+        request = request_type(scope, receive, None)
 
         try:
             user = await self.backend.authenticate(request)
@@ -202,26 +231,21 @@ class AuthenticationMiddleware:
 
 
 async def authenticate(request: Request, backend: AuthenticationBackend) -> User | None:
+    """Resolve a user or identity using the configured authentication backend."""
     return await backend.authenticate(request)
 
 
 async def get_current_user(request: Request) -> User | None:
+    """Return the current user."""
     return getattr(request, "user", None)
 
 
 def login_required(func: Callable) -> Callable:
+    """Protect a callable with a login requirement."""
+
     @wraps(func)
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        request = None
-        for arg in args:
-            if isinstance(arg, Request):
-                request = arg
-                break
-        if request is None:
-            for arg in kwargs.values():
-                if isinstance(arg, Request):
-                    request = arg
-                    break
+        request = endpoint_request(args, kwargs)
         if request is None:
             raise Unauthorized("Authentication required")
 
@@ -238,10 +262,11 @@ def login_required(func: Callable) -> Callable:
         if user is None:
             raise Unauthorized("Authentication required")
 
-        if hasattr(func, "__call__"):
+        if callable(func):
             result = func(*args, **kwargs)
             if hasattr(result, "__await__"):
                 return await result
             return result
         return func(*args, **kwargs)
+
     return wrapper

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import time
 from typing import Any
 
@@ -24,10 +25,8 @@ class MemoryBackend:
         self._running = False
         if self._cleanup_task:
             self._cleanup_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._cleanup_task
-            except asyncio.CancelledError:
-                pass
             self._cleanup_task = None
 
     async def get(self, key: str) -> Any:
@@ -65,7 +64,7 @@ class MemoryBackend:
             if key not in self._cache:
                 return False
 
-            value, expires, _ = self._cache[key]
+            _value, expires, _ = self._cache[key]
             if expires is not None and time.time() > expires:
                 del self._cache[key]
                 return False
@@ -107,14 +106,11 @@ class MemoryBackend:
             now = time.time()
             entry = self._cache.get(key)
             if entry is not None:
-                value, expires, _ = entry
+                _value, expires, _ = entry
                 if expires is not None and now > expires:
                     entry = None
 
-            if entry is None:
-                new_value = amount
-            else:
-                new_value = int(entry[0]) + amount
+            new_value = amount if entry is None else int(entry[0]) + amount
 
             self._cache[key] = (new_value, None, now)
             return new_value

@@ -7,11 +7,14 @@ from .manager import DatabaseManager
 
 
 class DatabaseHealthCheck:
+    """Database health check implementation for the database subsystem."""
+
     def __init__(self, db: DatabaseManager, name: str = "database") -> None:
         self.db = db
         self.name = name
 
     async def check(self) -> dict[str, Any]:
+        """Perform the check operation for database health check."""
         start = time.perf_counter()
 
         try:
@@ -33,21 +36,28 @@ class DatabaseHealthCheck:
             }
 
     async def is_healthy(self) -> bool:
+        """Return whether healthy holds for the current value."""
         result = await self.check()
         return result["status"] == "healthy"
 
 
 class HealthRegistry:
+    """Health registry implementation for the database subsystem."""
+
     def __init__(self) -> None:
+        """Perform the   init   operation for health registry."""
         self._checks: dict[str, Any] = {}
 
     def register(self, name: str, check: Any) -> None:
+        """Perform the register operation for health registry."""
         self._checks[name] = check
 
     def unregister(self, name: str) -> None:
+        """Perform the unregister operation for health registry."""
         self._checks.pop(name, None)
 
     async def check_all(self) -> dict[str, Any]:
+        """Check the all."""
         results = {}
         for name, check in self._checks.items():
             if hasattr(check, "check"):
@@ -57,6 +67,7 @@ class HealthRegistry:
         return results
 
     async def check_one(self, name: str) -> dict[str, Any] | None:
+        """Check the one."""
         check = self._checks.get(name)
         if check is None:
             return None
@@ -66,6 +77,7 @@ class HealthRegistry:
         return await check()
 
     async def overall_status(self) -> dict[str, Any]:
+        """Perform the overall status operation for health registry."""
         results = await self.check_all()
         all_healthy = all(r.get("status") == "healthy" for r in results.values())
 

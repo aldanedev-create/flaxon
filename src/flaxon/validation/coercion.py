@@ -10,13 +10,17 @@ T = TypeVar("T")
 
 
 class Coercer:
+    """Coercer implementation for the validation subsystem."""
+
     def __init__(self) -> None:
         self._coercers: dict[type, Callable[[Any], Any]] = {}
 
     def register(self, target_type: type, coerce_func: Callable[[Any], Any]) -> None:
+        """Perform the register operation for coercer."""
         self._coercers[target_type] = coerce_func
 
     def coerce(self, value: Any, target_type: type[T]) -> T | None:
+        """Perform the coerce operation for coercer."""
         if value is None:
             return None
         if target_type in self._coercers:
@@ -32,6 +36,7 @@ _default_coercer = Coercer()
 
 
 def coerce_str(value: Any) -> str:
+    """Coerce the str."""
     if value is None:
         return ""
     if isinstance(value, (bytes, bytearray)):
@@ -40,6 +45,7 @@ def coerce_str(value: Any) -> str:
 
 
 def coerce_int(value: Any) -> int:
+    """Coerce the int."""
     if value is None:
         return 0
     if isinstance(value, bool):
@@ -57,6 +63,7 @@ def coerce_int(value: Any) -> int:
 
 
 def coerce_float(value: Any) -> float:
+    """Coerce the float."""
     if value is None:
         return 0.0
     if isinstance(value, (int, float)):
@@ -67,6 +74,7 @@ def coerce_float(value: Any) -> float:
 
 
 def coerce_bool(value: Any) -> bool:
+    """Coerce the bool."""
     if value is None:
         return False
     if isinstance(value, bool):
@@ -74,16 +82,22 @@ def coerce_bool(value: Any) -> bool:
     if isinstance(value, (int, float)):
         return bool(value)
     if isinstance(value, str):
-        normalized = value.lower().strip()
-        if normalized in {"true", "1", "yes", "on", "enabled", "active"}:
-            return True
-        if normalized in {"false", "0", "no", "off", "disabled", "inactive"}:
-            return False
-        return bool(value)
+        return _coerce_bool_condition(value=value)
+    return bool(value)
+
+
+def _coerce_bool_condition(*, value):
+    """Handle condition behavior for coerce bool."""
+    normalized = value.lower().strip()
+    if normalized in {"true", "1", "yes", "on", "enabled", "active"}:
+        return True
+    if normalized in {"false", "0", "no", "off", "disabled", "inactive"}:
+        return False
     return bool(value)
 
 
 def coerce_list(value: Any) -> list:
+    """Coerce the list."""
     if value is None:
         return []
     if isinstance(value, list):
@@ -96,6 +110,7 @@ def coerce_list(value: Any) -> list:
 
 
 def coerce_date(value: Any) -> date:
+    """Coerce the date."""
     if value is None:
         return date.today()
     if isinstance(value, date):
@@ -113,6 +128,7 @@ def coerce_date(value: Any) -> date:
 
 
 def coerce_datetime(value: Any) -> datetime:
+    """Coerce the datetime."""
     if value is None:
         return datetime.now()
     if isinstance(value, datetime):
@@ -130,6 +146,7 @@ def coerce_datetime(value: Any) -> datetime:
 
 
 def coerce_decimal(value: Any) -> Decimal:
+    """Coerce the decimal."""
     if value is None:
         return Decimal("0")
     if isinstance(value, Decimal):
@@ -142,6 +159,7 @@ def coerce_decimal(value: Any) -> Decimal:
 
 
 def coerce_uuid(value: Any) -> uuid.UUID:
+    """Coerce the uuid."""
     if value is None:
         return uuid.uuid4()
     if isinstance(value, uuid.UUID):
@@ -163,4 +181,5 @@ _default_coercer.register(uuid.UUID, coerce_uuid)
 
 
 def coerce(value: Any, target_type: type[T]) -> T | None:
+    """Perform the coerce operation for this subsystem."""
     return _default_coercer.coerce(value, target_type)

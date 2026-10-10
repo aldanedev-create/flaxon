@@ -53,10 +53,7 @@ class Logger:
             return None
 
         formatter_type = handler_config.get("formatter", "console")
-        if formatter_type == "json":
-            formatter = JSONFormatter()
-        else:
-            formatter = ConsoleFormatter()
+        formatter = JSONFormatter() if formatter_type == "json" else ConsoleFormatter()
 
         handler.setFormatter(formatter)
         handler.setLevel(handler_config.get("level", logging.INFO))

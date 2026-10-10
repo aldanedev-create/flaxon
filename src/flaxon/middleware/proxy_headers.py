@@ -6,6 +6,7 @@ This module provides middleware for handling proxy headers like X-Forwarded-*.
 
 from __future__ import annotations
 
+import ipaddress
 from typing import Any
 
 from .base import Middleware
@@ -38,15 +39,10 @@ class ProxyHeadersMiddleware(Middleware):
         if ip in self.trusted_proxies:
             return True
 
-        for cidr in self.trusted_proxies:
-            if self._ip_in_cidr(ip, cidr):
-                return True
-
-        return False
+        return any(self._ip_in_cidr(ip, cidr) for cidr in self.trusted_proxies)
 
     def _ip_in_cidr(self, ip: str, cidr: str) -> bool:
         try:
-            import ipaddress
             return ipaddress.ip_address(ip) in ipaddress.ip_network(cidr, strict=False)
         except (ValueError, ImportError):
             return False
@@ -97,6 +93,7 @@ class ProxyHeadersMiddleware(Middleware):
         return None
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        """Handle the supplied call using this object's configured behavior."""
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return
@@ -119,18 +116,22 @@ class ProxyHeadersMiddleware(Middleware):
                 scope["flaxon.forwarded_proto"] = proto
 
         if self.forward_host:
-            host = self._get_forwarded_host(scope)
-            if host:
-                headers = list(scope.get("headers", []))
-                found = False
-                for i, (key, _) in enumerate(headers):
-                    if key.lower() == b"host":
-                        headers[i] = (b"host", host.encode("latin-1"))
-                        found = True
-                        break
-                if not found:
-                    headers.append((b"host", host.encode("latin-1")))
-                scope["headers"] = headers
-                scope["flaxon.forwarded_host"] = host
+            self._apply_forwarded_host(scope)
 
         await self.app(scope, receive, send)
+
+    def _apply_forwarded_host(self, scope):
+        """Apply apply forwarded host."""
+        host = self._get_forwarded_host(scope)
+        if host:
+            headers = list(scope.get("headers", []))
+            found = False
+            for i, (key, _) in enumerate(headers):
+                if key.lower() == b"host":
+                    headers[i] = (b"host", host.encode("latin-1"))
+                    found = True
+                    break
+            if not found:
+                headers.append((b"host", host.encode("latin-1")))
+            scope["headers"] = headers
+            scope["flaxon.forwarded_host"] = host

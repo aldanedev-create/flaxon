@@ -6,6 +6,8 @@ import json
 from typing import Any
 from urllib.parse import parse_qs
 
+from flaxon._imports import import_attribute
+
 from .cookies import Cookies
 from .headers import Headers
 from .response import HTMLResponse
@@ -89,10 +91,10 @@ class Request:
     def session(self) -> Any:
         """Create an unsaved session on first access; persist only mutations."""
         if self._session is None:
-            from flaxon.sessions.session import Session
+            session_type = import_attribute("flaxon.sessions.session", "Session")
 
             manager = getattr(self.app, "sessions", None)
-            self._session = Session(ttl=getattr(manager, "ttl", 86400))
+            self._session = session_type(ttl=getattr(manager, "ttl", 86400))
         return self._session
 
     @session.setter
@@ -127,9 +129,9 @@ class Request:
 
         Returns a FormData instance (see flaxon.http.form.FormData).
         """
-        from .form import FormData
+        form_data_type = import_attribute("flaxon.http.form", "FormData")
 
-        return await FormData.from_request(self)
+        return await form_data_type.from_request(self)
 
     async def render(self, template: str, context: dict[str, Any] | None = None) -> HTMLResponse:
         """Render a template using the application's configured engine."""

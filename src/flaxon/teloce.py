@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
+from flaxon._imports import import_attribute
 from flaxon.http import HTMLResponse
 
 
@@ -108,8 +109,8 @@ class Teloce:
         self._building = True
         try:
             try:
-                from teloce.build import Builder
-                from teloce.router import generate_spa_router
+                builder_type = import_attribute("teloce.build", "Builder")
+                generate_spa_router = import_attribute("teloce.router", "generate_spa_router")
             except ImportError as exc:
                 raise RuntimeError(
                     "Teloce support requires the optional dependency: pip install --upgrade flaxon teloce-py"
@@ -135,7 +136,7 @@ class Teloce:
                 "spa": False,
                 **self.options,
             }
-            result = Builder(build_options).build(self.project_root, self.build_dir)
+            result = builder_type(build_options).build(self.project_root, self.build_dir)
             if result.get("failed"):
                 details = "; ".join(
                     f"{item.get('file')}: {item.get('error')}" for item in result.get("errors", [])
@@ -165,7 +166,7 @@ class Teloce:
                     minify=False,
                 )
                 if not self.app.debug and self.options.get("minify", True):
-                    from minifyjs import minify
+                    minify = import_attribute("minifyjs", "minify")
 
                     optimized = minify(
                         router_path.read_text(encoding="utf-8"),
@@ -206,18 +207,21 @@ class Teloce:
             router_url = f"{self.static_url}/{self.router_output}"
             router_import = f"import router from {json.dumps(router_url)};"
             router_mount = (
-                'const view = document.querySelector("[data-teloce-router-view], #router-view");'
-                "if (view) router.mount(view, context);"
-                "window.__TELOCE_ROUTER__ = router;"
-                "document.addEventListener('click', event => {"
-                "const link = event.target.closest?.('a[data-teloce-link]');"
-                "if (!link || link.hasAttribute('download') || (link.target && link.target.toLowerCase() !== '_self') || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;"
-                "const url = new URL(link.href, location.href);"
-                "if (url.origin !== location.origin || !['http:', 'https:'].includes(url.protocol)) return;"
-                "if (url.pathname === location.pathname && url.search === location.search && url.hash) return;"
-                "if (!router.resolve(url.pathname + url.search)) return;"
-                "event.preventDefault(); router.push(url.pathname + url.search + url.hash);"
-                "});"
+                'const view = document.querySelector("[data-teloce-router-vie'
+                'w], #router-view");if (view) router.mount(view, context);win'
+                "dow.__TELOCE_ROUTER__ = router;document.addEventListener('cl"
+                "ick', event => {const link = event.target.closest?.('a[data-"
+                "teloce-link]');if (!link || link.hasAttribute('download') ||"
+                " (link.target && link.target.toLowerCase() !== '_self') || e"
+                "vent.defaultPrevented || event.button !== 0 || event.metaKey"
+                " || event.ctrlKey || event.shiftKey || event.altKey) return;"
+                "const url = new URL(link.href, location.href);if (url.origin"
+                " !== location.origin || !['http:', 'https:'].includes(url.pr"
+                "otocol)) return;if (url.pathname === location.pathname && ur"
+                "l.search === location.search && url.hash) return;if (!router"
+                ".resolve(url.pathname + url.search)) return;event.preventDef"
+                "ault(); router.push(url.pathname + url.search + url.hash);})"
+                ";"
             )
         aggregate_styles = sorted(self.build_dir.glob("styles*.css"))
         style_files = aggregate_styles or sorted(self.build_dir.rglob("*.css"))
@@ -291,6 +295,17 @@ def install_teloce(
     return integration
 
 
+def _validate_resource_url(tag: str, attributes: dict[str, Any]) -> None:
+    key = "src" if tag == "script" else "href"
+    url = attributes.get(key)
+    if not isinstance(url, str) or not url.strip():
+        raise ValueError(f"{tag} requires a nonempty {key}")
+    if any(ord(char) < 32 for char in url) or "\\" in url:
+        raise ValueError("Resource URLs must not contain control characters or backslashes")
+    if urlsplit(url).scheme.lower() not in {"", "http", "https"}:
+        raise ValueError("Resource URLs must be relative, HTTP or HTTPS")
+
+
 def _resource_tag(tag: str, attributes: dict[str, Any]) -> str:
     """Render explicitly supported resource attributes without accepting raw HTML."""
     allowed = (
@@ -301,14 +316,7 @@ def _resource_tag(tag: str, attributes: dict[str, Any]) -> str:
     unknown = attributes.keys() - allowed
     if unknown:
         raise ValueError(f"Unsupported {tag} attributes: {', '.join(sorted(unknown))}")
-    key = "src" if tag == "script" else "href"
-    url = attributes.get(key)
-    if not isinstance(url, str) or not url.strip():
-        raise ValueError(f"{tag} requires a nonempty {key}")
-    if any(ord(char) < 32 for char in url) or "\\" in url:
-        raise ValueError("Resource URLs must not contain control characters or backslashes")
-    if urlsplit(url).scheme.lower() not in {"", "http", "https"}:
-        raise ValueError("Resource URLs must be relative, HTTP or HTTPS")
+    _validate_resource_url(tag, attributes)
     parts = []
     for name, value in attributes.items():
         if name in {"defer", "async"}:

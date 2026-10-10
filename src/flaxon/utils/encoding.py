@@ -46,7 +46,8 @@ def url_decode(data: str) -> dict[str, Any]:
 def json_escape(data: str) -> str:
     """Escape a string for use in JSON."""
     return (
-        data.replace("\\", "\\\\")
+        data
+        .replace("\\", "\\\\")
         .replace('"', '\\"')
         .replace("\n", "\\n")
         .replace("\r", "\\r")
@@ -57,7 +58,8 @@ def json_escape(data: str) -> str:
 def html_escape(data: str) -> str:
     """Escape a string for use in HTML."""
     return (
-        data.replace("&", "&amp;")
+        data
+        .replace("&", "&amp;")
         .replace("<", "&lt;")
         .replace(">", "&gt;")
         .replace('"', "&quot;")

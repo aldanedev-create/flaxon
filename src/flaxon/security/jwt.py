@@ -7,7 +7,7 @@ from typing import Any, cast
 import jwt as pyjwt
 
 from flaxon.exceptions import Unauthorized
-from flaxon.http import Request
+from flaxon.security._request import endpoint_request
 
 
 class JWT:
@@ -91,18 +91,11 @@ class JWT:
 
 
 def jwt_required(func: Any) -> Any:
+    """Protect a callable with a jwt requirement."""
+
     @functools.wraps(func)
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        request = None
-        for arg in args:
-            if isinstance(arg, Request):
-                request = arg
-                break
-        if request is None:
-            for arg in kwargs.values():
-                if isinstance(arg, Request):
-                    request = arg
-                    break
+        request = endpoint_request(args, kwargs)
 
         if request is None:
             raise Unauthorized("Authentication required")

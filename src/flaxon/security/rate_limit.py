@@ -10,6 +10,8 @@ from flaxon.http import JSONResponse
 
 
 class RateLimiter:
+    """Rate limiter implementation for the security subsystem."""
+
     def __init__(
         self,
         requests: int = 60,
@@ -27,6 +29,7 @@ class RateLimiter:
         return str(client[0])
 
     async def check(self, scope: dict[str, Any]) -> bool:
+        """Perform the check operation for rate limiter."""
         key = self.key_func(scope)
         now = time.monotonic()
 
@@ -44,6 +47,7 @@ class RateLimiter:
             return True
 
     def get_remaining(self, scope: dict[str, Any]) -> int:
+        """Return the remaining."""
         key = self.key_func(scope)
         now = time.monotonic()
         bucket = self.hits.get(key, deque())
@@ -55,6 +59,7 @@ class RateLimiter:
         return max(0, self.requests - len(bucket))
 
     def get_retry_after(self, scope: dict[str, Any]) -> int:
+        """Return the retry after."""
         key = self.key_func(scope)
         now = time.monotonic()
         bucket = self.hits.get(key, deque())
@@ -73,6 +78,8 @@ class RateLimiter:
 
 
 class RateLimitMiddleware:
+    """Rate limit middleware implementation for the security subsystem."""
+
     def __init__(
         self,
         app: Any,
@@ -84,6 +91,7 @@ class RateLimitMiddleware:
         self.limiter = RateLimiter(requests, window_seconds, key_func)
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        """Handle the supplied call using this object's configured behavior."""
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return
@@ -110,6 +118,8 @@ class RateLimitMiddleware:
 
 
 class DistributedRateLimiter:
+    """Distributed rate limiter implementation for the security subsystem."""
+
     def __init__(self, redis_client: Any, prefix: str = "rate_limit") -> None:
         self.redis = redis_client
         self.prefix = prefix
@@ -120,6 +130,7 @@ class DistributedRateLimiter:
         requests: int = 60,
         window_seconds: int = 60,
     ) -> bool:
+        """Perform the check operation for distributed rate limiter."""
         full_key = f"{self.prefix}:{key}"
         now = time.time()
         window_start = now - window_seconds
@@ -138,6 +149,7 @@ class DistributedRateLimiter:
         return count < requests
 
     async def get_remaining(self, key: str, requests: int = 60, window_seconds: int = 60) -> int:
+        """Return the remaining."""
         full_key = f"{self.prefix}:{key}"
         now = int(time.time())
         window_start = now - window_seconds
@@ -147,6 +159,7 @@ class DistributedRateLimiter:
         return max(0, requests - count)
 
     async def get_retry_after(self, key: str, requests: int = 60, window_seconds: int = 60) -> int:
+        """Return the retry after."""
         full_key = f"{self.prefix}:{key}"
         now = int(time.time())
         window_start = now - window_seconds

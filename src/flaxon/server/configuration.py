@@ -7,6 +7,8 @@ from typing import Any
 
 @dataclass
 class ServerConfig:
+    """Server config implementation for the server subsystem."""
+
     host: str = "127.0.0.1"
     port: int = 8000
     reload: bool = False
@@ -29,7 +31,7 @@ class ServerConfig:
     backlog: int = 2048
     limit_concurrency: int | None = None
     limit_max_requests: int | None = None
-    app_dir: str = field(default_factory=lambda: os.getcwd())
+    app_dir: str = field(default_factory=os.getcwd)
     extra: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -46,6 +48,7 @@ class ServerConfig:
             self.reload = True
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a dictionary representation of the current value."""
         return {
             "host": self.host,
             "port": self.port,
@@ -74,10 +77,13 @@ class ServerConfig:
         }
 
     def is_development(self) -> bool:
+        """Return whether development holds for the current value."""
         return self.env == "development"
 
     def is_production(self) -> bool:
+        """Return whether production holds for the current value."""
         return self.env == "production"
 
     def is_testing(self) -> bool:
+        """Return whether testing holds for the current value."""
         return self.env == "testing"

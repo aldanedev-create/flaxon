@@ -41,6 +41,7 @@ class Response:
         return JSONResponse(value, legacy=json_mode == "legacy")
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        """Handle the supplied call using this object's configured behavior."""
         await send({
             "type": "http.response.start",
             "status": self.status_code,
@@ -110,6 +111,7 @@ class StreamingResponse(Response):
         self.headers.setdefault("content-type", self.media_type)
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        """Handle the supplied call using this object's configured behavior."""
         await send({
             "type": "http.response.start",
             "status": self.status_code,

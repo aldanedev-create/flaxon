@@ -6,6 +6,7 @@ This module provides utilities for handling HTTP content types.
 
 from __future__ import annotations
 
+import contextlib
 import mimetypes
 from typing import Any
 
@@ -81,10 +82,7 @@ class ContentType:
         if pattern_type != "*" and parsed["type"] != pattern_type:
             return False
 
-        if pattern_subtype != "*" and parsed["subtype"] != pattern_subtype:
-            return False
-
-        return True
+        return not (pattern_subtype != "*" and parsed["subtype"] != pattern_subtype)
 
     @classmethod
     def is_json(cls, content_type: str) -> bool:
@@ -151,9 +149,7 @@ class ContentType:
         Returns:
             True if the content type is XML.
         """
-        return cls.matches(content_type, "application/xml") or cls.matches(
-            content_type, "text/xml"
-        )
+        return cls.matches(content_type, "application/xml") or cls.matches(content_type, "text/xml")
 
     @classmethod
     def get_extension(cls, content_type: str) -> str:
@@ -219,9 +215,7 @@ def ensure_json_content_type(request: Any) -> None:
     """
     content_type = request.headers.get("content-type", "")
     if not ContentType.is_json(content_type):
-        raise BadRequest(
-            f"Content-Type must be application/json, got: {content_type}"
-        )
+        raise BadRequest(f"Content-Type must be application/json, got: {content_type}")
 
 
 def ensure_form_content_type(request: Any) -> None:
@@ -249,17 +243,16 @@ def get_accept_types(request: Any) -> list[dict[str, Any]]:
         return []
 
     types: list[dict[str, Any]] = []
-    for part in accept.split(","):
+    for raw_part in accept.split(","):
+        part = raw_part
         part = part.strip()
         if ";" in part:
             main, params = part.split(";", 1)
             weight = 1.0
             for param in params.split(";"):
                 if param.strip().startswith("q="):
-                    try:
+                    with contextlib.suppress(ValueError):
                         weight = float(param.strip().split("=")[1])
-                    except ValueError:
-                        pass
             types.append({"type": main.strip(), "q": weight})
         else:
             types.append({"type": part, "q": 1.0})

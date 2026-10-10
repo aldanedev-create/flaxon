@@ -29,20 +29,25 @@ class WebSocketManager:
                 await socket.send_json(value)
 
     async def connect(self, socket: Any) -> None:
+        """Open the configured connection."""
         self.connections.add(socket)
 
     async def disconnect(self, socket: Any) -> None:
+        """Close the configured connection."""
         self.connections.discard(socket)
         for members in self.rooms.values():
             members.discard(socket)
 
     async def join(self, room: str, socket: Any) -> None:
+        """Add the connection to the named room."""
         self.rooms[room].add(socket)
 
     async def leave(self, room: str, socket: Any) -> None:
+        """Remove the connection from the named room."""
         self.rooms[room].discard(socket)
 
     async def broadcast_json(self, room: str, value: Any) -> None:
+        """Perform the broadcast json operation for web socket manager."""
         if self.broadcaster is not None:
             await self.broadcaster.publish(room, value)
             if room in self._listeners:
@@ -51,6 +56,7 @@ class WebSocketManager:
             await socket.send_json(value)
 
     async def close_broadcaster(self) -> None:
+        """Perform the close broadcaster operation for web socket manager."""
         for task in self._listeners.values():
             task.cancel()
         self._listeners.clear()

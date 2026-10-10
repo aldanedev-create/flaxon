@@ -12,4 +12,5 @@ class Middleware:
         self.app = app
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        """Handle the supplied call using this object's configured behavior."""
         await self.app(scope, receive, send)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 from dataclasses import dataclass
 from typing import Any
@@ -9,19 +10,25 @@ from urllib.parse import urlencode, urlsplit
 
 @dataclass
 class TestResponse:
+    """Test response implementation for the testing subsystem."""
+
     status_code: int
     headers: dict[str, str]
     content: bytes
 
     @property
     def text(self) -> str:
+        """Return the configured text."""
         return self.content.decode("utf-8")
 
     def json(self) -> Any:
+        """Decode or expose the JSON representation of the current value."""
         return json.loads(self.content)
 
 
 class AsyncTestClient:
+    """Async test client implementation for the testing subsystem."""
+
     def __init__(self, app: Any, base_url: str = "http://testserver") -> None:
         self.app = app
         self.base_url = base_url.rstrip("/")
@@ -36,6 +43,7 @@ class AsyncTestClient:
         headers: dict[str, str] | None = None,
         query: dict[str, Any] | None = None,
     ) -> TestResponse:
+        """Perform the request operation for async test client."""
         url = urlsplit(f"{self.base_url}{path}")
         query_string = url.query
         if query:
@@ -98,28 +106,37 @@ class AsyncTestClient:
         return TestResponse(start["status"], response_headers, b"".join(chunks))
 
     async def get(self, path: str, **kwargs: Any) -> TestResponse:
+        """Retrieve the requested value using this object's configured behavior."""
         return await self.request("GET", path, **kwargs)
 
     async def post(self, path: str, **kwargs: Any) -> TestResponse:
+        """Register or issue an HTTP POST operation."""
         return await self.request("POST", path, **kwargs)
 
     async def put(self, path: str, **kwargs: Any) -> TestResponse:
+        """Register or issue an HTTP PUT operation."""
         return await self.request("PUT", path, **kwargs)
 
     async def patch(self, path: str, **kwargs: Any) -> TestResponse:
+        """Register or issue an HTTP PATCH operation."""
         return await self.request("PATCH", path, **kwargs)
 
     async def delete(self, path: str, **kwargs: Any) -> TestResponse:
+        """Send an HTTP DELETE request."""
         return await self.request("DELETE", path, **kwargs)
 
     async def options(self, path: str, **kwargs: Any) -> TestResponse:
+        """Register or issue an HTTP OPTIONS operation."""
         return await self.request("OPTIONS", path, **kwargs)
 
     async def head(self, path: str, **kwargs: Any) -> TestResponse:
+        """Register or issue an HTTP HEAD operation."""
         return await self.request("HEAD", path, **kwargs)
 
 
 class TestClient:
+    """Test client implementation for the testing subsystem."""
+
     __test__ = False
 
     def __init__(self, app: Any, base_url: str = "http://testserver") -> None:
@@ -141,36 +158,43 @@ class TestClient:
         )
 
     def request(self, method: str, path: str, **kwargs: Any) -> TestResponse:
+        """Perform the request operation for test client."""
         return self._run(self.async_client.request(method, path, **kwargs))
 
     def close(self) -> None:
+        """Release the resources held by this object."""
         if self._loop is not None and not self._loop.is_closed():
             self._loop.close()
 
     def __del__(self) -> None:
-        try:
+        # Best-effort finalizer; explicit close() still reports errors.
+        with contextlib.suppress(RuntimeError, AttributeError):
             self.close()
-        except (RuntimeError, AttributeError):
-            # Best-effort finalizer; explicit close() still reports errors.
-            pass
 
     def get(self, path: str, **kwargs: Any) -> TestResponse:
+        """Retrieve the requested value using this object's configured behavior."""
         return self.request("GET", path, **kwargs)
 
     def post(self, path: str, **kwargs: Any) -> TestResponse:
+        """Register or issue an HTTP POST operation."""
         return self.request("POST", path, **kwargs)
 
     def put(self, path: str, **kwargs: Any) -> TestResponse:
+        """Register or issue an HTTP PUT operation."""
         return self.request("PUT", path, **kwargs)
 
     def patch(self, path: str, **kwargs: Any) -> TestResponse:
+        """Register or issue an HTTP PATCH operation."""
         return self.request("PATCH", path, **kwargs)
 
     def delete(self, path: str, **kwargs: Any) -> TestResponse:
+        """Send an HTTP DELETE request."""
         return self.request("DELETE", path, **kwargs)
 
     def options(self, path: str, **kwargs: Any) -> TestResponse:
+        """Register or issue an HTTP OPTIONS operation."""
         return self.request("OPTIONS", path, **kwargs)
 
     def head(self, path: str, **kwargs: Any) -> TestResponse:
+        """Register or issue an HTTP HEAD operation."""
         return self.request("HEAD", path, **kwargs)

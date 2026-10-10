@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from flaxon.database.sql import statement
 from flaxon.tasks.exceptions import TaskNotFoundError
 from flaxon.tasks.result import TaskResult
 from flaxon.tasks.task import Task, TaskStatus
@@ -23,40 +24,49 @@ class DatabaseBackend:
 
     async def initialize(self) -> None:
         """Create the task and result tables if they do not exist."""
-        await self.db.execute(f"""
-            CREATE TABLE IF NOT EXISTS {self.table_name} (
-                id VARCHAR(64) PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                status VARCHAR(32) NOT NULL,
-                queue VARCHAR(64) NOT NULL,
-                priority INTEGER DEFAULT 0,
-                retry_count INTEGER DEFAULT 0,
-                created_at TIMESTAMP NOT NULL,
-                started_at TIMESTAMP,
-                completed_at TIMESTAMP,
-                error TEXT
+        await self.db.execute(
+            statement(
+                (
+                    "\n            CREATE TABLE IF NOT EXISTS {name_0} (\n         "
+                    "       id VARCHAR(64) PRIMARY KEY,\n                name VARC"
+                    "HAR(255) NOT NULL,\n                status VARCHAR(32) NOT NU"
+                    "LL,\n                queue VARCHAR(64) NOT NULL,\n            "
+                    "    priority INTEGER DEFAULT 0,\n                retry_count "
+                    "INTEGER DEFAULT 0,\n                created_at TIMESTAMP NOT "
+                    "NULL,\n                started_at TIMESTAMP,\n                "
+                    "completed_at TIMESTAMP,\n                error TEXT\n         "
+                    "   )\n        "
+                ),
+                name_0=self.table_name,
             )
-        """)
+        )
 
-        await self.db.execute(f"""
-            CREATE TABLE IF NOT EXISTS {self.result_table} (
-                task_id VARCHAR(64) PRIMARY KEY,
-                result TEXT,
-                status VARCHAR(32) NOT NULL,
-                created_at TIMESTAMP NOT NULL,
-                completed_at TIMESTAMP,
-                retry_count INTEGER DEFAULT 0
+        await self.db.execute(
+            statement(
+                (
+                    "\n            CREATE TABLE IF NOT EXISTS {name_0} (\n         "
+                    "       task_id VARCHAR(64) PRIMARY KEY,\n                resu"
+                    "lt TEXT,\n                status VARCHAR(32) NOT NULL,\n      "
+                    "          created_at TIMESTAMP NOT NULL,\n                com"
+                    "pleted_at TIMESTAMP,\n                retry_count INTEGER DEF"
+                    "AULT 0\n            )\n        "
+                ),
+                name_0=self.result_table,
             )
-        """)
+        )
 
     async def store_task(self, task: Task) -> None:
         """Save a task record using its task identifier."""
         await self.db.execute(
-            f"""
-            INSERT OR REPLACE INTO {self.table_name}
-            (id, name, status, queue, priority, retry_count, created_at, started_at, completed_at, error)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            """,
+            statement(
+                (
+                    "\n            INSERT OR REPLACE INTO {name_0}\n            (id"
+                    ", name, status, queue, priority, retry_count, created_at, st"
+                    "arted_at, completed_at, error)\n            VALUES ($1, $2, $"
+                    "3, $4, $5, $6, $7, $8, $9, $10)\n            "
+                ),
+                name_0=self.table_name,
+            ),
             task.id,
             task.name,
             task.status.value,
@@ -72,7 +82,7 @@ class DatabaseBackend:
     async def get_task(self, task_id: str) -> Task | None:
         """Read a task record, returning None when it is absent."""
         row = await self.db.fetch_one(
-            f"SELECT * FROM {self.table_name} WHERE id = $1",
+            statement("SELECT * FROM {name_0} WHERE id = $1", name_0=self.table_name),
             task_id,
         )
         if row is None:
@@ -103,18 +113,21 @@ class DatabaseBackend:
     async def remove_task(self, task_id: str) -> None:
         """Remove the stored task identified by task_id."""
         await self.db.execute(
-            f"DELETE FROM {self.table_name} WHERE id = $1",
+            statement("DELETE FROM {name_0} WHERE id = $1", name_0=self.table_name),
             task_id,
         )
 
     async def store_result(self, result: TaskResult) -> None:
         """Save the result snapshot for a task."""
         await self.db.execute(
-            f"""
-            INSERT OR REPLACE INTO {self.result_table}
-            (task_id, result, status, created_at, completed_at, retry_count)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            """,
+            statement(
+                (
+                    "\n            INSERT OR REPLACE INTO {name_0}\n            (ta"
+                    "sk_id, result, status, created_at, completed_at, retry_count"
+                    ")\n            VALUES ($1, $2, $3, $4, $5, $6)\n            "
+                ),
+                name_0=self.result_table,
+            ),
             result.id,
             json.dumps(result.result, default=str) if result.result is not None else None,
             result.status.value,
@@ -126,7 +139,7 @@ class DatabaseBackend:
     async def get_result(self, task_id: str) -> TaskResult | None:
         """Read a stored task result, returning None when it is absent."""
         row = await self.db.fetch_one(
-            f"SELECT * FROM {self.result_table} WHERE task_id = $1",
+            statement("SELECT * FROM {name_0} WHERE task_id = $1", name_0=self.result_table),
             task_id,
         )
         if row is None:
@@ -152,17 +165,17 @@ class DatabaseBackend:
     async def remove_result(self, task_id: str) -> None:
         """Remove the stored result identified by task_id."""
         await self.db.execute(
-            f"DELETE FROM {self.result_table} WHERE task_id = $1",
+            statement("DELETE FROM {name_0} WHERE task_id = $1", name_0=self.result_table),
             task_id,
         )
 
     async def list_tasks(self, status: TaskStatus | None = None) -> list[Task]:
         """Return stored tasks using the available queue and status filters."""
         if status is None:
-            rows = await self.db.fetch_all(f"SELECT * FROM {self.table_name}")
+            rows = await self.db.fetch_all(statement("SELECT * FROM {name_0}", name_0=self.table_name))
         else:
             rows = await self.db.fetch_all(
-                f"SELECT * FROM {self.table_name} WHERE status = $1",
+                statement("SELECT * FROM {name_0} WHERE status = $1", name_0=self.table_name),
                 status.value,
             )
 
@@ -187,5 +200,5 @@ class DatabaseBackend:
 
     async def clear(self) -> None:
         """Remove stored task and result records."""
-        await self.db.execute(f"DELETE FROM {self.table_name}")
-        await self.db.execute(f"DELETE FROM {self.result_table}")
+        await self.db.execute(statement("DELETE FROM {name_0}", name_0=self.table_name))
+        await self.db.execute(statement("DELETE FROM {name_0}", name_0=self.result_table))

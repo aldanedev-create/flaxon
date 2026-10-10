@@ -2,8 +2,8 @@
 
 This audit starts from commit `f4ab3cd440234750f6220ee2fc107dde58b93132`.
 It improves HTTP route lookup and error visibility, fixes the whole-package
-mypy invocation, and adds gates against new lint debt. It does not claim that
-Flaxon is completely lint-clean or fully type-checked.
+mypy invocation, and adds gates against new lint debt. The historical measurements below precede the complete lint cleanup documented
+at the end. Flaxon is not fully type-checked.
 
 ## HTTP routing
 
@@ -179,3 +179,36 @@ claim.
 The full suite completed with **946 passed and 32 skipped**, with default
 coverage options and benchmark timing disabled. This verifies test assertions;
 the existing coverage gap described above remains.
+
+
+## Complete configured lint cleanup
+
+The remaining 2,973 active findings are resolved. Ruff 0.16.10 now passes
+`ruff check src/flaxon`, and the per-file baseline is empty. CI runs every
+configured rule. No rule selection or global/per-file ignore was broadened.
+This means clean under the repository's existing configuration, not every
+possible Ruff rule or a complete security/type audit.
+
+The changes document public APIs, simplify large handlers, validate SQL
+identifiers, preserve lazy optional imports, and fix synchronous cache writes.
+Admin/CMS authorization, CSRF checks, transaction boundaries, stale-edit checks,
+and route registration order remain part of regression testing.
+
+Reviewed local exceptions retain established positional public APIs and the
+standard-library redirect-handler signature (PLR0917). CLI subprocess calls
+use argument lists without a shell (S603); outbound service requests validate
+HTTP(S) URLs and disable redirects (S310). The explicit trusted pickle mode
+retains S301 with a warning at the call site. These exceptions are visible
+`noqa` annotations with reasons, not globally disabled rules. Therefore this
+is not a claim that every former finding was fixed without suppressions.
+
+Task pickle loading now rejects arbitrary imported globals by default. Ordinary
+containers and allowlisted datetime, decimal and UUID values still round-trip.
+Custom classes need `Serializer.from_pickle(data, trusted=True)`, which can
+execute code and must never receive user-controlled or unauthenticated input.
+The restricted loader does not prevent memory-exhaustion or other resource attacks;
+prefer JSON for external inputs. Existing exception imports retain aliases to
+Error-suffixed classes; code relying on an exception's `__name__` should migrate.
+
+The strict typing gate remains limited to 15 core modules. The existing overall
+coverage threshold and optional browser/service test requirements are unchanged.

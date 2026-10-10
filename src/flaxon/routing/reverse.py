@@ -98,8 +98,7 @@ class ReverseResolver:
     def _replace_param(self, path: str, name: str, value: str) -> str:
         """Replace a parameter in a path with its value."""
         path = re.sub(rf"<(?:[a-zA-Z_][a-zA-Z0-9_]*:)?{re.escape(name)}>", value, path)
-        path = re.sub(rf"{{{re.escape(name)}(?::[a-zA-Z_][a-zA-Z0-9_]*)?}}", value, path)
-        return path
+        return re.sub(rf"{{{re.escape(name)}(?::[a-zA-Z_][a-zA-Z0-9_]*)?}}", value, path)
 
     def url_for(self, name: str, **params: Any) -> str:
         """
@@ -127,8 +126,4 @@ class ReverseResolver:
         routes = getattr(self.router, "routes", [])
         websocket_routes = getattr(self.router, "websocket_routes", [])
 
-        for route in [*routes, *websocket_routes]:
-            if getattr(route, "name", None) == name:
-                return True
-
-        return False
+        return any(getattr(route, "name", None) == name for route in [*routes, *websocket_routes])

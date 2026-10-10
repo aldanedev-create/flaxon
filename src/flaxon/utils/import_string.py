@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import importlib
-import os
 import sys
+from pathlib import Path
 from typing import Any
 
 
@@ -29,7 +29,7 @@ def import_string(value: str) -> Any:
 
     module_name, attribute = value.split(":", 1)
 
-    cwd = os.getcwd()
+    cwd = str(Path.cwd())
     if cwd not in sys.path:
         sys.path.insert(0, cwd)
 

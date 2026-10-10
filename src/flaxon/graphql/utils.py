@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 
@@ -16,6 +17,7 @@ async def graphql(
 
 
 def graphql_to_dict(obj: Any) -> dict[str, Any]:
+    """Provide to dict behavior for GraphQL integration."""
     if obj is None:
         return {}
 
@@ -32,10 +34,12 @@ def graphql_to_dict(obj: Any) -> dict[str, Any]:
 
 
 def graphql_to_json(obj: Any) -> str:
+    """Provide to json behavior for GraphQL integration."""
     return json.dumps(graphql_to_dict(obj), default=str)
 
 
 def graphql_format_error(message: str, line: int | None = None, column: int | None = None) -> dict[str, Any]:
+    """Provide format error behavior for GraphQL integration."""
     error = {"message": message}
     if line is not None and column is not None:
         error["locations"] = [{"line": line, "column": column}]
@@ -43,16 +47,17 @@ def graphql_format_error(message: str, line: int | None = None, column: int | No
 
 
 def graphql_is_valid_name(name: str) -> bool:
-    import re
+    """Provide is valid name behavior for GraphQL integration."""
     return bool(re.match(r"^[_a-zA-Z][_a-zA-Z0-9]*$", name))
 
 
 def graphql_sanitize_name(name: str) -> str:
-    import re
+    """Provide sanitize name behavior for GraphQL integration."""
     return re.sub(r"[^_a-zA-Z0-9]", "_", name)
 
 
 def graphql_get_field_names(obj: Any) -> list[str]:
+    """Provide get field names behavior for GraphQL integration."""
     if obj is None:
         return []
 
@@ -63,12 +68,13 @@ def graphql_get_field_names(obj: Any) -> list[str]:
         return list(obj.keys())
 
     if hasattr(obj, "__dict__"):
-        return [k for k in obj.__dict__.keys() if not k.startswith("_")]
+        return [k for k in obj.__dict__ if not k.startswith("_")]
 
     return []
 
 
 def graphql_get_value(obj: Any, field: str) -> Any:
+    """Provide get value behavior for GraphQL integration."""
     if obj is None:
         return None
 
@@ -85,6 +91,7 @@ def graphql_get_value(obj: Any, field: str) -> Any:
 
 
 async def graphql_async_get_value(obj: Any, field: str) -> Any:
+    """Provide async get value behavior for GraphQL integration."""
     value = graphql_get_value(obj, field)
     if hasattr(value, "__await__"):
         return await value
@@ -92,12 +99,14 @@ async def graphql_async_get_value(obj: Any, field: str) -> Any:
 
 
 def graphql_is_required_field(field: Any) -> bool:
+    """Provide is required field behavior for GraphQL integration."""
     if hasattr(field, "required"):
         return field.required
     return False
 
 
 def graphql_get_default_value(field: Any) -> Any:
+    """Provide get default value behavior for GraphQL integration."""
     if hasattr(field, "default_value"):
         return field.default_value
     return None
