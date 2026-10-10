@@ -1,6 +1,6 @@
 # Teloce SSR and the Flaxon debugger
 
-Flaxon loads application data and returns HTTP responses. Teloce owns template compilation, server rendering and browser hydration. Its independent renderer does not import Flaxon. Use matching package versions containing the AST renderer; while developing these changes, install both updated checkouts with `pip install -e /path/to/teloce-py -e /path/to/flaxon`.
+Flaxon loads application data and returns HTTP responses. Teloce owns template compilation, server rendering and browser hydration. Its independent renderer does not import Flaxon. Use matching package versions containing the AST renderer; if your published packages do not yet include the integration, install both matching updated checkouts with `pip install -e /path/to/teloce-py -e /path/to/flaxon`.
 
 ## Enable SSR deliberately
 

@@ -1,10 +1,11 @@
 # Project Manager: complete full-stack ebook
 
 Create your own project with `flaxon new project_manager`, then build the entire
-application in order. Every lesson includes complete files, commands, verification,
+application in order. Every lesson includes precise CREATE/EDIT/REPLACE instructions, code, recording notes, commands, verification,
 common errors and an exercise. Use Python 3.12 and the pinned course dependencies.
-The supplied Flaxon 0.2.7 wheel is an unreleased repository build with the ORM and
-CLI fixes; do not substitute a different PyPI release while following this revision.
+The public recording target is Flaxon 3.0.0 after publication and a clean rehearsal.
+Until then, the supplied preview wheels remain the verified installation path.
+The book distinguishes release and preview requirements explicitly.
 
 [Course repository and completed application](https://github.com/aldanedev-create/FreecodeCamp-flaxon-project-manager-course)
 

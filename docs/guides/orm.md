@@ -297,3 +297,7 @@ Admin and CMS use their durable AdminStore by default; they only automatically
 use a legacy database object implementing both `execute()` and `fetch_all()`.
 Choose `ADMIN_STORE_BACKEND = "orm"` explicitly to store metadata through the ORM.
 Do not pass the lifecycle object as `database=` to AdminDashboard or CMS.
+
+## Learn the ORM by building an application
+
+The [project manager models chapter](../fullstack/project-manager/03.md) supplies complete models and exact migration commands, then explains `flaxon.db.Model`, `fields`, async ownership-scoped queries and `in_transaction`. Continue through authentication, projects, tasks and staff registration. The [course contents](../fullstack/project-manager/index.md) distinguishes the planned Flaxon 3.0.0 release install from the bundled preview.
