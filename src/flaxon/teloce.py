@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import hashlib
 import html
 import json
@@ -14,7 +15,7 @@ from urllib.parse import urlsplit
 
 from flaxon._imports import import_attribute
 from flaxon.debugging.teloce import TeloceDebugger
-from flaxon.http import HTMLResponse, JSONResponse, Request
+from flaxon.http import HTMLResponse, JSONResponse, Request, Response
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +47,7 @@ class Teloce:
         stylesheets: list[str | dict[str, Any]] | None = None,
         scripts: list[str | dict[str, Any]] | None = None,
         options: dict[str, Any] | None = None,
+        plugins: dict[str, Any] | None = None,
     ) -> None:
         self.app = app
         self.project_root = Path(project_root or Path.cwd()).resolve()
@@ -69,7 +71,11 @@ class Teloce:
         for resource in scripts or []:
             attributes = {"src": resource} if isinstance(resource, str) else dict(resource)
             self.head_tags.append(_resource_tag("script", attributes))
-        self.options = dict(options or {})
+        self.options = copy.deepcopy(options or {})
+        if plugins is not None:
+            self.options["plugins"] = copy.deepcopy(plugins)
+        self.options["public_path"] = self.static_url + "/"
+        self._configure_plugins(app)
         self.sources: list[TeloceSource] = []
         self.build_result: dict[str, Any] | None = None
         self.router_output: str | None = None
@@ -143,6 +149,7 @@ class Teloce:
             }
             build_options.update(self._ssr_build_options())
             result = builder_type(build_options).build(self.project_root, self.build_dir)
+            self._validate_plugin_build(result)
             if self._check_build_failure(result):
                 return result
 
@@ -193,6 +200,72 @@ class Teloce:
             return result
         finally:
             self._building = False
+
+    def _validate_plugin_build(self, result: dict[str, Any]) -> None:
+        """Fail clearly when an older compiler silently ignores requested modules."""
+        if result.get("failed"):
+            return
+        configured = self.options.get("plugins") or {}
+        requested = {
+            name
+            for name, value in configured.items()
+            if value is True or (isinstance(value, dict) and value.get("enabled") is not False)
+        }
+        emitted = set((result.get("plugins") or {}).get("enabled", []))
+        if requested - emitted:
+            raise RuntimeError("Upgrade teloce-py to a release supporting the requested first-party plugins")
+
+    def _configure_plugins(self, app: Any) -> None:
+        """Validate first-party options and mount an explicitly scoped PWA worker."""
+        selected_plugins = self.options.get("plugins") or {}
+        if not isinstance(selected_plugins, dict):
+            raise ValueError("Teloce plugins must be an options dictionary")
+        pwa = selected_plugins.get("pwa")
+        if pwa is True:
+            pwa = {}
+            selected_plugins["pwa"] = pwa
+        if isinstance(pwa, dict) and pwa.get("enabled") is not False:
+            pwa.setdefault("workerURL", "/teloce-sw.js")
+            pwa.setdefault("scope", "/")
+            worker_url = urlsplit(pwa["workerURL"])
+            if (
+                worker_url.scheme
+                or worker_url.netloc
+                or worker_url.query
+                or worker_url.fragment
+                or not worker_url.path.startswith("/")
+            ):
+                raise ValueError("PWA workerURL must be an absolute same-origin URL path")
+            app.router.get(worker_url.path)(self.service_worker)
+
+    async def service_worker(self) -> Response:
+        """Serve the optional worker at its registration path with explicit scope."""
+        if self.build_result is None:
+            await asyncio.to_thread(self.build)
+        path = self.build_dir / "teloce-plugins/sw.js"
+        if not path.is_file():
+            raise RuntimeError("PWA requires a Teloce release supporting first-party plugins")
+        scope = self.options["plugins"]["pwa"].get("scope", "/")
+        return Response(
+            path.read_bytes(),
+            headers={
+                "content-type": "application/javascript; charset=utf-8",
+                "cache-control": "no-cache",
+                "service-worker-allowed": scope,
+            },
+        )
+
+    def _plugin_scripts(self, meta: dict[str, str]) -> tuple[str, str, str]:
+        """Initialize enabled modules before component mount and attach router hooks."""
+        descriptor = (self.build_result or {}).get("plugins")
+        if not descriptor:
+            return "", "", ""
+        url = self.static_url + "/" + descriptor["entry"]
+        return (
+            f"import {{ installPlugins, connectPlugins }} from {json.dumps(url)};",
+            "const plugins = await installPlugins(" + json.dumps(meta).replace("<", "\\u003c") + ");",
+            "connectPlugins(plugins, window.__TELOCE_ROUTER__);",
+        )
 
     def _capture_development_revision(self) -> None:
         """Record inputs before a development build, including failed attempts."""
@@ -262,8 +335,20 @@ class Teloce:
         )
         app_url = f"{self.static_url}/{output}"
         debug_script = self._debug_client_script()
-        meta_tags = _page_meta(meta or {})
-        page_title = title or (meta or {}).get("title") or self.title
+        configured_head = (self.options.get("plugins") or {}).get("head")
+        defaults = (
+            configured_head
+            if isinstance(configured_head, dict) and configured_head.get("enabled") is not False
+            else {}
+        )
+        combined_meta = {
+            **{key: value for key, value in defaults.items() if key not in {"pages", "enabled"}},
+            **(meta or {}),
+        }
+        aliases = {"ogTitle": "og:title", "ogDescription": "og:description", "ogImage": "og:image"}
+        combined_meta = {aliases.get(key, key): value for key, value in combined_meta.items()}
+        meta_tags = _page_meta(combined_meta)
+        page_title = title or combined_meta.get("title") or self.title
         router_import = ""
         router_mount = ""
         if self.router_output:
@@ -294,6 +379,15 @@ class Teloce:
         ]
         css_link = "\n  ".join(css_links)
         head_tags = "\n  ".join(self.head_tags)
+        plugin_import, plugin_mount, plugin_connect = self._plugin_scripts(combined_meta)
+        descriptor = (self.build_result or {}).get("plugins") or {}
+        if descriptor.get("pwa"):
+            manifest_url = self.static_url + "/" + descriptor["pwa"]["manifest"]
+            head_tags += f'<link rel="manifest" href="{html.escape(manifest_url, quote=True)}">'
+        if "head" in descriptor.get("enabled", []):
+            meta_tags = meta_tags.replace("<meta ", "<meta data-teloce-head ").replace(
+                "<link ", "<link data-teloce-head "
+            )
         document = f"""<!doctype html>
 <html lang="{html.escape(self.lang, quote=True)}">
 <head>
@@ -312,9 +406,12 @@ class Teloce:
   <script type="module">
     import {{ mount{", hydrate" if rendered is not None else ""} }} from {json.dumps(app_url)};
     {router_import}
+    {plugin_import}
+    {plugin_mount}
     const context = JSON.parse(document.getElementById("__FLAXON_TELOCE_DATA__").textContent);
     window.__FLAXON_TELOCE__ = {"hydrate" if rendered is not None else "mount"}("#app", context);
     {router_mount}
+    {plugin_connect}
   </script>
 </body>
 </html>"""

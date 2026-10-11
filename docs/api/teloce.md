@@ -285,3 +285,43 @@ This is automatic rebuilding and full-page reload, not state-preserving componen
 Unsaved editor changes are not visible; enable your editor's Auto Save if desired.
 Python changes still use the development server's Python reload. Imported files outside
 registered UI roots are not watched. Production registers no reload endpoint or client.
+
+## Optional first-party modules
+
+Configure these in `app.use_teloce(plugins={...})`:
+
+```python
+app.use_teloce(ui_dir="ui", plugins={
+    "forms": True,
+    "i18n": {"locale": "en", "messages": {"en": {"welcome": "Welcome"}}},
+    "accessibility": True,
+    "head": {"title": "Tasks", "pages": {"/projects": {"title": "Projects"}}},
+    "pwa": {"name": "Tasks", "scope": "/", "icons": [
+        {"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"},
+        {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"},
+    ]},
+})
+```
+
+Serve the icon files yourself. Browser APIs become available through `globalThis.telocePlugins`:
+`forms.createForm`, `i18n.t`, `accessibility.openDialog`, `head.set` and the asynchronous
+`pwa` registration result. Use `False` or `{"enabled": False}` to disable a module.
+Only enabled assets are emitted. The matching new Teloce version is required.
+
+Forms offer touched/errors/submission state and map server field errors; validation and
+CSRF/authentication remain server responsibilities. Subscriptions must be cleaned up.
+Translations use named placeholders and Intl plural/number/date formatting.
+Accessibility uses native dialogs, focus restoration and navigation announcements.
+Head defaults appear in server HTML; `request.compile(meta=...)` overrides them.
+SPA navigation uses `head.pages`, or call `head.set` for dynamic pages.
+
+PWA registration is disabled in debug mode. In production, Flaxon serves `/teloce-sw.js`
+with the configured allowed scope and injects the manifest link. HTTPS or localhost and
+valid icons are needed for browser installation eligibility. The worker caches only generated
+JS/CSS plus a generic offline fallback. It does not cache API, Admin or private user responses,
+and it does not implement offline editing. PWA registration failures never block mounting.
+Listen for `teloce:pwa-update` and `teloce:pwa-error`; activate updates only after the user
+has saved their work. Configuration is sent to the browser: never put secrets in plugin options.
+
+The full API and framework-neutral setup are documented in Teloce's
+`docs/first-party-plugins.md`. These are optional modules inside `teloce-py`, not separate pip packages.
