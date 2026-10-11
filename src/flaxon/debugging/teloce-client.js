@@ -50,7 +50,33 @@ export function installTeloceDebugger(config) {
     }
   };
   window.fetch = tracedFetch;
-  const cleanup = () => { closed = true; if (window.fetch === tracedFetch) window.fetch = originalFetch; overlay?.remove(); window.removeEventListener('teloce:error', runtime); window.removeEventListener('error', error); window.removeEventListener('unhandledrejection', rejection); };
+  // Serial polling avoids overlapping builds and works through ordinary HTTP proxies.
+  let revision = config.revision;
+  let reloadTimer;
+  const pollReload = async () => {
+    if (closed) return;
+    try {
+      const response = await nativeFetch('/__debug__/teloce/reload', {
+        method: 'POST', credentials: 'same-origin', cache: 'no-store',
+        headers: { 'x-flaxon-debug-token': config.token },
+      });
+      if (closed) return;
+      // A Python reload creates a new debugger token; reload to obtain it.
+      if (response.status === 403) { location.reload(); return; }
+      if (response.ok) {
+        const result = await response.json();
+        if (closed) return;
+        if (result.revision !== revision) {
+          revision = result.revision;
+          if (!result.failed) { location.reload(); return; }
+          show({ category: 'compile', message: 'Teloce rebuild failed. Open the Flaxon debugger for diagnostics.' });
+        }
+      }
+    } catch (_) { /* Retry while the Python server is restarting. */ }
+    if (!closed) reloadTimer = setTimeout(pollReload, 2000);
+  };
+  reloadTimer = setTimeout(pollReload, 2000);
+  const cleanup = () => { closed = true; clearTimeout(reloadTimer); if (window.fetch === tracedFetch) window.fetch = originalFetch; overlay?.remove(); window.removeEventListener('teloce:error', runtime); window.removeEventListener('error', error); window.removeEventListener('unhandledrejection', rejection); };
   globalThis.__FLAXON_TELOCE_DEBUG_CLEANUP__ = cleanup;
   globalThis.__FLAXON_TELOCE_REPORT__ = report;
   return cleanup;
