@@ -272,3 +272,16 @@ In `app.py`, call `app.use_teloce(...)` after mounting modules and before the
 `if app.is_management: return app` guard. Keep database connections and Admin
 store initialization after that guard. `build` does not run startup hooks or
 apply migrations. Backend-only projects do not need this command.
+
+## Automatic development rebuilds
+
+Run `python management.py runserver` with `DEBUG=True`. Saved `.html`, `.vel`,
+`.ts`, `.tsx`, `.js`, `.jsx`, `.css`, and `.json` changes inside registered application
+and module UI folders are detected by the development browser every two seconds.
+Flaxon rebuilds the UI once and refreshes open pages after a successful build.
+Compilation failures show a notice linking to the debugger; another saved edit retries.
+
+This is automatic rebuilding and full-page reload, not state-preserving component HMR.
+Unsaved editor changes are not visible; enable your editor's Auto Save if desired.
+Python changes still use the development server's Python reload. Imported files outside
+registered UI roots are not watched. Production registers no reload endpoint or client.

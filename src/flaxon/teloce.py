@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import html
 import json
 import logging
@@ -12,7 +14,7 @@ from urllib.parse import urlsplit
 
 from flaxon._imports import import_attribute
 from flaxon.debugging.teloce import TeloceDebugger
-from flaxon.http import HTMLResponse
+from flaxon.http import HTMLResponse, JSONResponse, Request
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +74,8 @@ class Teloce:
         self.build_result: dict[str, Any] | None = None
         self.router_output: str | None = None
         self._building = False
+        self._dev_revision = ""
+        self._dev_lock = asyncio.Lock()
         self._ssr_renderer = None
         self.debugger = TeloceDebugger(self)
 
@@ -82,6 +86,8 @@ class Teloce:
         cache_control = "no-cache"
         app.mount_static(self.static_url, str(self.build_dir), cache_control=cache_control)
         app.on_startup(self.build)
+        if app.debug:
+            app.router.post("/__debug__/teloce/reload")(self.development_reload)
 
     def register_source(
         self,
@@ -110,6 +116,7 @@ class Teloce:
         """Build all registered sources and one shared client-side router."""
         if self._building:
             raise RuntimeError("A Teloce build is already running")
+        self._capture_development_revision()
         self._building = True
         try:
             try:
@@ -186,6 +193,48 @@ class Teloce:
             return result
         finally:
             self._building = False
+
+    def _capture_development_revision(self) -> None:
+        """Record inputs before a development build, including failed attempts."""
+        if self.app.debug:
+            self._dev_revision = self._source_revision()
+
+    def _source_revision(self) -> str:
+        """Fingerprint registered UI inputs, excluding generated and dependency trees."""
+        digest = hashlib.sha256()
+        extensions = {".html", ".vel", ".ts", ".tsx", ".js", ".jsx", ".css", ".json"}
+        for source in self.sources:
+            for path in sorted(source.directory.rglob("*")):
+                if any(part in {"node_modules", ".git", ".venv", "__pycache__"} for part in path.parts):
+                    continue
+                if path == self.build_dir or self.build_dir in path.parents:
+                    continue
+                if path.suffix not in extensions or not path.is_file():
+                    continue
+                try:
+                    stat = path.stat()
+                except FileNotFoundError:
+                    continue
+                digest.update(f"{path}:{stat.st_mtime_ns}:{stat.st_size}".encode())
+        return digest.hexdigest()
+
+    async def development_reload(self, request: Request) -> JSONResponse:
+        """Rebuild changed UI inputs once; the development browser polls this endpoint."""
+        self.debugger._authorize(request)
+        async with self._dev_lock:
+            revision = await asyncio.to_thread(self._source_revision)
+            if revision != self._dev_revision:
+                try:
+                    await asyncio.to_thread(self.build)
+                except Exception as error:
+                    self._dev_revision = revision
+                    self.debugger.record({"category": "compile", "message": str(error)})
+                    self.build_result = {"failed": True}
+            failed = bool(self.build_result and self.build_result.get("failed"))
+            return JSONResponse(
+                {"revision": self._dev_revision, "failed": failed},
+                headers={"cache-control": "no-store"},
+            )
 
     def render(
         self,
@@ -355,7 +404,7 @@ class Teloce:
         if not self.app.debug:
             return ""
         resource = json.dumps(f"{self.static_url}/flaxon-debug.js")
-        config = json.dumps({"token": self.debugger.token})
+        config = json.dumps({"token": self.debugger.token, "revision": self._dev_revision})
         return (
             f'<script type="module">import {{ installTeloceDebugger }} from {resource};'
             f"installTeloceDebugger({config});</script>"
