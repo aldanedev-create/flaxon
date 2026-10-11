@@ -94,6 +94,7 @@ Use the guides for explanations, the API pages for reference, and the examples f
 - [Modules Guide](guides/Modules.md)
 - [OpenAPI, Swagger UI, and ReDoc](guides/openapi.md)
 - [Plugins](guides/plugins.md)
+- [Optional Teloce plugins: PWA, forms, i18n, accessibility and head](guides/teloce-first-party-plugins.md)
 - [Pydantic Integration](guides/pydantic.md)
 - [Requests](guides/requests.md)
 - [Responses](guides/responses.md)
@@ -214,3 +215,5 @@ Use the guides for explanations, the API pages for reference, and the examples f
 - [Release readiness audit](releases/readiness-audit.md)
 
 - [Routing and quality audit](quality-audit.md)
+
+- [16 | PWA: installation, offline fallback and updates](fullstack/project-manager/16.md)
