@@ -24,8 +24,15 @@ The book distinguishes release and preview requirements explicitly.
 - [13 | CMS help and sample data](13.md)
 - [14 | Full-stack verification](14.md)
 - [15 | Production build and Render](15.md)
+- [16 | PWA: installation, offline fallback and updates](16.md)
 
 Use scoped CSS in Teloce `.html` components, automatic signal helper imports,
 `data-teloce-link` navigation, explicit Flaxon modules, `settings.py`, `models.py`,
 Python migrations and `management.py`. Backend-only guides remain in the main
 documentation. These chapters are synchronized from the maintained course book.
+
+Chapter 16 adds the optional PWA plugin: generated icons, production registration,
+offline navigation fallback, explicit updates, and browser checks. It does not
+cache private API/Admin responses or queue writes while offline.
+
+[Download the companion PDF](https://flaxon.dev/downloads/flaxon-project-manager-course.pdf)
