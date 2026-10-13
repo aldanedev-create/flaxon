@@ -140,3 +140,25 @@ def test_parent_child_prop_errors_reach_development_checker_and_management(tmp_p
     checker.check()
     assert checker.result.ok
     assert management._typecheck(ui.app, SimpleNamespace(no_templates=False, json=False)) == 0
+
+
+def test_default_integration_does_not_start_checker_but_manual_command_works(tmp_path, monkeypatch):
+    (tmp_path / "ui").mkdir()
+    (tmp_path / "ui/app.html").write_text(
+        '<script lang="ts">const count: number = "wrong"; export default {};</script>'
+        '<template><p>Hello</p></template>'
+    )
+    ui = Flaxon("manual-checking", debug=True).use_teloce(project_root=tmp_path)
+    checker = ui.development_typecheck
+    assert ui.typecheck is False
+
+    def unexpected_check():
+        raise AssertionError("Default server must not invoke type checking")
+
+    monkeypatch.setattr(checker, "check", unexpected_check)
+    asyncio.run(checker.start())
+    assert checker.task is None
+    assert checker.result is None
+    # Compilation still succeeds; the separate checker reports the type error.
+    assert ui.build()["compiled"] >= 1
+    assert management._typecheck(ui.app, SimpleNamespace(no_templates=False, json=False)) == 1
