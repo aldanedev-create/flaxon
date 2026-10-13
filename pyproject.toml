@@ -51,6 +51,8 @@ dependencies = [
     "python-dotenv>=1.0,<2",
     "teloce-py>=0.2.6",
     "minifyjs>=0.1.3,<0.2",
+    "pytscheck>=0.1.1,<0.2",
+
 
 ]
 dynamic = ["version"]
@@ -81,9 +83,7 @@ standard = [
 pydantic = [
     "pydantic>=2.0",
 ]
-typecheck = [
-    "pytscheck>=0.1.1,<0.2",
-]
+
 mcp = [
     "fastmcp>=3.0",
 ]
