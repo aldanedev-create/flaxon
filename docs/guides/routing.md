@@ -579,3 +579,9 @@ authorization and privileged operations on the server; components call those
 endpoints and present their results. Follow the [full-stack lessons](../fullstack/index.md)
 and [Teloce integration reference](../api/teloce.md) to connect this capability
 to pages, components and application modules.
+
+## Route collision logging
+
+Expected overlaps such as `/admin/users` and `/admin/<model_name>` are logged at DEBUG when specificity determines the winner. Built-in Admin/CMS registration therefore does not emit warnings for these normal overlaps. Distinct literal paths such as `/admin/cms` and `/admin/cms/` are not collisions.
+
+Detected overlapping routes with equal specificity and a shared HTTP method still emit an `Ambiguous route collision` WARNING: registration order breaks the tie. This includes duplicate paths and equivalent dynamic shapes such as `/users/<id>` and `/users/<name>`. Rename, remove, or constrain those routes when the overlap is unintended. These diagnostics do not change route matching or reject registrations.
