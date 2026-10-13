@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Log expected route overlaps at DEBUG when specificity determines the winner. Keep WARNING for equal-specificity conflicts resolved by registration order, including duplicate dynamic routes. Avoid false collisions for distinct trailing-slash paths and static paths that do not match a converter. Route selection is unchanged.
+
 ### Production starter build
 
 - Add `python management.py build` for production Teloce/MinifyJS assets, including mounted module UI, without database or Admin initialization. Build failures stop deployment.

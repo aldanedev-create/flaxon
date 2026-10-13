@@ -279,12 +279,19 @@ class Router:
         shape = self._collision_shape(route.path)
         for existing in self._collision_candidates(route, shape):
             if existing.methods.intersection(route.methods) and self._patterns_overlap(existing, route):
-                logger.warning(
-                    "Ambiguous route collision: %s %s overlaps %s %s; specificity will decide",
+                # Registration order is only a tie-breaker. Expected overlaps
+                # with a more specific route should not warn during startup.
+                ambiguous = existing.specificity == route.specificity
+                log = logger.warning if ambiguous else logger.debug
+                log(
+                    "%s route %s: %s %s overlaps %s %s; %s will decide",
+                    "Ambiguous" if ambiguous else "Expected",
+                    "collision" if ambiguous else "overlap",
                     ",".join(sorted(route.methods)),
                     route.path,
                     ",".join(sorted(existing.methods)),
                     existing.path,
+                    "registration order" if ambiguous else "specificity",
                 )
         collision_key = (len(shape), shape[0] if shape and shape[0] != "*" else "*")
         if route.parameters:
@@ -293,7 +300,7 @@ class Router:
             self._static_collision_buckets.setdefault((len(shape), shape[0] if shape else ""), []).append(
                 route
             )
-            self._collision_buckets.setdefault(shape, []).append(route)
+        self._collision_buckets.setdefault(shape, []).append(route)
 
     @staticmethod
     def _collision_shape(path: str) -> tuple[str, ...]:
@@ -308,6 +315,12 @@ class Router:
     def _patterns_overlap(left: Route, right: Route) -> bool:
         if left.path == right.path:
             return True
+        # Literal paths (including trailing slashes) must really match; their
+        # segment shapes alone can report collisions that cannot occur.
+        if not left.parameters:
+            return right.match(left.path) is not None
+        if not right.parameters:
+            return left.match(right.path) is not None
         left_parts = [part for part in left.path.strip("/").split("/") if part]
         right_parts = [part for part in right.path.strip("/").split("/") if part]
         if len(left_parts) != len(right_parts):
