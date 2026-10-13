@@ -173,6 +173,7 @@ nav:
       - Admin Production Guide: guides/admin-production.md
       - Admin and CMS Microservices: guides/microservices.md
       - Admin Guide: admin-guide.md
+      - Type Checking: guides/typecheck.md
       - Testing: guides/testing.md
       - Debugging: guides/debugging.md
       - Plugins: guides/plugins.md
