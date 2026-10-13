@@ -11,6 +11,7 @@
 ## Unreleased
 
 ### Added
+- Parent-to-child prop findings are exercised through automatic development checks and the management command using the matching Teloce adapter.
 - Development-only background Teloce type checks on startup and saved input changes, with nonfatal terminal/debugger diagnostics and `app.use_teloce(typecheck=False)` opt-out.
 - Typecheck rejects an empty UI source list rather than checking the working directory; JSON output and script-only mode are covered by integration tests.
 - `python management.py typecheck` type-checks TypeScript in Teloce components and template expressions through pytscheck (`pip install "flaxon[typecheck]"`; requires a Teloce release that includes `teloce typecheck`).

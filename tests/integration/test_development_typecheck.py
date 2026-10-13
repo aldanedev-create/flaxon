@@ -4,7 +4,7 @@ import asyncio
 import threading
 from types import SimpleNamespace
 
-from flaxon import Flaxon
+from flaxon import Flaxon, management
 
 
 def integration(tmp_path, *, debug=True, enabled=True):
@@ -116,3 +116,27 @@ def test_shutdown_drains_active_check_and_does_not_overlap(tmp_path, monkeypatch
         assert calls == [1]
 
     asyncio.run(scenario())
+
+
+def test_parent_child_prop_errors_reach_development_checker_and_management(tmp_path):
+    ui = integration(tmp_path)
+    parent = tmp_path / "ui/app.html"
+    child = tmp_path / "ui/Counter.html"
+    child.write_text(
+        '<script lang="ts">export default { props: { count: { type: Number, required: true } } };</script>'
+        "<template>{{ count }}</template>"
+    )
+    parent.write_text(
+        '<script lang="ts">import Counter from "./Counter.html";'
+        'export default { components: { Counter }, data() { return { count: "wrong" }; } };</script>'
+        '<template><Counter :count="count" /></template>'
+    )
+    checker = ui.development_typecheck
+    checker.check()
+    assert not checker.result.ok
+    assert any(f.file == "ui/app.html" and "number" in f.message for f in checker.result.findings)
+    assert management._typecheck(ui.app, SimpleNamespace(no_templates=False, json=False)) == 1
+    parent.write_text(parent.read_text().replace('count: "wrong"', "count: 3"))
+    checker.check()
+    assert checker.result.ok
+    assert management._typecheck(ui.app, SimpleNamespace(no_templates=False, json=False)) == 0

@@ -23,7 +23,7 @@ python management.py typecheck && python management.py build
 
 Teloce uses the Flaxon project root, inherits `tsconfig.json` (including extended compiler settings), and resolves real TypeScript files and installed package declarations. Without a config, it uses strict ES2022/bundler defaults. Generated files are checked in a temporary workspace without replacing your component sources. Install npm package declarations when importing npm packages; installing the checker through Python does not install those dependencies.
 
-Object-style props using supported constructors get types inside the component, including required/default handling. Array-style props remain permissive, and validation of props passed between components is not implemented. Template positions still use heuristic expression mapping. See the Teloce adapter documentation for supported expressions and mapping limits.
+Object-style props using supported constructors get types inside the component, including required/default handling. Array-style props remain permissive, and props passed to statically imported TypeScript children are checked for wrong types, required inputs, and unknown names. Dynamic or untyped children and certain import forms remain outside these checks. Template positions still use heuristic expression mapping. See the Teloce adapter documentation for supported expressions and mapping limits.
 
 ## Automatic development checks
 
@@ -36,3 +36,7 @@ app.use_teloce(typecheck=False)
 ```
 
 Production (`DEBUG = False`) never starts the watcher. Shutdown stops polling and waits for an active compiler call to finish. Automatic checking is advisory; keep the explicit `typecheck` command as a deployment gate. The development checks require the Teloce release providing project-context support.
+
+## Checker dependency
+
+PyTSCheck is already a core Flaxon dependency because automatic development checks use it. A normal `pip install flaxon` installs the bundled checker; `flaxon[typecheck]` remains a supported explicit extra. Standalone Teloce keeps checking optional through `teloce-py[typecheck]`. This installs the compiler without requiring Node.js; it does not install npm package declarations used by your application.

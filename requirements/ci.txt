@@ -1,2 +1,2 @@
 # Test unreleased compiler fixes reproducibly; package metadata remains installable from PyPI.
-teloce-py @ git+https://github.com/aldanedev-create/teloce-py.git@672871fcea98bacddc97f2b2fcb7915782956b1d
+teloce-py @ git+https://github.com/aldanedev-create/teloce-py.git@2abe39ca7f7e7da765aee4ae67cd2b7c04bcda8c
