@@ -95,6 +95,13 @@ def _project_command_parser():
     copy_store.add_argument("source")
     commands.add_parser("build", help="Compile and optimize Teloce assets for production")
     commands.add_parser("check", help="Validate settings, model discovery, and Admin registration")
+    typecheck = commands.add_parser(
+        "typecheck", help="Type-check TypeScript in Teloce components and templates (needs pytscheck)"
+    )
+    typecheck.add_argument(
+        "--no-templates", action="store_true", help="Check only <script lang=\"ts\"> blocks and .ts files"
+    )
+    typecheck.add_argument("--json", action="store_true", help="Print findings as JSON")
     make = commands.add_parser("makemigrations", help="Generate Python migrations from models")
     make.add_argument("labels", nargs="*")
     make.add_argument("--name")
@@ -155,6 +162,7 @@ def execute(argv=None, *, settings="settings", application="app:app", project_ro
     known = {
         "build",
         "check",
+        "typecheck",
         "makemigrations",
         "migrate",
         "sqlmigrate",
@@ -199,6 +207,30 @@ def execute(argv=None, *, settings="settings", application="app:app", project_ro
         parser.exit(1, f"Error: {error}\n")
 
 
+def _typecheck(app, args):
+    """Type-check every registered Teloce UI source (application and module folders) with pytscheck."""
+    integration = getattr(app, "teloce", None)
+    if integration is None:
+        raise ValueError(
+            "No Teloce UI is configured. Call app.use_teloce() before the app.is_management guard; "
+            "backend-only projects do not need typecheck."
+        )
+    try:
+        command = import_attribute("teloce.cli.typecheck", "typecheck_command")
+    except ImportError as error:
+        raise ValueError(
+            "This Teloce version has no typecheck command. Upgrade teloce-py and install the extra: "
+            'pip install --upgrade "teloce-py[typecheck]"'
+        ) from error
+    options = argparse.Namespace(
+        paths=[str(source.directory) for source in integration.sources],
+        no_templates=args.no_templates,
+        no_strict=False,
+        json=args.json,
+    )
+    return command(options)
+
+
 def _run_application_command(app, args):
     """Dispatch asset and ORM commands without running application startup hooks."""
     if args.command == "build":
@@ -219,6 +251,8 @@ def _run_application_command(app, args):
             raise RuntimeError("Teloce production build failed; deployment must stop.")
         print(f"Built {result.get('compiled', 0)} Teloce components: {integration.build_dir}")
         return 0
+    if args.command == "typecheck":
+        return _typecheck(app, args)
     TORTOISE_ORM.clear()
     TORTOISE_ORM.update(app.db.configuration())
     if args.command == "check":

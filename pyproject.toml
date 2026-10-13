@@ -81,6 +81,9 @@ standard = [
 pydantic = [
     "pydantic>=2.0",
 ]
+typecheck = [
+    "pytscheck>=0.1.1,<0.2",
+]
 mcp = [
     "fastmcp>=3.0",
 ]

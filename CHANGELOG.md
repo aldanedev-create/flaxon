@@ -11,6 +11,7 @@
 ## Unreleased
 
 ### Added
+- `python management.py typecheck` type-checks TypeScript in Teloce components and template expressions through pytscheck (`pip install "flaxon[typecheck]"`; requires a Teloce release that includes `teloce typecheck`).
 - Teloce AST SSR with explicit public props, hydration, metadata, asset preloads and configurable rendering fallback/cache.
 - Development browser overlay and dashboard reports for compiler, SSR, runtime, hydration and API failures, with bounded source mapping.
 - Scoped-CSS SSR example and documentation; production debugger absence and real-browser regression checks.
