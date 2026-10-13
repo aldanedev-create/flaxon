@@ -325,3 +325,7 @@ has saved their work. Configuration is sent to the browser: never put secrets in
 
 The full API and framework-neutral setup are documented in Teloce's
 `docs/first-party-plugins.md`. These are optional modules inside `teloce-py`, not separate pip packages.
+
+## Type checking
+
+`python management.py typecheck` checks all registered UI sources through Teloce's optional PyTSCheck adapter. See [the type-checking guide](../guides/typecheck.md) for installation, JSON output, CI exit codes, and current limits.
