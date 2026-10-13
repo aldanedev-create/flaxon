@@ -222,10 +222,14 @@ def _typecheck(app, args):
             "This Teloce version has no typecheck command. Upgrade teloce-py and install the extra: "
             'pip install --upgrade "teloce-py[typecheck]"'
         ) from error
+    paths = [str(source.directory) for source in integration.sources]
+    if not paths:
+        raise ValueError("No Teloce UI source directories are registered; configure app.use_teloce().")
     options = argparse.Namespace(
-        paths=[str(source.directory) for source in integration.sources],
+        paths=paths,
         no_templates=args.no_templates,
         no_strict=False,
+        project_root=integration.project_root,
         json=args.json,
     )
     return command(options)

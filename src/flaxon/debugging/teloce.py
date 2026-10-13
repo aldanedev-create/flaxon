@@ -96,7 +96,7 @@ class TeloceDebugger:
     def record(self, report: dict[str, Any], *, client_reported: bool = False) -> dict[str, Any]:
         """Store a sanitized report; resolve source only through registered build inputs."""
         category = str(report.get("category", "runtime"))[:32]
-        allowed = {"compile", "ssr", "runtime", "hydration", "browser", "api"}
+        allowed = {"compile", "ssr", "runtime", "hydration", "browser", "api", "typecheck"}
         if category not in allowed:
             category = "browser"
         error: dict[str, Any] = {

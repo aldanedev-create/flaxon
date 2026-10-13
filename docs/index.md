@@ -217,3 +217,7 @@ Use the guides for explanations, the API pages for reference, and the examples f
 - [Routing and quality audit](quality-audit.md)
 
 - [16 | PWA: installation, offline fallback and updates](fullstack/project-manager/16.md)
+
+- [Type-check Teloce interfaces](guides/typecheck.md)
+
+- [Publishing releases](publishing.md)
