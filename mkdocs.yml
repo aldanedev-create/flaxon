@@ -148,6 +148,7 @@ plugins:
 
 # Navigation
 nav:
+  - Publishing: publishing.md
   - Home: index.md
   - Getting Started:
       - Installation: installation.md

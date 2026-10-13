@@ -219,3 +219,5 @@ Use the guides for explanations, the API pages for reference, and the examples f
 - [16 | PWA: installation, offline fallback and updates](fullstack/project-manager/16.md)
 
 - [Type-check Teloce interfaces](guides/typecheck.md)
+
+- [Publishing releases](publishing.md)

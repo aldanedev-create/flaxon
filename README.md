@@ -63,3 +63,7 @@ Report vulnerabilities privately following [SECURITY.md](https://github.com/alda
 [MIT](LICENSE).
 
 Models and Python migrations are integrated through Tortoise ORM. See the [settings and management guide](docs/guides/orm.md).
+
+## Publishing releases
+
+See [the publishing guide](docs/publishing.md) for `python scripts/publish.py`, TestPyPI, credentials, and release order.
