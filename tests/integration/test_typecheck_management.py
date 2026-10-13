@@ -67,7 +67,7 @@ def test_typecheck_rejects_empty_sources():
 
 def test_typecheck_forwards_all_sources_and_operational_exit_code(monkeypatch, tmp_path):
     sources = [SimpleNamespace(directory=tmp_path / name) for name in ("app-ui", "module-ui")]
-    app = SimpleNamespace(teloce=SimpleNamespace(sources=sources))
+    app = SimpleNamespace(teloce=SimpleNamespace(sources=sources, project_root=tmp_path))
 
     def command(options):
         assert options.paths == [str(source.directory) for source in sources]

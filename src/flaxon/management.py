@@ -229,6 +229,7 @@ def _typecheck(app, args):
         paths=paths,
         no_templates=args.no_templates,
         no_strict=False,
+        project_root=integration.project_root,
         json=args.json,
     )
     return command(options)
