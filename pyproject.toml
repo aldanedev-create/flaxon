@@ -58,6 +58,7 @@ dependencies = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
+typecheck = ["pytscheck>=0.1.1,<0.2"]
 postgres = ["asyncpg>=0.29,<1"]
 
 yaml = [
