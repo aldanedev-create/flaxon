@@ -1,4 +1,5 @@
 """Release commands must validate artifacts and preserve dry-run behavior."""
+import re
 import runpy
 from pathlib import Path
 from types import SimpleNamespace
@@ -60,12 +61,15 @@ def test_artifact_commands_use_real_paths(tmp_path, monkeypatch, name, function)
 
 def test_release_dry_run_performs_no_subprocesses(monkeypatch):
     monkeypatch.chdir(ROOT)
-    monkeypatch.setattr('sys.argv', ['release.py', '0.3.0', '--dry-run'])
+    commands = script('release.py')
+    major, minor, patch = map(int, re.match(r'(\d+)\.(\d+)\.(\d+)', commands['get_current_version']()).groups())
+    target = f'{major}.{minor}.{patch + 1}'
+    monkeypatch.setattr('sys.argv', ['release.py', target, '--dry-run'])
     def unexpected(*args, **kwargs):
         pytest.fail('Dry-run must not execute build, tag or upload')
     monkeypatch.setattr('subprocess.run', unexpected)
     before = [(path, path.read_bytes()) for path in [ROOT / 'CHANGELOG.md', ROOT / 'src/flaxon/version.py']]
-    script('release.py')['main']()
+    commands['main']()
     assert all(path.read_bytes() == content for path, content in before)
 
 
@@ -82,7 +86,7 @@ def test_release_updates_authoritative_version(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize('version', ['0.3.0', '0.3.0rc1', '0.3.0a1', '0.3.0b2', '0.3.0.dev1'])
 def test_version_module_imports_release_candidates(version):
-    source = (ROOT / 'src/flaxon/version.py').read_text().replace('__version__ = "0.2.7"', f'__version__ = "{version}"')
+    source = re.sub(r'(?m)^__version__ = .*$', f'__version__ = "{version}"', (ROOT / 'src/flaxon/version.py').read_text(), count=1)
     namespace = {}
     exec(compile(source, 'version.py', 'exec'), namespace)
     assert namespace['__version_info__'] == (0, 3, 0)
@@ -98,12 +102,10 @@ def test_release_commit_stages_only_version_and_changelog(monkeypatch):
 
 
 def test_ci_compiler_constraint_is_shared_with_isolated_wheel_install():
-    import re
-
     constraint = (ROOT / "requirements/ci.txt").read_text()
-    match = re.search(r"teloce-py @ git\+https://github.com/aldanedev-create/teloce-py.git@([0-9a-f]{40})", constraint)
-    assert match, "Pin compiler source to an immutable commit"
+    match = re.search(r"(?m)^teloce-py==(\d+\.\d+\.\d+)$", constraint)
+    assert match, "Pin the installable published compiler version"
     for filename in ("orm.yml", "fullstack.yml"):
         workflow = (ROOT / ".github/workflows" / filename).read_text()
         assert "PIP_CONSTRAINT: ${{ github.workspace }}/requirements/ci.txt" in workflow
-    assert match.group(1) in (ROOT / ".github/workflows/fullstack.yml").read_text()
+    assert "-r requirements/ci.txt" in (ROOT / ".github/workflows/fullstack.yml").read_text()

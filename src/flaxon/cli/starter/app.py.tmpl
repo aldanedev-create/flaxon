@@ -13,6 +13,7 @@ def create_app():
     app.use_teloce(
         project_root=settings.root,
         ui_dir="ui",
+        typecheck=False,
         title=f"Welcome to {settings.PROJECT_NAME}",
         favicon="https://flaxon-website.vercel.app/assets/images/logo/flaxon.png",
         description="Your Python and Teloce full-stack application is ready.",

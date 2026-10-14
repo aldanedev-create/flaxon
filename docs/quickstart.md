@@ -12,7 +12,7 @@ python -m pip install "flaxon[standard,admin]"
 flaxon new project_manager
 cd project_manager
 # Activate the generated .venv, then:
-python -m pip install -e .
+python -m pip install -r requirements.txt
 python management.py check
 python management.py makemigrations
 python management.py migrate
@@ -20,11 +20,29 @@ python management.py setup-admin
 python management.py runserver
 ```
 
-For unreleased ORM features, install the repository revision or the pinned course
-wheel rather than assuming those features are in the latest PyPI release.
+The generated starter requires Flaxon 0.3.0 or newer, including its ORM and Teloce integrations. Application dependency installation is a separate step from project generation.
 Follow [getting started](getting-started.md) for activation commands and the
 [complete project-manager ebook](fullstack/project-manager/index.md) to build a
 real app, one complete file at a time.
+
+## Slow or interrupted project setup
+
+`flaxon new` first writes project files, then creates `.venv` without pip and installs Python's bundled pip as a separate, visible phase. These steps do not download application dependencies. Each phase reports elapsed time, has a 120-second default timeout, and prints progress while running. Disk speed and Windows antivirus scanning can still make Python environment creation slow.
+
+For an existing generated project whose environment setup failed or was cancelled:
+
+```bash
+python -m flaxon new project_manager --resume-venv --venv-timeout 300
+```
+
+This retries environment setup without regenerating project files. Do not delete your edited project just to rerun creation. Use `--no-venv` when creating a new project with an environment you manage yourself:
+
+```bash
+flaxon new project_manager --no-venv
+```
+
+The printed next steps use `.venv/bin/python` on Unix or `.\.venv\Scripts\python.exe` on Windows directly. Activation is optional; this avoids installing dependencies with the wrong Python or being blocked by PowerShell activation policy. Install the generated project, then run its checks and migrations before starting the server. The starter disables background type checking on Flaxon 0.3.0; the explicit `management.py typecheck` command remains available.
+
 
 ## A minimal hand-written full-stack example
 

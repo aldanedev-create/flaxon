@@ -1,2 +1,2 @@
-# Test unreleased compiler fixes reproducibly; package metadata remains installable from PyPI.
-teloce-py @ git+https://github.com/aldanedev-create/teloce-py.git@2abe39ca7f7e7da765aee4ae67cd2b7c04bcda8c
+# Verify against the published compiler required by Flaxon 0.3.0.
+teloce-py==0.3.0
