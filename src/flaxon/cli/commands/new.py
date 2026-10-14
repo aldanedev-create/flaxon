@@ -197,13 +197,16 @@ class NewCommand(Command):
             raise ValueError(
                 "Refusing to modify a .venv symlink; use your existing environment with --no-venv."
             )
-        NewCommand._run_step(
-            [sys.executable, "-u", "-m", "venv", "--without-pip", ".venv"],
-            directory,
-            console,
-            "Creating virtual environment",
-            timeout,
-        )
+        if Path(sys.prefix).resolve() == (directory / ".venv").resolve():
+            console.info("Using the active project environment; checking bundled pip.")
+        else:
+            NewCommand._run_step(
+                [sys.executable, "-u", "-m", "venv", "--without-pip", ".venv"],
+                directory,
+                console,
+                "Creating virtual environment",
+                timeout,
+            )
         python = directory.resolve() / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
         NewCommand._run_step(
             [str(python), "-u", "-m", "ensurepip", "--upgrade"],

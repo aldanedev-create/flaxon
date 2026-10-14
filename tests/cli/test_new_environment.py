@@ -130,3 +130,12 @@ def test_native_environment_creation_and_resume(tmp_path):
     args.resume_venv = True
     assert NewCommand()._run(args, Console(color=False)) == 0
     assert (project / "app.py").read_bytes() == original
+
+
+def test_resume_from_active_project_environment_does_not_copy_its_python(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr(sys, "prefix", str(tmp_path / ".venv"))
+    monkeypatch.setattr(NewCommand, "_run_step", lambda command, *args: calls.append(command))
+    NewCommand._create_environment(tmp_path, Console(color=False))
+    assert len(calls) == 1
+    assert calls[0][1:] == ["-u", "-m", "ensurepip", "--upgrade"]
