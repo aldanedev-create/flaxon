@@ -27,6 +27,16 @@ class RunCommand(Command):
         parser.add_argument("--reload", action="store_true", help="Enable auto-reload")
         parser.add_argument("--workers", type=int, default=1, help="Number of worker processes")
         parser.add_argument("--log-level", default="info", help="Log level")
+        parser.add_argument(
+            "--forwarded-allow-ips",
+            default=None,
+            help=(
+                "Comma-separated proxy IPs trusted to send X-Forwarded-Proto/For (use '*' only in "
+                "development). Needed behind a Docker, Codespaces or tunnel proxy so the browser's "
+                "https origin matches; defaults to uvicorn's own default (127.0.0.1) or the "
+                "FORWARDED_ALLOW_IPS environment variable"
+            ),
+        )
         parser.add_argument("--env-file", help="Environment file to load")
 
     def _run(self, args: argparse.Namespace, console: Any) -> int:
@@ -48,6 +58,8 @@ class RunCommand(Command):
         console.info(f"Starting Flaxon application: {args.application}")
         console.info(f"Host: {args.host}, Port: {args.port}")
 
+        # Only pass the option when given, so uvicorn's default and FORWARDED_ALLOW_IPS still apply.
+        proxy_options = {"forwarded_allow_ips": args.forwarded_allow_ips} if args.forwarded_allow_ips else {}
         try:
             uvicorn.run(
                 args.application,
@@ -57,6 +69,7 @@ class RunCommand(Command):
                 workers=args.workers,
                 log_level=args.log_level,
                 app_dir=cwd,
+                **proxy_options,
             )
             return 0
         except KeyboardInterrupt:

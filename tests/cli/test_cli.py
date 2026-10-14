@@ -1,7 +1,9 @@
 import sys
+from types import SimpleNamespace
 
 import pytest
 
+from flaxon.cli.commands import run as run_module
 from flaxon.cli.main import create_parser, main
 
 
@@ -68,3 +70,24 @@ def test_environment_timeout_terminates_process(monkeypatch, tmp_path):
     with pytest.raises(subprocess.TimeoutExpired):
         NewCommand._create_environment(tmp_path, Console(color=False))
     assert process.stopped
+
+
+def _run_with_fake_uvicorn(monkeypatch, argv):
+    captured = {}
+    fake_uvicorn = SimpleNamespace(run=lambda *args, **kwargs: captured.update(kwargs))
+    monkeypatch.setattr(run_module, "import_module", lambda name: fake_uvicorn)
+    args = create_parser().parse_args(["run", "app:app", *argv])
+    console = SimpleNamespace(info=lambda message: None, error=lambda message: None)
+    assert run_module.RunCommand()._run(args, console) == 0
+    return captured
+
+
+def test_run_passes_forwarded_allow_ips_to_uvicorn(monkeypatch):
+    captured = _run_with_fake_uvicorn(monkeypatch, ["--forwarded-allow-ips", "10.0.0.0/8"])
+    assert captured["forwarded_allow_ips"] == "10.0.0.0/8"
+
+
+def test_run_keeps_uvicorn_proxy_default_when_flag_is_absent(monkeypatch):
+    """Omitting the flag must leave uvicorn's default and FORWARDED_ALLOW_IPS untouched."""
+
+    assert "forwarded_allow_ips" not in _run_with_fake_uvicorn(monkeypatch, [])

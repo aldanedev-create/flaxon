@@ -13,8 +13,13 @@ from urllib.parse import urlsplit
 
 from flaxon.debugging.redaction import Redactor
 from flaxon.debugging.source_maps import source_position
-from flaxon.exceptions import BadRequest, Forbidden, HTTPException
+from flaxon.exceptions import BadRequest, HTTPException
 from flaxon.http import JSONResponse, Request
+
+#: 403 codes the browser client uses to tell the two causes apart. Reloading fixes a stale
+#: token (the server restarted) but can never fix a rejected origin.
+ORIGIN_REJECTED = "FX-DEBUG-ORIGIN"
+TOKEN_REJECTED = "FX-DEBUG-TOKEN"
 
 
 class TeloceDebugger:
@@ -72,17 +77,26 @@ class TeloceDebugger:
     def _authorize(self, request: Request) -> None:
         if not self.integration.app.debug:
             raise HTTPException(404, "Not found")
+        scheme = request.scope.get("scheme", "http")
+        host = request.headers.get("host", "")
         try:
             origin = urlsplit(request.headers.get("origin", ""))
         except ValueError as error:
-            raise Forbidden("Invalid diagnostic origin") from error
-        if origin.netloc != request.headers.get("host", "") or origin.scheme != request.scope.get(
-            "scheme", "http"
-        ):
-            raise Forbidden("Development diagnostics require the same origin")
+            raise HTTPException(403, "Invalid diagnostic origin", code=ORIGIN_REJECTED) from error
+        if origin.netloc != host or origin.scheme != scheme:
+            sent = f"{origin.scheme}://{origin.netloc}" if origin.netloc else "no Origin"
+            raise HTTPException(
+                403,
+                "Development diagnostics require the same origin. "
+                f"The browser sent {sent[:200]} but the server sees {scheme}://{host[:200]}. "
+                "Behind a proxy or tunnel, make it send X-Forwarded-Proto and X-Forwarded-Host, "
+                "and start the server with --forwarded-allow-ips (or FORWARDED_ALLOW_IPS) "
+                "so Flaxon trusts it.",
+                code=ORIGIN_REJECTED,
+            )
         supplied = request.headers.get("x-flaxon-debug-token", "")
         if not hmac.compare_digest(supplied, self.token):
-            raise Forbidden("Invalid development diagnostic token")
+            raise HTTPException(403, "Invalid development diagnostic token", code=TOKEN_REJECTED)
         length = request.headers.get("content-length", "0")
         if len(length) > 5 or not length.isdecimal() or int(length) > 32768:
             raise BadRequest("Browser diagnostic is too large")

@@ -11,9 +11,13 @@
 
 - Starting the development server no longer starts the Teloce type checker by default. Use `python management.py typecheck` explicitly; `app.use_teloce(typecheck=True)` remains an opt-in watcher. Existing 0.3.0 applications can disable the watcher with `typecheck=False`. Compilation and asset reload remain enabled.
 
+
+
 ## Unreleased
 
 - Log expected route overlaps at DEBUG when specificity determines the winner. Keep WARNING for equal-specificity conflicts resolved by registration order, including duplicate dynamic routes. Avoid false collisions for distinct trailing-slash paths and static paths that do not match a converter. Route selection is unchanged.
+
+- fix the endless infinite refresh of pages and did redesing of debugger that regards teloce browser errors. 
 
 ### Production starter build
 
