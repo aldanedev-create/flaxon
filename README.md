@@ -21,7 +21,7 @@ Requires **Python 3.11+**. In an activated virtual environment:
 python -m pip install "flaxon[standard]"
 flaxon new my-project --no-venv
 cd my-project
-python -m pip install -e .
+python -m pip install -r requirements.txt
 python management.py makemigrations
 python management.py migrate
 python management.py setup-admin
