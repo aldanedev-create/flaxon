@@ -118,3 +118,15 @@ def test_windows_cleanup_targets_owned_process_tree(monkeypatch):
     monkeypatch.setattr(subprocess, "run", lambda command, **kwargs: calls.append(command))
     NewCommand._stop_process(process)
     assert calls == [["taskkill", "/PID", "42", "/T", "/F"]]
+
+
+def test_native_environment_creation_and_resume(tmp_path):
+    project = tmp_path / "native project with spaces"
+    args = create_parser(include_project=False).parse_args(["new", str(project)])
+    assert NewCommand()._run(args, Console(color=False)) == 0
+    python = project / ".venv" / ("Scripts/python.exe" if module.os.name == "nt" else "bin/python")
+    subprocess.run([str(python), "-m", "pip", "--version"], check=True)
+    original = (project / "app.py").read_bytes()
+    args.resume_venv = True
+    assert NewCommand()._run(args, Console(color=False)) == 0
+    assert (project / "app.py").read_bytes() == original
