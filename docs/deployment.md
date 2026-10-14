@@ -366,10 +366,4 @@ step and use shared session, media and CMS storage.
 
 ### Compiler release and CI
 
-Flaxon's dependency minimum is the published `teloce-py>=0.2.6`. CI uses the
-exact compiler source revision in `requirements/ci.txt` to verify unreleased
-SSR, hydration and runtime fixes. This constraint also applies to the isolated
-wheel installation test. Publishing a new Flaxon release that depends on those
-fixes requires publishing the corresponding Teloce release first and then
-raising the dependency minimum. A passing source-integration job does not
-prove an unreleased compiler is available from PyPI.
+Flaxon 0.3.0 requires the published `teloce-py>=0.3.0`. CI pins `teloce-py==0.3.0` in `requirements/ci.txt`, including the isolated wheel installation check, so it verifies an installable released compiler. Old source pins whose package metadata declares 0.2.6 cannot satisfy that minimum. When increasing the runtime minimum, publish and test the required Teloce release first, then update the minimum and CI pin together. Passing source-only tests does not prove a dependency is available from PyPI.

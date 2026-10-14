@@ -8,7 +8,6 @@ import importlib
 import os
 import sqlite3
 import sys
-import tomllib
 from pathlib import Path
 from urllib.parse import quote, unquote
 import re
@@ -54,9 +53,8 @@ def test_new_defaults_to_fullstack_and_keeps_basic():
 
 
 def test_starter_metadata_and_literal_teloce_bindings(starter):
-    metadata = tomllib.loads((starter / "pyproject.toml").read_text())
-    assert metadata["project"]["name"] == "my-project"
-    assert "flaxon[standard,admin]>=0.2.7" in metadata["project"]["dependencies"]
+    assert (starter / "requirements.txt").read_text() == "flaxon[standard,admin]>=0.3.0\n"
+    assert not (starter / "pyproject.toml").exists()
     assert "{{ projectName }}" in (starter / "modules/welcome/ui/Welcome.html").read_text()
     assert "data/" in (starter / ".gitignore").read_text()
 
@@ -150,6 +148,8 @@ def test_generator_preserves_existing_files_and_rejects_unknown_templates(tmp_pa
     basic = tmp_path / "basic"
     Generator().generate(basic, "basic")
     assert (basic / "app.py").is_file()
+    assert (basic / "requirements.txt").read_text() == "flaxon[standard]>=0.3.0\n"
+    assert not (basic / "pyproject.toml").exists()
     assert not (basic / "management.py").exists()
 
 
