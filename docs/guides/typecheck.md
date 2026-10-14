@@ -25,18 +25,18 @@ Teloce uses the Flaxon project root, inherits `tsconfig.json` (including extende
 
 Object-style props using supported constructors get types inside the component, including required/default handling. Array-style props remain permissive, and props passed to statically imported TypeScript children are checked for wrong types, required inputs, and unknown names. Dynamic or untyped children and certain import forms remain outside these checks. Template positions still use heuristic expression mapping. See the Teloce adapter documentation for supported expressions and mapping limits.
 
-## Automatic development checks
+## Development server and explicit checks
 
-With `DEBUG = True`, `python management.py runserver` starts a background checker during application startup. It checks once, then checks saved UI, TypeScript, and JSON configuration changes about once per second, even with no browser connected. Checks run serially outside the event loop. Findings appear in the terminal and the development debugger; errors do not stop the server. The latest result and operational error are available as `app.teloce.development_typecheck.result` and `.error`. Debugger reports are historical; use the latest result to inspect the current check.
+Starting `python management.py runserver` builds and serves Teloce components but does not start type checking by default. Run `python management.py typecheck` separately when you want diagnostics. A successful JavaScript build does not prove type correctness: the compiler can strip TypeScript annotations without validating them, and the adapter does not yet model every runtime feature.
 
-Disable automatic checking while retaining the manual command:
+For existing Flaxon 0.3.0 installations, disable the automatic checker explicitly while preserving all other integration options:
 
 ```python
-app.use_teloce(typecheck=False)
+app.use_teloce(project_root=ROOT, ui_dir="ui", typecheck=False)
 ```
 
-Production (`DEBUG = False`) never starts the watcher. Shutdown stops polling and waits for an active compiler call to finish. Automatic checking is advisory; keep the explicit `typecheck` command as a deployment gate. The development checks require the Teloce release providing project-context support.
+The optional development watcher remains available only when explicitly requested with `typecheck=True`. It checks on startup and saved input changes, reports findings without stopping the server, and never starts in production (`DEBUG = False`). The manual management command works regardless of this option. Register `app.use_teloce()` before the `app.is_management` guard so the command can discover your UI.
 
 ## Checker dependency
 
-PyTSCheck is already a core Flaxon dependency because automatic development checks use it. A normal `pip install flaxon` installs the bundled checker; `flaxon[typecheck]` remains a supported explicit extra. Standalone Teloce keeps checking optional through `teloce-py[typecheck]`. This installs the compiler without requiring Node.js; it does not install npm package declarations used by your application.
+PyTSCheck is already a core Flaxon dependency for the explicit management command and optional development watcher. A normal `pip install flaxon` installs the bundled checker; `flaxon[typecheck]` remains a supported explicit extra. Standalone Teloce keeps checking optional through `teloce-py[typecheck]`. This installs the compiler without requiring Node.js; it does not install npm package declarations used by your application.

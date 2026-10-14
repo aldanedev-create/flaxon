@@ -49,7 +49,7 @@ class Teloce:
         scripts: list[str | dict[str, Any]] | None = None,
         options: dict[str, Any] | None = None,
         plugins: dict[str, Any] | None = None,
-        typecheck: bool = True,
+        typecheck: bool = False,
     ) -> None:
         self.app = app
         self.typecheck = typecheck
@@ -96,10 +96,15 @@ class Teloce:
         app.mount_static(self.static_url, str(self.build_dir), cache_control=cache_control)
         app.on_startup(self.build)
         self.development_typecheck = DevelopmentTypecheck(self)
-        app.on_startup(self.development_typecheck.start)
-        app.on_shutdown(self.development_typecheck.stop)
+        self._register_typecheck_hooks()
         if app.debug:
             app.router.post("/__debug__/teloce/reload")(self.development_reload)
+
+    def _register_typecheck_hooks(self) -> None:
+        """Attach the development checker only when explicitly requested."""
+        if self.typecheck:
+            self.app.on_startup(self.development_typecheck.start)
+            self.app.on_shutdown(self.development_typecheck.stop)
 
     def register_source(
         self,
