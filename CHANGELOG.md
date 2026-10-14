@@ -1,5 +1,10 @@
 # Changelog
 
+### Recoverable project creation
+
+- Separate virtual-environment creation from bundled-pip setup, report each phase and elapsed progress, and allow configurable per-phase timeouts. Add `flaxon new PATH --resume-venv` without rewriting project files; stop owned setup processes on timeout or cancellation.
+- Print next steps using the project interpreter directly, raise starter dependency minimums to 0.3.0, and disable automatic checker startup in generated full-stack apps.
+
 ## Unreleased
 
 - Log expected route overlaps at DEBUG when specificity determines the winner. Keep WARNING for equal-specificity conflicts resolved by registration order, including duplicate dynamic routes. Avoid false collisions for distinct trailing-slash paths and static paths that do not match a converter. Route selection is unchanged.

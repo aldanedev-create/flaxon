@@ -56,7 +56,7 @@ def test_new_defaults_to_fullstack_and_keeps_basic():
 def test_starter_metadata_and_literal_teloce_bindings(starter):
     metadata = tomllib.loads((starter / "pyproject.toml").read_text())
     assert metadata["project"]["name"] == "my-project"
-    assert "flaxon[standard,admin]>=0.2.7" in metadata["project"]["dependencies"]
+    assert "flaxon[standard,admin]>=0.3.0" in metadata["project"]["dependencies"]
     assert "{{ projectName }}" in (starter / "modules/welcome/ui/Welcome.html").read_text()
     assert "data/" in (starter / ".gitignore").read_text()
 
