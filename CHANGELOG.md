@@ -1,5 +1,7 @@
 # Changelog
 
+- Generated full-stack and basic starters use `requirements.txt` with `pip install -r requirements.txt`; legacy projects with `pyproject.toml` still support environment recovery.
+
 ### Recoverable project creation
 
 - Separate virtual-environment creation from bundled-pip setup, report each phase and elapsed progress, and allow configurable per-phase timeouts. Add `flaxon new PATH --resume-venv` without rewriting project files; stop owned setup processes on timeout or cancellation.

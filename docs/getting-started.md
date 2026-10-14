@@ -14,7 +14,7 @@ source .venv/bin/activate
 python -m pip install "flaxon[standard]"
 flaxon new my-project
 cd my-project
-python -m pip install -e .
+python -m pip install -r requirements.txt
 python management.py check
 python management.py makemigrations
 python management.py migrate

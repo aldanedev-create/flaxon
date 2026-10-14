@@ -99,6 +99,8 @@ def test_without_environment_does_not_launch_process(monkeypatch, tmp_path, caps
 
 def test_windows_next_steps_need_no_activation(monkeypatch, tmp_path, capsys):
 
+    project = tmp_path / "developer's project"
+    Generator().generate(project)
     monkeypatch.setattr(module, "os", SimpleNamespace(name="nt"))
     NewCommand._next_steps(
         tmp_path / "developer's project", Console(color=False), environment=True, fullstack=True
@@ -106,7 +108,7 @@ def test_windows_next_steps_need_no_activation(monkeypatch, tmp_path, capsys):
     output = capsys.readouterr().out
     assert "Set-Location -LiteralPath" in output
     assert "developer''s project" in output
-    assert ".\\.venv\\Scripts\\python.exe -m pip install -e ." in output
+    assert ".\\.venv\\Scripts\\python.exe -m pip install -r requirements.txt" in output
     assert "Activate.ps1" not in output
 
 
@@ -139,3 +141,13 @@ def test_resume_from_active_project_environment_does_not_copy_its_python(monkeyp
     NewCommand._create_environment(tmp_path, Console(color=False))
     assert len(calls) == 1
     assert calls[0][1:] == ["-u", "-m", "ensurepip", "--upgrade"]
+
+
+def test_legacy_pyproject_resume_keeps_editable_install(monkeypatch, tmp_path, capsys):
+    (tmp_path / "app.py").write_text("# existing app\n")
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "legacy"\n')
+    monkeypatch.setattr(NewCommand, "_create_environment", lambda *args, **kwargs: None)
+    args = create_parser(include_project=False).parse_args(["new", str(tmp_path), "--resume-venv"])
+    assert NewCommand()._run(args, Console(color=False)) == 0
+    assert "-m pip install -e ." in capsys.readouterr().out
+    assert not (tmp_path / "requirements.txt").exists()

@@ -24,16 +24,7 @@ async def home():
 async def health():
     return {{"status": "healthy", "service": "{name}"}}
 """,
-            "pyproject.toml": """[build-system]
-requires = ["setuptools>=75", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
-name = "{package_name}"
-version = "0.1.0"
-requires-python = ">=3.11"
-dependencies = ["flaxon[standard]>=0.3.0"]
-""",
+            "requirements.txt": "flaxon[standard]>=0.3.0\n",
             "gitignore": """.venv/
 __pycache__/
 *.pyc
@@ -52,7 +43,7 @@ A Flaxon application.
 ## Installation
 
 ```bash
-python -m pip install -e .
+python -m pip install -r requirements.txt
 
 ```
 

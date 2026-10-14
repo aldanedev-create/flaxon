@@ -83,7 +83,8 @@ class NewCommand(Command):
         )
         if environment:
             console.info("Activation is optional; these commands use your project's Python directly.")
-        console.info(f"  {python} -m pip install -e .")
+        dependencies = "-r requirements.txt" if (directory / "requirements.txt").is_file() else "-e ."
+        console.info(f"  {python} -m pip install {dependencies}")
         if fullstack:
             console.info(f"  {python} management.py check")
             console.info(f"  {python} -m flaxon welcome")
@@ -101,8 +102,13 @@ class NewCommand(Command):
             console.error(f"Directory '{args.directory}' already exists; no files were changed.")
             console.info("For a previously generated project, use --resume-venv to finish environment setup.")
             return 1
-        if resume and not ((directory / "pyproject.toml").is_file() and (directory / "app.py").is_file()):
-            console.error("--resume-venv requires an existing project with app.py and pyproject.toml.")
+        if resume and not ((directory / "app.py").is_file() and any(
+            (directory / name).is_file() for name in ("requirements.txt", "pyproject.toml")
+        )):
+            console.error(
+                "--resume-venv requires an existing project with app.py and requirements.txt "
+                "(or legacy pyproject.toml)."
+            )
             return 1
         try:
             if not resume:
@@ -134,7 +140,7 @@ class NewCommand(Command):
             return 130
         except Exception as exc:
             console.error(f"Setup failed: {exc}")
-            if (directory / "pyproject.toml").is_file():
+            if (directory / "app.py").is_file():
                 self._recovery(directory, console)
             return 1
 

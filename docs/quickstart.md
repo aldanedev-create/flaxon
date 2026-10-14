@@ -12,7 +12,7 @@ python -m pip install "flaxon[standard,admin]"
 flaxon new project_manager
 cd project_manager
 # Activate the generated .venv, then:
-python -m pip install -e .
+python -m pip install -r requirements.txt
 python management.py check
 python management.py makemigrations
 python management.py migrate

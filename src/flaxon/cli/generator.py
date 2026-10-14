@@ -30,8 +30,8 @@ class Generator:
         app_py = self.templates.render("app.py", {"name": directory.name})
         (directory / "app.py").write_text(app_py, encoding="utf-8")
 
-        pyproject = self.templates.render("pyproject.toml", {"package_name": package_name})
-        (directory / "pyproject.toml").write_text(pyproject, encoding="utf-8")
+        requirements = self.templates.render("requirements.txt")
+        (directory / "requirements.txt").write_text(requirements, encoding="utf-8")
 
         gitignore = self.templates.render("gitignore")
         (directory / ".gitignore").write_text(gitignore, encoding="utf-8")
