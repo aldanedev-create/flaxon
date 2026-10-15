@@ -1,0 +1,58 @@
+<template>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="/" data-teloce-link>{{ school }}</a>
+      <nav aria-label="Primary navigation">
+        <a href="/students" data-teloce-link>Students</a>
+        <a href="/courses" data-teloce-link>Courses</a>
+        <a href="/enroll" data-teloce-link>Enroll</a>
+        <a href="/news" data-teloce-link>News</a>
+        <a href="/events" data-teloce-link>Events</a>
+        <a class="staff-link" :href="admin_url" target="_blank" rel="noopener">Staff admin</a>
+      </nav>
+    </header>
+    <main id="router-view" data-teloce-router-view></main>
+    <footer class="footer">
+      <span>{{ school }} · built with Teloce + Flaxon</span>
+    </footer>
+  </div>
+</template>
+
+<script>
+export default {
+  props: ["school", "admin_url"],
+};
+</script>
+
+<style>
+:root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #17202b; background: #f4f6f8; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+.shell { min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; }
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 28px; background: #12273f; color: #fff; }
+.brand { color: #fff; font-size: 20px; font-weight: 800; text-decoration: none; }
+.topbar nav { display: flex; gap: 8px; flex-wrap: wrap; }
+.topbar nav a { color: #cdd9e6; padding: 8px 12px; border-radius: 6px; text-decoration: none; font-weight: 600; }
+.topbar nav a:hover, .topbar nav a.active { color: #fff; background: #244c77; }
+.staff-link { background: #1f6feb; color: #fff !important; }
+#router-view { padding: 28px; max-width: 980px; margin: 0 auto; width: 100%; }
+.footer { padding: 18px 28px; color: #6b7a8a; font-size: 13px; text-align: center; }
+.page-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+h1 { margin: 0 0 4px; font-size: 28px; }
+.sub { color: #607080; margin: 0; }
+.grid { display: grid; gap: 16px; }
+.grid.cards { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.card { background: #fff; border: 1px solid #dce2e7; border-radius: 10px; padding: 16px; }
+.card h3 { margin: 0 0 6px; }
+.muted { color: #6b7a8a; font-size: 13px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid #eef1f4; }
+.badge { display: inline-flex; padding: 3px 9px; border-radius: 999px; background: #e5f5ed; color: #176241; font-size: 12px; font-weight: 700; }
+.event { display: grid; grid-template-columns: 56px 1fr; gap: 14px; align-items: center; background: #fff; border: 1px solid #dce2e7; border-radius: 10px; padding: 14px 16px; }
+.cal { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 56px; height: 56px; border-radius: 10px; background: #12273f; color: #fff; }
+.cal .d { font-size: 22px; font-weight: 800; line-height: 1; }
+.cal .m { font-size: 11px; letter-spacing: 1px; }
+button, .button { border: 0; border-radius: 6px; background: #1f6feb; color: #fff; padding: 9px 14px; font: inherit; font-weight: 600; text-decoration: none; cursor: pointer; }
+button.ghost { background: #eef2f7; color: #2b3a4a; }
+.muted-block { color: #6b7a8a; padding: 18px; background: #fff; border: 1px dashed #cdd6df; border-radius: 10px; }
+@media (max-width: 640px) { .topbar { flex-direction: column; align-items: flex-start; } #router-view { padding: 18px 16px; } }
+</style>

@@ -1,0 +1,43 @@
+<template>
+  <section>
+    <div class="page-head">
+      <div>
+        <h1>Students</h1>
+        <p class="sub">Read live from <code>/api/students</code>.</p>
+      </div>
+      <button class="button ghost" @click="load">Refresh</button>
+    </div>
+
+    <div v-if="loading" class="muted-block">Loading students…</div>
+    <div v-else-if="error" class="muted-block">Could not load students: {{ error }}</div>
+    <div v-else class="grid">
+      <student-card v-for="student in students" :key="student.id" :student="student"></student-card>
+    </div>
+  </section>
+</template>
+
+<script>
+export default {
+  data() {
+    return { students: [], loading: true, error: "" };
+  },
+  async mounted() {
+    await this.load();
+  },
+  methods: {
+    async load() {
+      this.loading = true;
+      this.error = "";
+      try {
+        const response = await fetch("/api/students");
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        this.students = (await response.json()).items;
+      } catch (err) {
+        this.error = String(err);
+      } finally {
+        this.loading = false;
+      }
+    },
+  },
+};
+</script>

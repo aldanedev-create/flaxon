@@ -1,0 +1,99 @@
+<template>
+  <section>
+    <div class="page-head">
+      <div>
+        <h1>Enroll a student</h1>
+        <p class="sub">POSTs JSON to <code>/api/enrollments</code> — a direct ORM write that an Admin also sees.</p>
+      </div>
+      <button class="button ghost" @click="load">Refresh</button>
+    </div>
+
+    <div class="card" style="margin-bottom: 20px">
+      <div class="row" style="border:0; gap:12px; align-items:flex-end">
+        <label>Student
+          <select v-model="student_id" style="display:block; margin-top:6px; padding:8px; border-radius:6px; border:1px solid #cdd6df">
+            <option v-for="s in students" :key="s.id" :value="s.id">{{ s.name }}</option>
+          </select>
+        </label>
+        <label>Course
+          <select v-model="course_id" style="display:block; margin-top:6px; padding:8px; border-radius:6px; border:1px solid #cdd6df">
+            <option v-for="c in courses" :key="c.id" :value="c.id">{{ c.code }} — {{ c.name }}</option>
+          </select>
+        </label>
+        <label>Grade
+          <input v-model="grade" placeholder="A" style="display:block; margin-top:6px; padding:8px; border-radius:6px; border:1px solid #cdd6df; width:80px" />
+        </label>
+        <button class="button" :disabled="busy" @click="enroll">Enroll</button>
+      </div>
+      <p v-if="message" class="muted">{{ message }}</p>
+    </div>
+
+    <h2 style="font-size:18px">Existing enrollments</h2>
+    <div v-if="loading" class="muted-block">Loading…</div>
+    <div v-else class="grid">
+      <div class="row" v-for="e in enrollments" :key="e.id">
+        <span>Student #{{ e.student_id }} → Course #{{ e.course_id }}</span>
+        <span class="badge">{{ e.grade || "—" }}</span>
+      </div>
+    </div>
+  </section>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      students: [], courses: [], enrollments: [],
+      student_id: null, course_id: null, grade: "",
+      loading: true, busy: false, message: "",
+    };
+  },
+  async mounted() {
+    await this.load();
+  },
+  methods: {
+    async load() {
+      this.loading = true;
+      try {
+        const [s, c, e] = await Promise.all([
+          fetch("/api/students").then(r => r.json()),
+          fetch("/api/courses").then(r => r.json()),
+          fetch("/api/enrollments").then(r => r.json()),
+        ]);
+        this.students = s.items;
+        this.courses = c.items;
+        this.enrollments = e.items;
+        if (this.student_id === null && this.students[0]) this.student_id = this.students[0].id;
+        if (this.course_id === null && this.courses[0]) this.course_id = this.courses[0].id;
+      } catch (err) {
+        this.message = "Could not load data: " + err;
+      } finally {
+        this.loading = false;
+      }
+    },
+    async enroll() {
+      this.busy = true;
+      this.message = "";
+      try {
+        const response = await fetch("/api/enrollments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ student_id: this.student_id, course_id: this.course_id, grade: this.grade }),
+        });
+        const data = await response.json();
+        if (response.status === 201) {
+          this.message = "Enrolled (id " + data.id + "). Check Admin — it is the same row.";
+          this.grade = "";
+          await this.load();
+        } else {
+          this.message = (data.error && data.error.message) || ("Request failed (" + response.status + ")");
+        }
+      } catch (err) {
+        this.message = "Request failed: " + err;
+      } finally {
+        this.busy = false;
+      }
+    },
+  },
+};
+</script>

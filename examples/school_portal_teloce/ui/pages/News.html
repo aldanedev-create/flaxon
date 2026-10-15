@@ -1,0 +1,48 @@
+<template>
+  <section>
+    <div class="page-head">
+      <div>
+        <h1>News</h1>
+        <p class="sub">Published CMS items from <code>/api/news</code>.</p>
+      </div>
+      <button class="button ghost" @click="load">Refresh</button>
+    </div>
+
+    <div v-if="loading" class="muted-block">Loading news…</div>
+    <div v-else-if="error" class="muted-block">Could not load news: {{ error }}</div>
+    <div v-else-if="!news.length" class="muted-block">No published news yet.</div>
+    <div v-else class="grid">
+      <article class="card" v-for="item in news" :key="item.title">
+        <h3>{{ item.title }}</h3>
+        <p>{{ item.summary }}</p>
+        <span class="badge">{{ item.category }}</span>
+      </article>
+    </div>
+  </section>
+</template>
+
+<script>
+export default {
+  data() {
+    return { news: [], loading: true, error: "" };
+  },
+  async mounted() {
+    await this.load();
+  },
+  methods: {
+    async load() {
+      this.loading = true;
+      this.error = "";
+      try {
+        const response = await fetch("/api/news");
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        this.news = (await response.json()).items;
+      } catch (err) {
+        this.error = String(err);
+      } finally {
+        this.loading = false;
+      }
+    },
+  },
+};
+</script>

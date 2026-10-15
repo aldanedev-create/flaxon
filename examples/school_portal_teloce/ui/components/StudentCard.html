@@ -1,0 +1,12 @@
+<template>
+  <div class="card">
+    <h3>{{ student.name }}</h3>
+    <p class="muted">Grade {{ student.grade }} · {{ student.email }}</p>
+    <span class="badge" v-if="student.active">Active</span>
+    <span class="badge" v-else style="background:#fde8e8;color:#9b2c2c">Inactive</span>
+  </div>
+</template>
+
+<script>
+export default { props: ["student"] };
+</script>

@@ -1,0 +1,11 @@
+<template>
+  <div class="card">
+    <h3>{{ course.name }}</h3>
+    <p class="muted">{{ course.code }} · {{ course.teacher }}</p>
+    <span class="badge">Room {{ course.room }}</span>
+  </div>
+</template>
+
+<script>
+export default { props: ["course"] };
+</script>

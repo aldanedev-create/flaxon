@@ -1,0 +1,59 @@
+<template>
+  <section>
+    <div class="page-head">
+      <div>
+        <h1>Welcome to {{ school }}</h1>
+        <p class="sub">A Teloce interface reading the same flaxon.db rows the staff Admin edits.</p>
+      </div>
+      <a class="button" href="/students" data-teloce-link>Browse students</a>
+    </div>
+
+    <div v-if="loading" class="muted-block">Loading the school overview…</div>
+    <div v-else-if="error" class="muted-block">Could not load data: {{ error }}</div>
+    <div v-else class="grid cards">
+      <div class="card"><div class="muted">Students</div><div class="metric">{{ stats.students }}</div></div>
+      <div class="card"><div class="muted">Courses</div><div class="metric">{{ stats.courses }}</div></div>
+      <div class="card"><div class="muted">Staff</div><div class="metric">{{ stats.staff }}</div></div>
+      <div class="card"><div class="muted">Enrollments</div><div class="metric">{{ stats.enrollments }}</div></div>
+    </div>
+
+    <div class="page-head" style="margin-top: 28px">
+      <h1 style="font-size: 22px">Latest news</h1>
+      <a class="button ghost" href="/news" data-teloce-link>All news</a>
+    </div>
+    <div v-if="!loading && news.length" class="grid cards">
+      <div class="card" v-for="item in news" :key="item.title">
+        <h3>{{ item.title }}</h3>
+        <p class="muted">{{ item.summary }}</p>
+        <span class="badge">{{ item.category }}</span>
+      </div>
+    </div>
+  </section>
+</template>
+
+<script>
+export default {
+  props: ["school"],
+  data() {
+    return { stats: {}, news: [], loading: true, error: "" };
+  },
+  async mounted() {
+    try {
+      const [overview, news] = await Promise.all([
+        fetch("/api/overview").then(r => r.json()),
+        fetch("/api/news").then(r => r.json()),
+      ]);
+      this.stats = overview;
+      this.news = (news.items || []).slice(0, 3);
+    } catch (err) {
+      this.error = String(err);
+    } finally {
+      this.loading = false;
+    }
+  },
+};
+</script>
+
+<style>
+.metric { font-size: 28px; font-weight: 800; margin-top: 6px; }
+</style>
