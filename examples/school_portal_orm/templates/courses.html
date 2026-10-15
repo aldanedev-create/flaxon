@@ -1,0 +1,5 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="inner-hero inner-hero-gold"><p class="eyebrow">Course directory</p><h1>Find a class that makes you want to know more.</h1><p>Our current catalog is maintained by the Northstar operations team through Admin.</p></section>
+<section class="catalog-section catalog-section-spaced"><div class="section-heading"><div><p class="eyebrow">Current offerings</p><h2>Explore the directory</h2></div><a class="text-link" href="/academics">How we teach -&gt;</a></div><div class="catalog-grid">{% for course in courses %}<article class="catalog-card"><span class="course-code">{{ course.code }}</span><h3>{{ course.name }}</h3><p>{{ course.teacher }} | Room {{ course.room }}</p></article>{% else %}<p class="muted">No courses have been published yet.</p>{% endfor %}</div></section>
+{% endblock %}

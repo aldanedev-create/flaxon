@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="home-hero">
+  <div class="home-hero-copy">
+    <p class="eyebrow">Northstar Academy | Established 2004</p>
+    <h1>Let curiosity <em>lead.</em></h1>
+    <p class="home-hero-copy-text">A thoughtful, ambitious school for students ready to ask better questions, make meaningful work, and contribute with confidence.</p>
+    <div class="hero-actions"><a class="button" href="/admissions">Discover Northstar</a><a class="text-link" href="/about">Meet our community -&gt;</a></div>
+  </div>
+  <div class="campus-photo"><img src="/school-static/campus.png" alt="Northstar Academy campus and tree-lined walkway"><div class="campus-photo-overlay"><span>A place to grow</span><strong>Learn<br>bravely.</strong><small>Austin, Texas</small></div></div>
+</section>
+<section class="home-proof">
+  <div><strong>{{ course_count }}</strong><span>Active courses</span></div>
+  <div><strong>{{ staff_count }}</strong><span>Faculty and staff</span></div>
+  <div><strong>1:12</strong><span>Mentor ratio</span></div>
+  <div><strong>7-12</strong><span>Grades served</span></div>
+</section>
+<section class="welcome-section">
+  <div class="section-intro"><p class="eyebrow">The Northstar way</p><h2>Serious about learning.<br><em>Human about school.</em></h2></div>
+  <div class="welcome-copy"><p>Northstar is a close-knit college-preparatory school where students are known, challenged, and encouraged to make a difference.</p><p>Our classrooms combine strong academic foundations with the freedom to explore ideas through art, science, service, and leadership.</p><a class="text-link" href="/about">Read about our mission -&gt;</a></div>
+</section>
+<section class="home-cards">
+  <a class="home-card home-card-dark" href="/academics"><span class="card-number">01 | Academics</span><h3>Build a strong foundation.</h3><p>Explore a broad, challenging curriculum guided by teachers who know how students learn.</p><span class="card-arrow">-&gt;</span></a>
+  <a class="home-card" href="/students"><span class="card-number">02 | Student life</span><h3>Find your people.</h3><p>Clubs, teams, studios, and service projects give every student a place to belong.</p><span class="card-arrow">-&gt;</span></a>
+  <a class="home-card home-card-warm" href="/admissions"><span class="card-number">03 | Admissions</span><h3>Come see what is possible.</h3><p>Start a conversation, visit campus, and learn how Northstar supports the whole student.</p><span class="card-arrow">-&gt;</span></a>
+</section>
+<section class="home-news-events">
+  <div class="home-news"><div class="section-heading"><div><p class="eyebrow">From the bulletin</p><h2>News &amp; notices</h2></div><a class="text-link" href="/news">View all -&gt;</a></div>{% for item in news %}<a class="home-news-item" href="/news"><span class="news-tag">{{ item.get("category") or "Campus update" }}</span><div><h3>{{ item.title }}</h3><p>{{ item.summary }}</p></div></a>{% else %}<p class="muted">New announcements will appear here.</p>{% endfor %}</div>
+  <div class="home-events"><div class="section-heading"><div><p class="eyebrow">Save the date</p><h2>Upcoming events</h2></div><a class="text-link" href="/calendar">Calendar -&gt;</a></div>{% for event in events %}<a class="home-event" href="/calendar"><span class="event-date"><b>{{ event.day }}</b><small>{{ event.month }}</small></span><span><strong>{{ event.title }}</strong><small>{{ event.location }} | {{ event.time }}</small></span></a>{% else %}<p class="muted">The calendar is being updated.</p>{% endfor %}</div>
+</section>
+{% endblock %}
