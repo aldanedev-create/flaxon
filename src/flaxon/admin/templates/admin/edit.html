@@ -38,6 +38,7 @@
           <span class="corporate-badge corporate-badge-neutral">ID {{ object_id }}</span>
         </div>
         {% if form_error is defined and form_error %}<p role="alert">{{ form_error }}</p>{% endif %}
+        {% if write_disabled is defined and write_disabled %}<p role="alert">{{ write_disabled }}</p>{% endif %}
       <div class="record-fields">
           {% for field in form_fields %}
           {% set field_name = field|string %}

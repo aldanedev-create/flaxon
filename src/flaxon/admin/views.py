@@ -9,6 +9,49 @@ from flaxon.http import HTMLResponse, RedirectResponse, Request
 
 from .registry import evaluate_permission_hook
 
+WRITE_HOOKS = (
+    "get_instances",
+    "get_instance",
+    "create_instance",
+    "update_instance",
+    "delete_instance",
+)
+
+
+def write_disabled_notice(admin_model: Any, hook: str) -> str:
+    """Return an empty string when the model can be written, else a notice.
+
+    Rendered by the add/edit templates so an operator sees the problem before
+    pressing Save instead of after.
+    """
+    if hasattr(admin_model.model, hook):
+        return ""
+    return str(unsupported_write(admin_model, hook))
+
+
+def unsupported_write(admin_model: Any, hook: str) -> BadRequest:
+    """Build the explicit error raised when a registered model cannot be written.
+
+    Admin models only gain CRUD hooks when they are Tortoise models (the registry
+    wraps them with ``model_adapter``). A plain class registered without the
+    async hooks used to save silently, so surface it as a form error instead.
+    """
+    name = admin_model.get_name()
+    orm_model = getattr(admin_model.model, "orm_model", None)
+    if orm_model is not None:
+        detail = f"{orm_model.__name__} was registered without its Admin CRUD adapter."
+    else:
+        detail = (
+            f"{getattr(admin_model.model, '__name__', admin_model.model)} is not a "
+            "Tortoise model, so the Admin never wrapped it with CRUD hooks."
+        )
+    return BadRequest(
+        f"'{name}' cannot be saved from the admin: {hook}() is missing. {detail} "
+        "Inherit the model from flaxon.db.Model, or implement "
+        + "/".join(WRITE_HOOKS)
+        + "."
+    )
+
 
 class AdminView:
     """Admin view implementation for the admin subsystem."""
@@ -257,14 +300,28 @@ class CreateView(AdminView):
 
             # Hook for model saving instance if supported by model manager
             model_class = self.admin_model.model
+            if not hasattr(model_class, "create_instance"):
+                return await self.invalid_form(
+                    unsupported_write(self.admin_model, "create_instance"),
+                    form_data,
+                    "admin/add.html",
+                )
             result = None
-            if hasattr(model_class, "create_instance"):
-                try:
-                    result = model_class.create_instance(form_data)
-                    if hasattr(result, "__await__"):
-                        result = await result
-                except BadRequest as exc:
-                    return await self.invalid_form(exc, form_data, "admin/add.html")
+            try:
+                result = model_class.create_instance(form_data)
+                if hasattr(result, "__await__"):
+                    result = await result
+            except BadRequest as exc:
+                return await self.invalid_form(exc, form_data, "admin/add.html")
+            if result is None:
+                return await self.invalid_form(
+                    BadRequest(
+                        "The record was not created: create_instance() returned no record. "
+                        "Nothing was written to the database."
+                    ),
+                    form_data,
+                    "admin/add.html",
+                )
             record_id = (
                 str(result.get("id", "")) if isinstance(result, dict) else str(getattr(result, "pk", ""))
             )
@@ -289,6 +346,7 @@ class CreateView(AdminView):
             "readonly_fields": self.admin_model.readonly_fields,
             "version": "",
             "user": getattr(self.request, "user", None),
+            "write_disabled": write_disabled_notice(self.admin_model, "create_instance"),
         }
         return await self.dashboard.jinax.render_response("admin/add.html", context)
 
@@ -400,6 +458,7 @@ class UpdateView(AdminView):
             "history_count": len(entries),
             "record_label": record_label,
             "last_modified": last_modified,
+            "write_disabled": write_disabled_notice(self.admin_model, "update_instance"),
         }
         return await self.dashboard.jinax.render_response("admin/edit.html", context)
 
@@ -434,19 +493,35 @@ class UpdateView(AdminView):
                 raise Conflict("This record was changed by another user. Reload before saving.")
 
         before = self._snapshot(current)
+        if not hasattr(model_class, "update_instance"):
+            return await self.invalid_form(
+                unsupported_write(self.admin_model, "update_instance"),
+                form_data,
+                "admin/edit.html",
+                current,
+            )
         result = None
-        if hasattr(model_class, "update_instance"):
-            try:
-                result = (
-                    model_class.update_instance(self.object_id, form_data, expected_version=expected_version)
-                    if hasattr(model_class, "version")
-                    else model_class.update_instance(self.object_id, form_data)
-                )
-                if hasattr(result, "__await__"):
-                    result = await result
-            except BadRequest as exc:
-                return await self.invalid_form(exc, form_data, "admin/edit.html", current)
-        after = self._snapshot(result if result is not None else await self._get_object())
+        try:
+            result = (
+                model_class.update_instance(self.object_id, form_data, expected_version=expected_version)
+                if hasattr(model_class, "version")
+                else model_class.update_instance(self.object_id, form_data)
+            )
+            if hasattr(result, "__await__"):
+                result = await result
+        except BadRequest as exc:
+            return await self.invalid_form(exc, form_data, "admin/edit.html", current)
+        if result is None:
+            return await self.invalid_form(
+                BadRequest(
+                    "The record was not updated: update_instance() returned no record. "
+                    "Nothing was written to the database."
+                ),
+                form_data,
+                "admin/edit.html",
+                current,
+            )
+        after = self._snapshot(result)
         details = {"before": before, "after": after} if before or after else {}
         self.dashboard.record_activity(
             "updated",
