@@ -28,6 +28,48 @@ python management.py runserver         # http://127.0.0.1:8000
 Open the site at http://127.0.0.1:8000. Sign in to the staff Admin at
 `/admin/` with the credentials printed by `setup-admin`.
 
+## Behind a reverse proxy (GitHub Codespaces, tunnels)
+
+The Teloce live reload / development diagnostics compare the browser's `Origin`
+(`https://…`) with what the server sees. When Flaxon runs behind the Codespaces
+proxy, the proxy connects over plain `http` and forwards the real scheme/host in
+`X-Forwarded-Proto` / `X-Forwarded-Host`, but the dev server **ignores** those
+headers unless the proxy IP is trusted. Two things then look mismatched:
+
+- `teloce.py` turns live reload off — *"Development diagnostics require the same
+  origin. The browser sent http://localhost:8000 but the server sees
+  https://localhost:8000."*
+- `TrustedHostsMiddleware` rejects the Codespaces host (it is not in
+  `ALLOWED_HOSTS`).
+
+The Codespaces proxy already sends the forwarded headers — you only need to make
+Flaxon trust them and allow the public host. **Important:** Flaxon's
+`TrustedHostsMiddleware` does *not* treat `*` as a wildcard, so `ALLOWED_HOSTS`
+must contain the *exact* forwarded host (copy it from your browser's address bar
+when you open the forwarded port — typically `${CODESPACE_NAME}-8000.app.github.dev`).
+
+```bash
+# 1) Env vars with the bundled runserver (uvicorn reads FORWARDED_ALLOW_IPS):
+FLAXON_ALLOWED_HOSTS="${CODESPACE_NAME}-8000.app.github.dev" \
+FORWARDED_ALLOW_IPS='*' \
+python management.py runserver
+
+# 2) Framework `run` command, which has a first-class flag:
+FLAXON_ALLOWED_HOSTS="${CODESPACE_NAME}-8000.app.github.dev" \
+flaxon run app:app --forwarded-allow-ips '*' --reload --port 8000
+
+# 3) Plain runserver, letting the app own the proxy trust (see app.py):
+FLAXON_ALLOWED_HOSTS="${CODESPACE_NAME}-8000.app.github.dev" \
+FLAXON_TRUST_PROXY=1 \
+python management.py runserver
+```
+
+`FORWARDED_ALLOW_IPS='*'` (or `FLAXON_TRUST_PROXY=1`) makes Flaxon rewrite the
+seen scheme/host from `X-Forwarded-*` so the browser's `https` origin matches;
+use `'*'` for the proxy trust **only** in development. The `FLAXON_ALLOWED_HOSTS`
+value must stay the concrete public host — never `*` (it would be rejected by
+the host check, and Flaxon blocks `*` in production anyway).
+
 ## What to look at
 
 - `ui/app.html` — the shell, navigation, and router outlet.

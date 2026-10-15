@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from flaxon import Flaxon, Request
 from flaxon.admin.cms import CMSField, ContentType
+from flaxon.config import env
 from flaxon.db.admin import configure_admin
 from flaxon.jinax.loaders import CompositeLoader, FileSystemLoader
 
@@ -54,6 +55,18 @@ EVENT_FIELDS = [
 def create_app():
     app = Flaxon.from_settings()
     settings = app.settings
+
+    # Trust a reverse proxy (GitHub Codespaces, a tunnel, Docker) for
+    # X-Forwarded-Proto / X-Forwarded-Host so the Teloce development diagnostics
+    # see the browser's real https origin instead of the internal
+    # http://localhost. OFF by default — enable in development only via
+    # FLAXON_TRUST_PROXY=1. NOTE: Flaxon's TrustedHostsMiddleware does not treat
+    # "*" as a wildcard, so you must still list the public host in
+    # FLAXON_ALLOWED_HOSTS (e.g. ${CODESPACE_NAME}-8000.app.github.dev).
+    if env.bool("FLAXON_TRUST_PROXY", default=False):
+        from flaxon.middleware import ProxyHeadersMiddleware
+
+        app.add_middleware(ProxyHeadersMiddleware, trusted_proxies=["*"])
 
     app.mount_static("/school-static", str(settings.root / "static"))
     # Teloce must be configured before the management guard so that build and
