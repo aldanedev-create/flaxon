@@ -1,0 +1,54 @@
+<template>
+  <section>
+    <div class="page-head">
+      <div>
+        <h1>Events</h1>
+        <p class="sub">Published CMS items from <code>/api/events</code>.</p>
+      </div>
+      <button class="button ghost" @click="load">Refresh</button>
+    </div>
+
+    <div v-if="loading" class="muted-block">Loading events…</div>
+    <div v-else-if="error" class="muted-block">Could not load events: {{ error }}</div>
+    <div v-else-if="!events.length" class="muted-block">No published events yet.</div>
+    <div v-else class="grid">
+      <div class="event" v-for="item in events" :key="item.title">
+        <div class="cal">
+          <span class="d">{{ item.day }}</span>
+          <span class="m">{{ item.month }}</span>
+        </div>
+        <div>
+          <h3 style="margin:0 0 4px">{{ item.title }}</h3>
+          <p class="muted" style="margin:0">{{ item.date_label }} · {{ item.time }} · {{ item.location }}</p>
+          <p style="margin:6px 0 0">{{ item.description }}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</template>
+
+<script>
+export default {
+  data() {
+    return { events: [], loading: true, error: "" };
+  },
+  async mounted() {
+    await this.load();
+  },
+  methods: {
+    async load() {
+      this.loading = true;
+      this.error = "";
+      try {
+        const response = await fetch("/api/events");
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        this.events = (await response.json()).items;
+      } catch (err) {
+        this.error = String(err);
+      } finally {
+        this.loading = false;
+      }
+    },
+  },
+};
+</script>

@@ -1,0 +1,11 @@
+{% extends "admin/base.html" %}
+{% block content %}
+<section class="flaxon-card-grid">
+  <div class="flaxon-card"><div class="flaxon-card-value">{{ student_count }}</div><div class="flaxon-card-label">Students</div></div>
+  <div class="flaxon-card"><div class="flaxon-card-value">{{ course_count }}</div><div class="flaxon-card-label">Courses</div></div>
+  <div class="flaxon-card"><div class="flaxon-card-value">{{ staff_count }}</div><div class="flaxon-card-label">Staff</div></div>
+  <div class="flaxon-card"><div class="flaxon-card-value">{{ enrollment_count }}</div><div class="flaxon-card-label">Enrollments</div></div>
+  <div class="flaxon-card"><div class="flaxon-card-value">{{ news_count }}</div><div class="flaxon-card-label">Published news</div></div>
+</section>
+<p class="flaxon-muted">Live counts from the ORM and CMS. Edit the catalog in <a href="{{ admin_url }}">Admin</a> or the CMS in <a href="{{ cms_url }}">CMS</a>.</p>
+{% endblock %}

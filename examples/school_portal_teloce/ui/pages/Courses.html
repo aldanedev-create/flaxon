@@ -1,0 +1,43 @@
+<template>
+  <section>
+    <div class="page-head">
+      <div>
+        <h1>Courses</h1>
+        <p class="sub">Read live from <code>/api/courses</code>.</p>
+      </div>
+      <button class="button ghost" @click="load">Refresh</button>
+    </div>
+
+    <div v-if="loading" class="muted-block">Loading courses…</div>
+    <div v-else-if="error" class="muted-block">Could not load courses: {{ error }}</div>
+    <div v-else class="grid">
+      <course-card v-for="course in courses" :key="course.id" :course="course"></course-card>
+    </div>
+  </section>
+</template>
+
+<script>
+export default {
+  data() {
+    return { courses: [], loading: true, error: "" };
+  },
+  async mounted() {
+    await this.load();
+  },
+  methods: {
+    async load() {
+      this.loading = true;
+      this.error = "";
+      try {
+        const response = await fetch("/api/courses");
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        this.courses = (await response.json()).items;
+      } catch (err) {
+        this.error = String(err);
+      } finally {
+        this.loading = false;
+      }
+    },
+  },
+};
+</script>
