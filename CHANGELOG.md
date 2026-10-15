@@ -13,7 +13,7 @@
 
 
 
-## Unreleased
+## 3.2
 
 - Log expected route overlaps at DEBUG when specificity determines the winner. Keep WARNING for equal-specificity conflicts resolved by registration order, including duplicate dynamic routes. Avoid false collisions for distinct trailing-slash paths and static paths that do not match a converter. Route selection is unchanged.
 

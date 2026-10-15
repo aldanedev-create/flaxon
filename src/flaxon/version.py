@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 
-__version__ = "0.3.1"
+__version__ = "0.3.2"
 _version_match = re.match(r"^(\d+)\.(\d+)\.(\d+)", __version__)
 if _version_match is None:
     raise ValueError("Flaxon version must start with major.minor.patch")
