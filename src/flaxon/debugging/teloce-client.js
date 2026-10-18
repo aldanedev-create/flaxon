@@ -107,6 +107,20 @@ async function rejectionOf(response) {
   } catch (_) { return { code: '', message: '' }; }
 }
 
+/**
+ * Say why a report was rejected, so "no mapped location" is never mistaken for a broken mapping.
+ * @param {Response} response
+ * @returns {Promise<string>}
+ */
+async function transportNote(response) {
+  const status = Number(response.status) || 0;
+  const rejection = await rejectionOf(response);
+  if (rejection.code === ORIGIN_REJECTED) {
+    return `Source mapping unavailable: the debug endpoint rejected this origin (${status}).`;
+  }
+  return `Source mapping unavailable: the debug endpoint answered ${status}.`;
+}
+
 /** Selector scope for the error dialog and the status banner, so app CSS cannot restyle them. */
 const OVERLAY = 'dialog[data-flaxon-error]';
 const NOTICE = '[data-flaxon-notice]';
@@ -123,6 +137,7 @@ ${OVERLAY}[open]{display:flex;flex-direction:column;animation:fx-in .16s ease-ou
 ${OVERLAY}::backdrop{background:rgba(1,4,9,.74);backdrop-filter:blur(3px)}
 ${OVERLAY}:focus{outline:none}
 ${OVERLAY} *{box-sizing:border-box}
+${OVERLAY} [hidden]{display:none !important}
 @keyframes fx-in{from{opacity:0;transform:translateY(6px)}}
 
 ${OVERLAY} .fx-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 10px 10px 20px;background:var(--surface);border-bottom:1px solid var(--line)}
@@ -137,6 +152,8 @@ ${OVERLAY} .fx-where{justify-self:start;display:inline-flex;align-items:baseline
 ${OVERLAY} .fx-where:hover{border-color:var(--line-strong);color:var(--text)}
 ${OVERLAY} .fx-path{overflow-wrap:anywhere}
 ${OVERLAY} .fx-hint{flex:none;color:var(--muted);font:12px/1.5 var(--sans)}
+${OVERLAY} .fx-tip{margin:-8px 0 0;color:var(--muted);font:13px/1.5 var(--sans);overflow-wrap:anywhere}
+${OVERLAY} .fx-note{margin:0;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--muted);font:12.5px/1.5 var(--sans);overflow-wrap:anywhere}
 
 ${OVERLAY} .fx-src{display:grid;overflow:auto;padding:6px 0;border:1px solid var(--line);border-radius:8px;background:var(--surface);font:12.5px/1.7 var(--mono)}
 ${OVERLAY} .fx-ln{display:grid;grid-template-columns:52px minmax(max-content,1fr);white-space:pre}
@@ -243,6 +260,94 @@ function parseExcerpt(excerpt, errorLine) {
 }
 
 /**
+ * Schemes a browser must never be asked to follow from a link we render.
+ * The server refuses them too; this is the second half of that check.
+ */
+const FORBIDDEN_EDITOR_SCHEMES = new Set(['javascript', 'data', 'vbscript', 'file']);
+
+/**
+ * Keep only editor links a browser may follow: http(s) and custom schemes such as
+ * `vscode://`. Anything else, and anything that is not a URL at all, becomes ''.
+ * @param {unknown} url
+ * @returns {string} The accepted URL, or '' when it must not be used.
+ */
+export function safeEditorUrl(url) {
+  const text = String(url || '').trim();
+  if (!text) return '';
+  try {
+    const parsed = new URL(text, globalThis.location?.href || 'http://localhost/');
+    if (FORBIDDEN_EDITOR_SCHEMES.has(parsed.protocol.slice(0, -1).toLowerCase())) return '';
+  } catch (_) { return ''; }
+  return text;
+}
+
+/** How V8 prints a name: letters, digits, `_` and `$`, never starting with a digit. */
+const IDENTIFIER = '([A-Za-z_$][\\w$]*)';
+/** Start of a name: never in the middle of `a-b`, `a.b` or a longer word. */
+const NAME_START = '(?:^|[\\s(])';
+
+/**
+ * Hints for the runtime messages developers hit most. V8 (Chromium, Edge, Node)
+ * wording only: another engine simply gets no hint rather than a wrong one.
+ * Order matters, the first matching rule wins.
+ * @type {{pattern: RegExp, hint: (match: RegExpMatchArray) => string}[]}
+ */
+const HINT_RULES = [
+  {
+    pattern: new RegExp(`${NAME_START}${IDENTIFIER} is not defined`),
+    hint: m => `${m[1]} is not defined. Declare it in <script setup>, import it, or fix the spelling.`,
+  },
+  {
+    pattern: new RegExp(`${NAME_START}${IDENTIFIER} is not a function`),
+    hint: m => `${m[1]} is not a function. A Teloce signal is read by calling it (${m[1]}()), ` +
+      `so check what ${m[1]} holds.`,
+  },
+  {
+    pattern: new RegExp(`${NAME_START}${IDENTIFIER} is not iterable`),
+    hint: m => `${m[1]} is not iterable. Give the signal a list as its default, or wrap the value.`,
+  },
+  {
+    pattern: /Cannot read properties of (undefined|null) \(reading '([^']*)'\)/,
+    hint: m => `The value is ${m[1]} when .${m[2]} is read. Give the signal a default, or guard the read.`,
+  },
+  {
+    pattern: /Cannot set properties of (undefined|null) \(setting '([^']*)'\)/,
+    hint: m => `The value is ${m[1]} when .${m[2]} is set. Create it first, usually as a signal.`,
+  },
+  {
+    pattern: /Cannot read property '([^']*)' of (undefined|null)/,
+    hint: m => `The value is ${m[2]} when .${m[1]} is read. Give the signal a default, or guard the read.`,
+  },
+  {
+    pattern: /Maximum call stack size exceeded/,
+    hint: () => 'A function keeps calling itself. Check an effect or computed that writes a signal it also reads.',
+  },
+  {
+    pattern: /Assignment to constant variable/,
+    hint: () => 'Assigning to a const. Make it a signal: const count = signal(0), then count(count() + 1).',
+  },
+  {
+    pattern: /Unexpected token '<'/,
+    hint: () => 'JavaScript arrived as HTML: a script URL is missing, so the dev server returned its page.',
+  },
+];
+
+/**
+ * Short, actionable hint for a runtime message. Pure: no DOM, no state, and the same
+ * input always gives the same answer. Returns '' for messages it does not recognise.
+ * @param {string} [message]
+ * @returns {string}
+ */
+export function hintFor(message) {
+  const text = String(message || '');
+  for (const rule of HINT_RULES) {
+    const match = text.match(rule.pattern);
+    if (match) return rule.hint(match);
+  }
+  return '';
+}
+
+/**
  * Copy text to the clipboard. Falls back to a hidden textarea on insecure origins.
  * @param {string} text
  * @param {HTMLElement} host Element to attach the fallback textarea to (must be inside a modal dialog).
@@ -281,7 +386,7 @@ export function installTeloceDebugger(config) {
   /**
    * The open error dialog: its elements, the report it shows and the text "Copy error" copies.
    * @type {{item: DebugReport, dialog: HTMLDialogElement, kind: HTMLElement, body: HTMLElement,
-   *   link: HTMLAnchorElement, text: string} | undefined}
+   *   link: HTMLAnchorElement, editor: HTMLAnchorElement, note: string, text: string} | undefined}
    */
   let ui;
   /** True once the person dismissed the dialog for the current report. */
@@ -346,11 +451,14 @@ export function installTeloceDebugger(config) {
     const body = el('div', 'fx-body');
 
     const link = /** @type {HTMLAnchorElement} */ (el('a', 'fx-btn fx-primary', 'Open Flaxon debugger'));
+    // Only revealed when the server sends a usable editor URL for the mapped location.
+    const editor = /** @type {HTMLAnchorElement} */ (el('a', 'fx-btn', 'Open in editor'));
+    editor.target = '_blank'; editor.rel = 'noreferrer noopener'; editor.hidden = true;
     const copy = el('button', 'fx-btn', 'Copy error'); copy.type = 'button';
     copy.onclick = () => copyWithFeedback(copy, 'Copy error', ui.text);
     const dismiss = el('button', 'fx-btn', 'Dismiss'); dismiss.type = 'button';
     dismiss.onclick = () => dialog.close();
-    const foot = el('div', 'fx-foot'); foot.append(link, copy, el('span', 'fx-spacer'), dismiss);
+    const foot = el('div', 'fx-foot'); foot.append(link, editor, copy, el('span', 'fx-spacer'), dismiss);
 
     dialog.append(head, body, foot);
     // Close on a click outside the panel, but not when a text selection merely ends there.
@@ -358,17 +466,21 @@ export function installTeloceDebugger(config) {
     dialog.addEventListener('mousedown', event => { pressedOutside = event.target === dialog; });
     dialog.addEventListener('click', event => { if (pressedOutside && event.target === dialog) dialog.close(); });
     dialog.addEventListener('close', () => { dismissed = true; });
-    ui = { item: report, dialog, kind, body, link, text: '' };
+    ui = { item: report, dialog, kind, body, link, editor, note: '', text: '' };
   };
 
   /**
    * Fill the dialog for a report. Called again with the server's extra context, which adds the
    * mapped source location and excerpt without re-opening or re-animating the dialog.
    * @param {DebugReport} report
-   * @param {{location?: string, source_excerpt?: string, related_error_id?: string, error_id?: string}} result
+   * @param {{location?: string, source_excerpt?: string, related_error_id?: string, error_id?: string,
+   *   editor_url?: string}} result
    * @returns {void}
    */
   const fill = (report, result) => {
+    ui.editor.hidden = true; ui.editor.removeAttribute('href');
+    const href = safeEditorUrl(result.editor_url);
+    if (href) { ui.editor.href = href; ui.editor.hidden = false; }
     const place = result.location || report.component || report.filename || '';
     const where = result.location || (place && report.line ? `${place}:${report.line}${report.column ? ':' + report.column : ''}` : place);
     ui.text = [place, report.message, result.source_excerpt, report.stack].filter(Boolean).join('\n\n');
@@ -379,6 +491,9 @@ export function installTeloceDebugger(config) {
     const title = el('h2', 'fx-title', String(report.message || 'Unknown error').split('\n')[0].replace(/^Uncaught\s+/, ''));
     title.id = 'fx-title'; parts.push(title);
 
+    const tip = hintFor(report.message);
+    if (tip) parts.push(el('p', 'fx-tip', tip));
+
     if (where) {
       const chip = el('button', 'fx-where'); chip.type = 'button'; chip.title = 'Copy path';
       const hint = el('span', 'fx-hint', 'Copy');
@@ -386,6 +501,8 @@ export function installTeloceDebugger(config) {
       chip.onclick = () => copyWithFeedback(hint, 'Copy', where);
       parts.push(chip);
     }
+
+    if (ui.note) parts.push(el('p', 'fx-note', ui.note));
 
     const errorLine = Number((result.location || '').split(':')[1]) || Number(report.line) || 0;
     const rows = parseExcerpt(result.source_excerpt, errorLine);
@@ -458,9 +575,16 @@ export function installTeloceDebugger(config) {
     try {
       const response = await nativeFetch('/__debug__/teloce/errors', { method: 'POST', credentials: 'same-origin',
         headers: { 'content-type': 'application/json', 'x-flaxon-debug-token': config.token }, body: JSON.stringify(item) });
-      if (response.ok && !closed) show(item, await response.json());
-    } catch (_) { /* Diagnostic transport failures stay local. */ }
-    finally { activeReports -= 1; }
+      if (closed) return;
+      if (response.ok) { show(item, await response.json()); return; }
+      // A rejected report used to be swallowed whole, which looked like a mapping bug.
+      if (ui) { ui.note = await transportNote(response); show(item, {}); }
+    } catch (_) {
+      if (ui && !closed) {
+        ui.note = 'Source mapping unavailable: the debug endpoint could not be reached.';
+        show(item, {});
+      }
+    } finally { activeReports -= 1; }
   };
   const runtime = event => report(event.detail || {});
   const error = event => report({message: event.message, stack: event.error?.stack, filename: event.filename, line: event.lineno, column: event.colno});
