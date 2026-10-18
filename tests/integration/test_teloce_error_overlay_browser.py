@@ -15,10 +15,13 @@ PAGE = """<!doctype html><meta charset="utf-8"><title>App</title>
 <style>%(css)s</style><h1>App</h1>
 <script type="module">
 import { installTeloceDebugger } from '/client.js';
-window.__reply = { error_id: 'fx_1' }; window.__delay = 0;
-window.fetch = async () => {
+window.__reply = { error_id: 'fx_1' }; window.__delay = 0; window.__status = 200;
+window.fetch = async (input) => {
+  const url = String((input && input.url) ? input.url : input);
   await new Promise(resolve => setTimeout(resolve, window.__delay));
-  return { ok: true, status: 200, json: async () => window.__reply };
+  // Only the diagnostics endpoint is allowed to fail; live reload must keep answering.
+  const status = url.includes('/teloce/errors') ? window.__status : 200;
+  return { ok: status >= 200 && status < 300, status, json: async () => window.__reply };
 };
 installTeloceDebugger({ token: 't', revision: 'r' });
 window.__fire = detail => window.dispatchEvent(new CustomEvent('teloce:error', { detail }));
@@ -50,7 +53,7 @@ def open_overlay_page():
     with sync_playwright() as pw:
         browser = pw.chromium.launch(args=["--no-sandbox"])
 
-        def open_page(css="", reply=None, delay=0):
+        def open_page(css="", reply=None, delay=0, status=200):
             context = browser.new_context(permissions=["clipboard-read", "clipboard-write"])
             page = context.new_page()
             page.set_default_timeout(5000)
@@ -66,8 +69,9 @@ def open_overlay_page():
             page.goto(f"{ORIGIN}/")
             page.wait_for_function("window.__ready")
             page.evaluate(
-                "([reply, delay]) => { window.__reply = reply; window.__delay = delay; }",
-                [reply or {}, delay],
+                "([reply, delay, status]) => { window.__reply = reply; window.__delay = delay; "
+                "window.__status = status; }",
+                [reply or {}, delay, status],
             )
             return page
 
@@ -95,8 +99,9 @@ def test_clicking_the_path_copies_the_full_url_and_confirms(open_overlay_page):
     page.locator(".fx-where").click()
     page.locator(".fx-hint", has_text="Copied").wait_for()
     assert page.evaluate("navigator.clipboard.readText()") == f"{ORIGIN}/_flaxon/app.js:4:17"
-    page.get_by_role("button", name="Copy error").click()
-    page.get_by_role("button", name="Copied").wait_for()
+    # exact: the path chip also reads "Copied" for a moment, so a loose match finds two buttons.
+    page.get_by_role("button", name="Copy error", exact=True).click()
+    page.get_by_role("button", name="Copied", exact=True).wait_for()
     assert "Uncaught TypeError: boom" in page.evaluate("navigator.clipboard.readText()")
 
 
@@ -163,6 +168,71 @@ def test_app_styles_cannot_restyle_the_overlay(open_overlay_page):
         page.eval_on_selector(".fx-btn:not(.fx-primary)", "e => getComputedStyle(e).backgroundColor")
         == "rgb(22, 27, 34)"
     )
+
+
+def test_a_rejected_report_says_why_the_mapping_is_missing(open_overlay_page):
+    """Finding D: a non-OK answer used to be swallowed, which looked like a broken mapping."""
+    page = open_overlay_page(status=403)
+    fire(page)
+    page.locator(".fx-note").wait_for()
+    assert "Source mapping unavailable" in page.locator(".fx-note").inner_text()
+    assert "403" in page.locator(".fx-note").inner_text()
+    assert page.locator("dialog[data-flaxon-error][open]").count() == 1
+
+
+def test_a_rejected_origin_names_the_cause(open_overlay_page):
+    page = open_overlay_page(status=403, reply={"error": {"code": "FX-DEBUG-ORIGIN"}})
+    fire(page)
+    page.locator(".fx-note").wait_for()
+    assert "rejected this origin" in page.locator(".fx-note").inner_text()
+
+
+def test_an_ok_report_shows_no_note(open_overlay_page):
+    page = open_overlay_page(reply=SERVER_CONTEXT)
+    fire(page)
+    page.locator(".fx-hit").wait_for()
+    assert page.locator(".fx-note").count() == 0
+
+
+def test_a_recognised_message_gets_a_hint(open_overlay_page):
+    page = open_overlay_page()
+    fire(page, {**REPORT, "message": "Uncaught ReferenceError: signal is not defined"})
+    assert page.locator(".fx-tip").inner_text() == (
+        "signal is not defined. Declare it in the component <script> block, import it, or fix the spelling."
+    )
+
+
+def test_an_unrecognised_message_gets_no_hint(open_overlay_page):
+    page = open_overlay_page()
+    fire(page)
+    assert page.locator(".fx-tip").count() == 0
+
+
+def test_the_editor_link_appears_only_when_the_server_offers_one(open_overlay_page):
+    url = "vscode://file/work/app/ui/app.html:4:17"
+    page = open_overlay_page(reply={**SERVER_CONTEXT, "editor_url": url})
+    fire(page)
+    link = page.get_by_role("link", name="Open in editor")
+    link.wait_for()
+    name = link.evaluate("element => element.getAttribute('aria-label') || element.textContent")
+    assert "Dismiss" not in name
+    assert link.get_attribute("href") == url
+    page.locator(".fx-btn", has_text="Open in editor").wait_for()
+
+
+def test_no_editor_link_without_a_url(open_overlay_page):
+    page = open_overlay_page(reply=SERVER_CONTEXT)
+    fire(page)
+    page.locator(".fx-hit").wait_for()
+    assert page.get_by_role("link", name="Open in editor").count() == 0
+
+
+def test_a_forbidden_editor_scheme_is_refused(open_overlay_page):
+    for url in ["javascript:alert(1)", "data:text/html,x", "vbscript:x", "file:///etc/passwd"]:
+        page = open_overlay_page(reply={**SERVER_CONTEXT, "editor_url": url})
+        fire(page)
+        page.locator(".fx-hit").wait_for()
+        assert page.get_by_role("link", name="Open in editor").count() == 0
 
 
 def test_overlay_uses_the_dark_palette_and_keeps_focus_off_the_buttons(open_overlay_page):

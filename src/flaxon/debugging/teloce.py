@@ -9,7 +9,7 @@ import secrets
 import time
 import uuid
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 from flaxon.debugging.redaction import Redactor
 from flaxon.debugging.source_maps import source_position
@@ -47,15 +47,16 @@ class TeloceDebugger:
         if not isinstance(report, dict):
             raise BadRequest("Diagnostic must be an object")
         result = self.record(report, client_reported=True)
-        return JSONResponse(
-            {
-                "error_id": result["error_id"],
-                "related_error_id": result.get("related_error_id"),
-                "location": result.get("location"),
-                "source_excerpt": result.get("source_excerpt"),
-            },
-            headers={"cache-control": "no-store"},
-        )
+        payload: dict[str, Any] = {
+            "error_id": result["error_id"],
+            "related_error_id": result.get("related_error_id"),
+            "location": result.get("location"),
+            "source_excerpt": result.get("source_excerpt"),
+        }
+        editor_url = self._editor_url(result)
+        if editor_url:
+            payload["editor_url"] = editor_url
+        return JSONResponse(payload, headers={"cache-control": "no-store"})
 
     async def _bounded_body(self, request: Request) -> bytes:
         """Reject an oversized body while receiving it, including chunked transport."""
@@ -142,9 +143,34 @@ class TeloceDebugger:
         location = self._map_browser_location(mapped_report)
         if location:
             error["component"] = location["component"]
+            # The mapped position is the answer even when the excerpt below is
+            # refused (huge file, unreadable file): never drop it.
+            error["location"] = f"{location['component']}:{location['line']}:{location['column']}"
         self._source_excerpt(error, location or report)
         self.integration.app.error_store.store(error)
         return error
+
+    @staticmethod
+    def _location_parts(location: Any) -> tuple[str, int, int] | None:
+        """Split a stored `component:line:column` location back into its parts."""
+        match = re.match(r"^(?P<path>.+):(?P<line>\d+):(?P<column>\d+)$", str(location or ""))
+        return (match["path"], int(match["line"]), int(match["column"])) if match else None
+
+    def _editor_url(self, error: dict[str, Any]) -> str | None:
+        """Offer an editor link in debug mode, and only for a registered source file."""
+        if not self.integration.app.debug:
+            return None
+        parts = self._location_parts(error.get("location"))
+        if parts is None:
+            return None
+        component, line, column = parts
+        try:
+            path = (self.integration.project_root / component).resolve()
+        except (OSError, ValueError):
+            return None
+        if not any(path.is_relative_to(source.directory) for source in self.integration.sources):
+            return None
+        return self.integration.editor_link.url_for(path, relpath=component, line=line, column=column)
 
     @staticmethod
     def _safe_path(value: Any) -> str:
@@ -154,14 +180,25 @@ class TeloceDebugger:
         except ValueError:
             return "/"
 
+    def _known_output(self, path: str) -> str | None:
+        """Resolve a reported build URL path to a known output, decoding percent escapes.
+
+        Browsers percent-encode the path of a compiled component, so ``[id].js``
+        arrives as ``%5Bid%5D.js`` and has to be decoded before it can be matched.
+        The decoded path must still equal a known output *exactly*, which is what
+        keeps ``..%2f`` from escaping: no build output contains a ``..`` segment,
+        so a traversal never matches and no file outside the build is reachable.
+        """
+        prefix = self.integration.static_url + "/"
+        output = unquote(path[len(prefix) :]) if path.startswith(prefix) else ""
+        known = {item.get("output") for item in (self.integration.build_result or {}).get("files", [])}
+        return output if output in known else None
+
     def _stack_position(self, report: dict[str, Any]) -> dict[str, Any]:
         if report.get("filename"):
             return report
-        known = {item.get("output") for item in (self.integration.build_result or {}).get("files", [])}
-        prefix = self.integration.static_url + "/"
         for match in re.finditer(r"(https?://[^\s()]+):(\d+):(\d+)", str(report.get("stack", ""))[:12000]):
-            url = self._safe_path(match[1])
-            if url.startswith(prefix) and url[len(prefix) :] in known:
+            if self._known_output(self._safe_path(match[1])) is not None:
                 return {**report, "filename": match[1], "line": match[2], "column": match[3]}
         return report
 
@@ -172,10 +209,8 @@ class TeloceDebugger:
             url = urlsplit(str(report["filename"])[:2000])
         except ValueError:
             return None
-        prefix = self.integration.static_url + "/"
-        output = url.path[len(prefix) :] if url.path.startswith(prefix) else ""
-        known = {item.get("output") for item in (self.integration.build_result or {}).get("files", [])}
-        if output not in known:
+        output = self._known_output(url.path)
+        if output is None:
             return None
         try:
             path = (self.integration.build_dir / (output + ".map")).resolve()
@@ -205,7 +240,9 @@ class TeloceDebugger:
             if path.stat().st_size > 200000:
                 return
             lines = path.read_text(encoding="utf-8").splitlines()
-            error["location"] = f"{component}:{line}:{column}"
+            # A mapped location wins; without one this is still the best answer
+            # for reports that name a component directly (SSR, typecheck).
+            error.setdefault("location", f"{component}:{line}:{column}")
             error["source_excerpt"] = self.redactor.redact(
                 "\n".join(
                     f"{index + 1}: {lines[index]}"

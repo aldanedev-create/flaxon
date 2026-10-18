@@ -14,6 +14,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from flaxon._imports import import_attribute
+from flaxon.debugging.editor import EditorLink, resolve_editor
 from flaxon.debugging.teloce import TeloceDebugger
 from flaxon.development_typecheck import DevelopmentTypecheck
 from flaxon.http import HTMLResponse, JSONResponse, Request, Response
@@ -50,9 +51,19 @@ class Teloce:
         options: dict[str, Any] | None = None,
         plugins: dict[str, Any] | None = None,
         typecheck: bool = False,
+        editor: str | None = "vscode",
+        editor_remote: str | None = None,
+        editor_path_map: dict[str, str] | None = None,
+        editor_configured: bool = False,
     ) -> None:
         self.app = app
         self.typecheck = typecheck
+        self.editor_link: EditorLink = resolve_editor(
+            editor,
+            editor_remote=editor_remote,
+            editor_path_map=editor_path_map,
+            configured=editor_configured,
+        )
         self.project_root = Path(project_root or Path.cwd()).resolve()
         output = Path(build_dir)
         self.build_dir = output.resolve() if output.is_absolute() else (self.project_root / output).resolve()
@@ -551,6 +562,9 @@ def install_teloce(
     existing = getattr(app, "teloce", None)
     if existing is not None:
         raise RuntimeError("Teloce is already configured for this application")
+    # Remember whether the caller chose an editor, so Codespaces can tell an
+    # explicit choice from the default preset it cannot open.
+    options.setdefault("editor_configured", "editor" in options or "editor_remote" in options)
     integration = Teloce(app, **options)
     app.teloce = integration
     return integration
