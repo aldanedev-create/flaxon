@@ -171,6 +171,7 @@ nav:
       - Authentication: guides/authentication.md
       - Authorization: guides/authorization.md
       - Admin and CMS: guides/admin-cms.md
+      - ORM, Admin URLs, and Custom Pages: guides/orm-admin-custom-pages.md
       - Admin Production Guide: guides/admin-production.md
       - Admin and CMS Microservices: guides/microservices.md
       - Admin Guide: admin-guide.md
