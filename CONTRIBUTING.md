@@ -41,7 +41,7 @@ By participating in this project, you agree to abide by our [Code of Conduct](CO
 
 ```bash
 # Clone the repository
-git clone https://github.com/aldanedev-create/Flaxon-Backend-Framework.git
+git clone https://github.com/aldanedev-create/flaxon.git
 cd Flaxon-Backend-Framework
 
 # Create a virtual environment
