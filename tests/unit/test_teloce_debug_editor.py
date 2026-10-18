@@ -13,7 +13,7 @@ from flaxon.debugging.editor import EDITOR_PRESETS, EditorLink, resolve_editor
 from flaxon.testing import TestClient
 
 PAGE = """<template><h1>{title}</h1></template>
-<script setup lang="ts">
+<script lang="ts">
 const title = signal<string>('Project');
 </script>
 """

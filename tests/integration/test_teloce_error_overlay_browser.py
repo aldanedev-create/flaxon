@@ -198,7 +198,7 @@ def test_a_recognised_message_gets_a_hint(open_overlay_page):
     page = open_overlay_page()
     fire(page, {**REPORT, "message": "Uncaught ReferenceError: signal is not defined"})
     assert page.locator(".fx-tip").inner_text() == (
-        "signal is not defined. Declare it in <script setup>, import it, or fix the spelling."
+        "signal is not defined. Declare it in the component <script> block, import it, or fix the spelling."
     )
 
 

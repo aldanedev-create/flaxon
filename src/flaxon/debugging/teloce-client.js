@@ -295,7 +295,8 @@ const NAME_START = '(?:^|[\\s(])';
 const HINT_RULES = [
   {
     pattern: new RegExp(`${NAME_START}${IDENTIFIER} is not defined`),
-    hint: m => `${m[1]} is not defined. Declare it in <script setup>, import it, or fix the spelling.`,
+    hint: m => `${m[1]} is not defined. Declare it in the component <script> block, ` +
+      `import it, or fix the spelling.`,
   },
   {
     pattern: new RegExp(`${NAME_START}${IDENTIFIER} is not a function`),

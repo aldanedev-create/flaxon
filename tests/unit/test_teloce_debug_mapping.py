@@ -11,7 +11,7 @@ from flaxon import Flaxon
 from flaxon.testing import TestClient
 
 PAGE = """<template><h1>{title}</h1></template>
-<script setup lang="ts">
+<script lang="ts">
 const title = signal<string>('Project');
 </script>
 """
@@ -94,7 +94,7 @@ def test_location_is_returned_when_the_excerpt_cannot_be_read(tmp_path):
     """
     padding = "x" * 210_000
     source = f"<template><h1>{{title}}</h1><!--{padding}--></template>\n" + (
-        "<script setup lang=\"ts\">\nconst title = signal<string>('Project');\n</script>\n"
+        "<script lang=\"ts\">\nconst title = signal<string>('Project');\n</script>\n"
     )
     app = build_app(tmp_path, source)
     client = TestClient(app)

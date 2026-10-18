@@ -16,13 +16,13 @@ test('hintFor is pure: the same message always gives the same hint', () => {
   assert.equal(hintFor(message), hintFor(message));
   assert.equal(
     hintFor(message),
-    'signal is not defined. Declare it in <script setup>, import it, or fix the spelling.',
+    'signal is not defined. Declare it in the component <script> block, import it, or fix the spelling.',
   );
 });
 
 test('hintFor names the undefined identifier', () => {
   assert.match(hintFor('Uncaught ReferenceError: count is not defined'), /^count is not defined\./);
-  assert.match(hintFor('signal is not defined'), /<script setup>/);
+  assert.match(hintFor('signal is not defined'), /<script>/);
   assert.match(hintFor('$state is not defined'), /^\$state is not defined\./);
   assert.match(hintFor('_x is not defined'), /^_x is not defined\./);
 });
