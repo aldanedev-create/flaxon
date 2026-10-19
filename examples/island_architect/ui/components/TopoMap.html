@@ -1,0 +1,112 @@
+<template>
+  <figure class="map">
+    <svg viewBox="0 0 1000 560" role="img" aria-label="Island topology">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#4c6478"></path>
+        </marker>
+      </defs>
+
+      <g class="regions">
+        <g v-for="region in regions" :key="region.id">
+          <circle :cx="region.x" :cy="region.y" r="96" class="region-blob"></circle>
+          <text :x="region.x" :y="region.y - 104" class="region-label">{{ region.label }}</text>
+        </g>
+      </g>
+
+      <g class="edges">
+        <line v-for="edge in drawEdges" :key="edge.key"
+              :x1="edge.x1" :y1="edge.y1" :x2="edge.x2" :y2="edge.y2"
+              class="edge" marker-end="url(#arrow)"></line>
+      </g>
+
+      <g class="nodes">
+        <g v-for="node in drawNodes" :key="node.id">
+          <circle :cx="node.x" :cy="node.y" r="26" :class="node.className"></circle>
+          <text :x="node.x" :y="node.y + 5" class="node-kind">{{ node.short }}</text>
+          <text :x="node.x" :y="node.y + 48" class="node-name">{{ node.name }}</text>
+        </g>
+      </g>
+    </svg>
+
+    <figcaption>
+      <span class="key"><i class="dot healthy"></i> healthy</span>
+      <span class="key"><i class="dot busy"></i> over 85% capacity</span>
+      <span class="key"><i class="dot down"></i> dropping traffic</span>
+      <span class="muted">Circle colour is the latest simulated tick. Design the graph on the Design tab.</span>
+    </figcaption>
+  </figure>
+</template>
+
+<script>
+import { NODE_KINDS, REGIONS, nodePositions } from "../../static/js/island.js";
+
+const SHORT = { client: "C", edge: "GW", service: "S", cache: "$", queue: "Q", db: "DB" };
+
+export default {
+  props: ["nodes", "edges", "snapshot"],
+  data() {
+    return { regions: REGIONS };
+  },
+  computed: {
+    positions() {
+      return nodePositions({ nodes: this.nodes || [], edges: this.edges || [] });
+    },
+    drawNodes() {
+      const report = (this.snapshot && this.snapshot.nodes) || {};
+      return (this.nodes || []).map((node) => {
+        const point = this.positions[node.id] || { x: 500, y: 280 };
+        const row = report[node.id];
+        let state = "idle";
+        if (row) {
+          if (!row.healthy) state = "down";
+          else if (row.dropped > 0) state = "down";
+          else if (row.load > 0.85) state = "busy";
+          else state = "healthy";
+        }
+        return {
+          id: node.id,
+          name: node.name,
+          x: point.x,
+          y: point.y,
+          short: SHORT[node.kind] || "?",
+          className: "node-" + state,
+        };
+      });
+    },
+    drawEdges() {
+      return (this.edges || []).map((edge) => {
+        const from = this.positions[edge.from] || { x: 500, y: 280 };
+        const to = this.positions[edge.to] || { x: 500, y: 280 };
+        return {
+          key: edge.from + "->" + edge.to,
+          x1: from.x,
+          y1: from.y,
+          x2: to.x,
+          y2: to.y,
+        };
+      });
+    },
+  },
+};
+</script>
+
+<style scoped>
+.map { margin: 0; }
+svg { width: 100%; height: auto; background: #0c1116; border-radius: 0.75rem; }
+.region-blob { fill: #12202b; stroke: #1e3547; stroke-dasharray: 4 6; }
+.region-label { fill: #8b9cad; font-size: 15px; text-anchor: middle; letter-spacing: 0.08em; text-transform: uppercase; }
+.edge { stroke: #4c6478; stroke-width: 2; }
+.node-healthy { fill: #1f7a4d; stroke: #7ee2a8; stroke-width: 2; }
+.node-busy { fill: #7a5d1f; stroke: #ffd166; stroke-width: 2; }
+.node-down { fill: #7a2333; stroke: #ff8f8f; stroke-width: 2; }
+.node-idle { fill: #1c2836; stroke: #465b6e; stroke-width: 2; }
+.node-kind { fill: #eaf2f8; font-size: 13px; font-weight: 700; text-anchor: middle; }
+.node-name { fill: #a9bccb; font-size: 14px; text-anchor: middle; }
+figcaption { display: flex; flex-wrap: wrap; gap: 0.9rem; align-items: center; margin-top: 0.6rem; font-size: 0.85rem; }
+.key { display: inline-flex; gap: 0.35rem; align-items: center; color: #c3d3de; }
+.dot { width: 0.7rem; height: 0.7rem; border-radius: 50%; display: inline-block; }
+.dot.healthy { background: #7ee2a8; }
+.dot.busy { background: #ffd166; }
+.dot.down { background: #ff8f8f; }
+</style>

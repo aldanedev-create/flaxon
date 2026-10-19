@@ -1,0 +1,355 @@
+<template>
+  <div class="shell">
+    <header class="masthead">
+      <div>
+        <h1>Island Architect</h1>
+        <p class="sub">
+          One island, one stack. Teloce draws the island, Flaxon stores the design,
+          and <code>static/js/sim.js</code> runs it one tick at a time.
+        </p>
+      </div>
+      <nav class="tabs" aria-label="Views">
+        <button :class="tab === 'design' ? 'tab tab-on' : 'tab'" @click="tab = 'design'">Design</button>
+        <button :class="tab === 'simulate' ? 'tab tab-on' : 'tab'" @click="tab = 'simulate'">Simulate</button>
+        <button :class="tab === 'learn' ? 'tab tab-on' : 'tab'" @click="tab = 'learn'">Learn</button>
+      </nav>
+    </header>
+
+    <p class="status" role="status">{{ status }}</p>
+
+    <section v-if="tab === 'design'" class="view">
+      <node-editor
+        :nodes="design.nodes"
+        :edges="design.edges"
+        :problems="problems"
+        @add-node="addNode"
+        @remove-node="removeNode"
+        @add-edge="addEdge"
+        @remove-edge="removeEdge"></node-editor>
+
+      <div class="panel">
+        <h2>Save &amp; load — Flaxon + one ORM table</h2>
+        <form class="row" @submit.prevent="save">
+          <label class="grow">
+            <span>Design name</span>
+            <input v-model="name" placeholder="Island booking platform" required>
+          </label>
+          <button type="submit" :disabled="problems.length > 0">{{ selectedId ? "Update saved design" : "Save new design" }}</button>
+        </form>
+        <p v-if="problems.length" class="muted">Fix the problems above before saving — the API runs the same checks.</p>
+
+        <ul class="list" aria-label="Saved designs">
+          <li v-for="item in designs" :key="item.id">
+            <span class="name">{{ item.name }}</span>
+            <span class="muted">{{ item.node_count }} nodes · {{ item.edge_count }} links · {{ item.scenario }}</span>
+            <button class="link" @click="load(item.id)">Load</button>
+            <button class="link danger" @click="remove(item.id)">Delete</button>
+          </li>
+          <li v-if="designs.length === 0" class="muted">No saved designs yet. Save one and it lands in <code>island_designs</code>.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section v-else-if="tab === 'simulate'" class="view">
+      <topo-map :nodes="design.nodes" :edges="design.edges" :snapshot="snapshot"></topo-map>
+
+      <div class="panel">
+        <sim-panel
+          :nodes="design.nodes"
+          :snapshot="snapshot"
+          :events="events"
+          :scenarios="scenarios"
+          :scenario-id="scenarioId"
+          :seed="seed"
+          :running="running"
+          :tick="tick"
+          :summary="summary"
+          @step="stepOnce"
+          @toggle="toggleRun"
+          @reset="resetRun"
+          @change-scenario="setScenario"
+          @change-seed="setSeed"></sim-panel>
+      </div>
+    </section>
+
+    <section v-else class="view">
+      <div class="panel">
+        <lesson-pane :lessons="lessons"></lesson-pane>
+      </div>
+    </section>
+
+    <footer class="foot">
+      <span>{{ island }} · {{ design.nodes.length }} nodes · {{ design.edges.length }} links</span>
+      <span class="muted">API: /api/designs · table: island_designs</span>
+    </footer>
+  </div>
+</template>
+
+<script>
+import NodeEditor from "./components/NodeEditor.html";
+import TopoMap from "./components/TopoMap.html";
+import SimPanel from "./components/SimPanel.html";
+import LessonPane from "./components/LessonPane.html";
+
+import { DEFAULT_DESIGN, cloneDesign, validateDesign, slugify } from "../static/js/island.js";
+import { SCENARIOS, createRun, step, summarize } from "../static/js/sim.js";
+import { LESSONS } from "../static/js/lessons.js";
+import { listDesigns, getDesign, createDesign, updateDesign, deleteDesign } from "../static/js/api.js";
+
+export default {
+  // Registered under their kebab-case tags, which is how Teloce resolves a
+  // child component in a template.
+  components: {
+    "node-editor": NodeEditor,
+    "topo-map": TopoMap,
+    "sim-panel": SimPanel,
+    "lesson-pane": LessonPane,
+  },
+  data() {
+    return {
+      tab: "design",
+      island: "Jamaica",
+      design: cloneDesign(DEFAULT_DESIGN),
+      name: "Island booking platform",
+      designs: [],
+      selectedId: null,
+      status: "Ready.",
+      scenarios: SCENARIOS,
+      scenarioId: "calm-day",
+      seed: 7,
+      run: null,
+      snapshot: null,
+      events: [],
+      tick: 0,
+      running: false,
+      timer: null,
+      lessons: LESSONS,
+    };
+  },
+  computed: {
+    problems() {
+      return validateDesign(this.design);
+    },
+    summary() {
+      return summarize(this.run ? this.run.snapshots : []);
+    },
+  },
+  async mounted() {
+    this.resetRun();
+    await this.refreshDesigns();
+  },
+  methods: {
+    // ------------------------------------------------------------ design
+    addNode(draft) {
+      let id = slugify(draft.name) || "node";
+      let unique = id;
+      let suffix = 2;
+      while (this.design.nodes.some((node) => node.id === unique)) {
+        unique = id + "-" + suffix;
+        suffix += 1;
+      }
+      this.design.nodes.push({
+        id: unique,
+        name: draft.name,
+        kind: draft.kind,
+        region: draft.region,
+        replicas: draft.replicas,
+      });
+      this.status = `Added ${draft.name} in ${draft.region}.`;
+      this.resetRun();
+    },
+    removeNode(id) {
+      this.design.nodes = this.design.nodes.filter((node) => node.id !== id);
+      this.design.edges = this.design.edges.filter((edge) => edge.from !== id && edge.to !== id);
+      this.status = "Node removed.";
+      this.resetRun();
+    },
+    addEdge(edge) {
+      const exists = this.design.edges.some((item) => item.from === edge.from && item.to === edge.to);
+      if (exists) {
+        this.status = "That link already exists.";
+        return;
+      }
+      this.design.edges.push({ from: edge.from, to: edge.to });
+      this.status = "Link added.";
+      this.resetRun();
+    },
+    removeEdge(edge) {
+      this.design.edges = this.design.edges.filter(
+        (item) => !(item.from === edge.from && item.to === edge.to)
+      );
+      this.status = "Link removed.";
+      this.resetRun();
+    },
+
+    // ------------------------------------------------------- persistence
+    async refreshDesigns() {
+      try {
+        this.designs = await listDesigns();
+      } catch (error) {
+        this.status = `Could not load saved designs: ${error.message}`;
+      }
+    },
+    async save() {
+      if (this.problems.length) return;
+      const payload = {
+        name: this.name,
+        scenario: this.scenarioId,
+        seed: this.seed,
+        graph: this.design,
+      };
+      try {
+        if (this.selectedId) {
+          await updateDesign(this.selectedId, payload);
+          this.status = `Updated "${this.name}".`;
+        } else {
+          const created = await createDesign(payload);
+          this.selectedId = created.id;
+          this.status = `Saved "${created.name}" with id ${created.id}.`;
+        }
+        await this.refreshDesigns();
+      } catch (error) {
+        this.status = `Save failed: ${error.message}`;
+      }
+    },
+    async load(id) {
+      try {
+        const record = await getDesign(id);
+        this.design = cloneDesign(record.graph);
+        this.name = record.name;
+        this.scenarioId = record.scenario || "calm-day";
+        this.seed = record.seed || 7;
+        this.selectedId = id;
+        this.status = `Loaded "${record.name}".`;
+        this.resetRun();
+      } catch (error) {
+        this.status = `Load failed: ${error.message}`;
+      }
+    },
+    async remove(id) {
+      try {
+        await deleteDesign(id);
+        if (this.selectedId === id) this.selectedId = null;
+        this.status = "Design deleted.";
+        await this.refreshDesigns();
+      } catch (error) {
+        this.status = `Delete failed: ${error.message}`;
+      }
+    },
+
+    // -------------------------------------------------------- simulation
+    resetRun() {
+      this.stopTimer();
+      this.run = createRun(this.design, this.scenarioId, this.seed);
+      this.snapshot = null;
+      this.events = [];
+      this.tick = 0;
+    },
+    stepOnce() {
+      if (!this.run || !this.run.valid) {
+        this.status = "The graph has a cycle; fix it on the Design tab.";
+        this.stopTimer();
+        return;
+      }
+      const snapshot = step(this.run);
+      this.snapshot = snapshot;
+      this.tick = this.run.tick;
+      this.events = this.events.concat(snapshot.events).slice(-120);
+    },
+    toggleRun() {
+      if (this.running) {
+        this.stopTimer();
+        return;
+      }
+      this.running = true;
+      this.timer = setInterval(() => this.stepOnce(), 600);
+    },
+    stopTimer() {
+      if (this.timer) clearInterval(this.timer);
+      this.timer = null;
+      this.running = false;
+    },
+    setScenario(id) {
+      this.scenarioId = id;
+      this.resetRun();
+    },
+    setSeed(value) {
+      this.seed = value || 7;
+      this.resetRun();
+    },
+  },
+};
+</script>
+
+<style>
+:root { color-scheme: dark; }
+body {
+  margin: 0;
+  background: #0a0f14;
+  color: #eaf2f8;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.shell { max-width: 1180px; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
+.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+  align-items: flex-end;
+  border-bottom: 2px solid #009b3a;
+  padding-bottom: 0.9rem;
+}
+h1 { margin: 0; font-size: 1.6rem; letter-spacing: 0.01em; }
+h1::after { content: ""; display: block; width: 3rem; height: 3px; background: #ffd100; margin-top: 0.35rem; }
+.sub { margin: 0.4rem 0 0; color: #9fb2c1; max-width: 44rem; }
+.tabs { display: flex; gap: 0.4rem; }
+.tab {
+  background: #131d26;
+  color: #c3d3de;
+  border: 1px solid #24323f;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+}
+.tab-on { background: #009b3a; border-color: #7ee2a8; color: #f2fff8; font-weight: 600; }
+.status { margin: 0.9rem 0; padding: 0.5rem 0.75rem; background: #121b23; border-left: 3px solid #009b3a; border-radius: 0.3rem; font-size: 0.9rem; }
+.view { display: grid; gap: 1rem; }
+.panel { background: #101922; border: 1px solid #1d2a35; border-radius: 0.75rem; padding: 1rem 1.1rem; }
+.panel h2 { margin: 0 0 0.6rem; font-size: 1.05rem; }
+.row { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: flex-end; }
+.grow { flex: 1 1 14rem; }
+label span { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; color: #8b9cad; margin-bottom: 0.2rem; }
+input, select {
+  background: #0c1319;
+  color: #eaf2f8;
+  border: 1px solid #26343f;
+  border-radius: 0.4rem;
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+}
+button {
+  background: #1b2836;
+  color: #eaf2f8;
+  border: 1px solid #2c3d4d;
+  border-radius: 0.4rem;
+  padding: 0.45rem 0.8rem;
+  cursor: pointer;
+  font: inherit;
+}
+button:hover { border-color: #7fd7ff; }
+button.primary { background: #009b3a; border-color: #7ee2a8; }
+button.ghost { background: transparent; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+.link { background: none; border: none; color: #7fd7ff; padding: 0 0.4rem; }
+.link.danger { color: #ff8f8f; }
+.list { list-style: none; margin: 0.75rem 0 0; padding: 0; }
+.list li { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; padding: 0.35rem 0; border-bottom: 1px solid #1a2530; }
+.name { flex: 1; }
+.muted { color: #8b9cad; font-size: 0.85rem; }
+.hint { color: #8b9cad; font-size: 0.85rem; margin: 0.5rem 0 0; }
+.foot { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; margin-top: 1.5rem; font-size: 0.8rem; color: #8b9cad; }
+code { background: #0c1319; padding: 0.05rem 0.3rem; border-radius: 0.25rem; font-size: 0.85em; }
+@media (max-width: 800px) {
+  .masthead { align-items: flex-start; }
+}
+</style>
