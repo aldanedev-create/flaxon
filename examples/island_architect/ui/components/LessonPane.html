@@ -1,0 +1,75 @@
+<template>
+  <div class="lessons">
+    <nav class="lesson-nav" aria-label="Lessons">
+      <button v-for="lesson in lessons" :key="lesson.id"
+              :class="open === lesson.id ? 'chip chip-on' : 'chip'"
+              @click="open = lesson.id">{{ lesson.title }}</button>
+    </nav>
+
+    <article class="lesson">
+      <h2>{{ current.title }}</h2>
+      <p class="blurb">{{ current.blurb }}</p>
+
+      <ol class="steps">
+        <li v-for="step in current.steps" :key="step.label">
+          <strong>{{ step.label }}</strong>
+          <span>{{ step.detail }}</span>
+        </li>
+      </ol>
+
+      <h3>{{ current.code.label }}</h3>
+      <pre><code>{{ current.code.source }}</code></pre>
+
+      <h3>Common mistakes</h3>
+      <ul class="pitfalls">
+        <li v-for="pitfall in current.pitfalls" :key="pitfall">{{ pitfall }}</li>
+      </ul>
+    </article>
+  </div>
+</template>
+
+<script>
+export default {
+  props: ["lessons"],
+  data() {
+    return { open: (this.lessons && this.lessons[0] && this.lessons[0].id) || "" };
+  },
+  computed: {
+    current() {
+      const found = (this.lessons || []).find((lesson) => lesson.id === this.open);
+      return found || (this.lessons || [])[0] || { title: "", blurb: "", steps: [], pitfalls: [], code: { label: "", source: "" } };
+    },
+  },
+};
+</script>
+
+<style scoped>
+.lesson-nav { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+.chip {
+  background: #131d26;
+  color: #c3d3de;
+  border: 1px solid #24323f;
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem;
+  cursor: pointer;
+}
+.chip-on { background: #1f7a4d; border-color: #7ee2a8; color: #f2fff8; }
+.blurb { color: #c3d3de; }
+.steps { padding-left: 1.1rem; }
+.steps li { margin-bottom: 0.5rem; }
+.steps strong { display: block; color: #7fd7ff; }
+.steps span { color: #b9c9d6; }
+pre {
+  background: #0c1116;
+  border: 1px solid #1d2a35;
+  border-radius: 0.6rem;
+  padding: 0.85rem;
+  overflow: auto;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+code { color: #d7e6f2; }
+.pitfalls { color: #ffb4a2; padding-left: 1.1rem; }
+h2 { margin-top: 0; }
+h3 { font-size: 0.95rem; margin: 1.1rem 0 0.4rem; color: #eaf2f8; }
+</style>

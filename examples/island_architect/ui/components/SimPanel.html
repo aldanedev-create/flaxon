@@ -1,0 +1,127 @@
+<template>
+  <div class="sim">
+    <div class="controls">
+      <label>
+        <span>Scenario</span>
+        <select v-model="scenarioValue" @change="$emit('change-scenario', scenarioValue)">
+          <option v-for="scenario in scenarios" :key="scenario.id" :value="scenario.id">{{ scenario.label }}</option>
+        </select>
+      </label>
+      <label class="narrow">
+        <span>Seed</span>
+        <input v-model="seedValue" type="number" min="1" max="999999" @change="$emit('change-seed', Number(seedValue))">
+      </label>
+      <div class="buttons">
+        <button @click="$emit('step')">Step</button>
+        <button class="primary" @click="$emit('toggle')">{{ running ? "Pause" : "Run" }}</button>
+        <button class="ghost" @click="$emit('reset')">Reset</button>
+      </div>
+      <p class="hint">{{ scenarioNote }}</p>
+    </div>
+
+    <div class="totals" role="status">
+      <div><span class="k">Tick</span><span class="v">{{ tick }}</span></div>
+      <div><span class="k">Client latency</span><span class="v">{{ latency }} ms</span></div>
+      <div><span class="k">Error rate</span><span class="v">{{ errorRate }}%</span></div>
+      <div><span class="k">Dropped</span><span class="v">{{ dropped }}/s</span></div>
+    </div>
+
+    <table class="metrics" aria-label="Node metrics for the latest tick">
+      <thead>
+        <tr><th>Node</th><th>In</th><th>Served</th><th>Dropped</th><th>Queued</th><th>Latency</th><th>Load</th></tr>
+      </thead>
+      <tbody>
+        <tr v-for="row in rows" :key="row.id">
+          <td>{{ row.name }}</td>
+          <td>{{ row.incoming }}</td>
+          <td>{{ row.served }}</td>
+          <td>{{ row.dropped }}</td>
+          <td>{{ row.queued }}</td>
+          <td>{{ row.latencyMs }} ms</td>
+          <td class="bar-cell">
+            <span class="bar"><i :style="'width:' + row.percent + '%'"></i></span>
+            <span class="muted">{{ row.percent }}%</span>
+          </td>
+        </tr>
+        <tr v-if="rows.length === 0">
+          <td colspan="7" class="muted">Press Step or Run to simulate a tick.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Event log</h3>
+    <ol class="log" aria-label="Simulation events">
+      <li v-for="event in recentEvents" :key="event.tick + '-' + event.nodeId + '-' + event.message" :class="event.level">
+        <span class="tick">t{{ event.tick }}</span> {{ event.message }}
+      </li>
+      <li v-if="recentEvents.length === 0" class="muted">No events yet.</li>
+    </ol>
+  </div>
+</template>
+
+<script>
+export default {
+  props: ["nodes", "snapshot", "events", "scenarios", "scenarioId", "seed", "running", "tick", "summary"],
+  emits: ["step", "toggle", "reset", "change-scenario", "change-seed"],
+  data() {
+    return { scenarioValue: this.scenarioId, seedValue: this.seed };
+  },
+  computed: {
+    report() {
+      return (this.snapshot && this.snapshot.nodes) || {};
+    },
+    rows() {
+      return (this.nodes || []).map((node) => {
+        const row = this.report[node.id] || {};
+        const load = row.load || 0;
+        return {
+          id: node.id,
+          name: node.name,
+          incoming: Math.round(row.incoming || 0),
+          served: Math.round(row.served || 0),
+          dropped: Math.round(row.dropped || 0),
+          queued: Math.round(row.queued || 0),
+          latencyMs: Math.round(row.latencyMs || 0),
+          percent: Math.min(100, Math.round(load * 100)),
+        };
+      });
+    },
+    totals() {
+      return (this.snapshot && this.snapshot.totals) || { dropped: 0, errorRate: 0, clientLatencyMs: 0 };
+    },
+    dropped() { return Math.round(this.totals.dropped); },
+    errorRate() { return (this.totals.errorRate * 100).toFixed(1); },
+    latency() { return Math.round(this.totals.clientLatencyMs); },
+    scenarioNote() {
+      const found = (this.scenarios || []).find((item) => item.id === this.scenarioValue);
+      return found ? found.note : "";
+    },
+    recentEvents() {
+      return (this.events || []).slice(-14).reverse();
+    },
+  },
+};
+</script>
+
+<style scoped>
+.controls { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end; }
+.narrow input { width: 6rem; }
+.buttons { display: flex; gap: 0.4rem; }
+.hint { flex: 1 1 100%; margin: 0; color: #8b9cad; font-size: 0.85rem; }
+.totals { display: flex; flex-wrap: wrap; gap: 1.25rem; margin: 1rem 0; padding: 0.75rem 1rem; background: #121b23; border-radius: 0.6rem; }
+.totals .k { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #8b9cad; }
+.totals .v { font-size: 1.15rem; font-weight: 600; color: #eaf2f8; }
+.metrics { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.metrics th { text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: #8b9cad; padding: 0.35rem 0.5rem; }
+.metrics td { padding: 0.35rem 0.5rem; border-top: 1px solid #1d2a35; }
+.bar-cell { display: flex; gap: 0.5rem; align-items: center; }
+.bar { display: inline-block; width: 6rem; height: 0.5rem; background: #1d2a35; border-radius: 999px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: linear-gradient(90deg, #1f7a4d, #ffd166 70%, #ff8f8f); }
+.log { list-style: none; margin: 0; padding: 0; font-size: 0.85rem; max-height: 12rem; overflow: auto; }
+.log li { padding: 0.25rem 0; border-bottom: 1px solid #16212b; }
+.log .tick { color: #6f8394; margin-right: 0.4rem; }
+.log .warn { color: #ffd166; }
+.log .error { color: #ff8f8f; }
+.log .info { color: #c3d3de; }
+h3 { font-size: 0.95rem; margin: 1.1rem 0 0.4rem; }
+</style>

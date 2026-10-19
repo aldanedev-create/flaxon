@@ -1,0 +1,155 @@
+<template>
+  <div class="editor">
+    <div class="panel">
+      <h2>Nodes</h2>
+      <form class="row" @submit.prevent="addNode">
+        <label class="grow">
+          <span>Name</span>
+          <input v-model="draft.name" placeholder="Booking service" required>
+        </label>
+        <label>
+          <span>Kind</span>
+          <select v-model="draft.kind">
+            <option v-for="kind in kinds" :key="kind" :value="kind">{{ kind }}</option>
+          </select>
+        </label>
+        <label>
+          <span>Region</span>
+          <select v-model="draft.region">
+            <option v-for="region in regions" :key="region.id" :value="region.id">{{ region.label }}</option>
+          </select>
+        </label>
+        <label class="narrow">
+          <span>Replicas</span>
+          <input v-model="draft.replicas" type="number" min="1" max="9">
+        </label>
+        <button type="submit">Add node</button>
+      </form>
+      <p class="hint">{{ kindNotes[draft.kind].note }}</p>
+
+      <ul class="list" aria-label="Nodes">
+        <li v-for="node in nodes" :key="node.id">
+          <span class="tag">{{ node.kind }}</span>
+          <span class="name">{{ node.name }}</span>
+          <span class="muted">{{ node.region }} · x{{ node.replicas }}</span>
+          <button class="link" @click="$emit('remove-node', node.id)">Remove</button>
+        </li>
+      </ul>
+    </div>
+
+    <div class="panel">
+      <h2>Links</h2>
+      <form class="row" @submit.prevent="addEdge">
+        <label>
+          <span>From</span>
+          <select v-model="link.from">
+            <option v-for="node in nodes" :key="node.id" :value="node.id">{{ node.name }}</option>
+          </select>
+        </label>
+        <label>
+          <span>To</span>
+          <select v-model="link.to">
+            <option v-for="node in nodes" :key="node.id" :value="node.id">{{ node.name }}</option>
+          </select>
+        </label>
+        <button type="submit">Add link</button>
+      </form>
+
+      <ul class="list" aria-label="Links">
+        <li v-for="edge in edges" :key="edge.from + '->' + edge.to">
+          <span class="name">{{ labelOf(edge.from) }} → {{ labelOf(edge.to) }}</span>
+          <button class="link" @click="$emit('remove-edge', edge)">Remove</button>
+        </li>
+      </ul>
+
+      <ul v-if="problems.length" class="problems" aria-label="Problems">
+        <li v-for="problem in problems" :key="problem">{{ problem }}</li>
+      </ul>
+      <p v-else class="ok">Design is valid — the simulator can run it.</p>
+    </div>
+  </div>
+</template>
+
+<script>
+import { KIND_IDS, NODE_KINDS, REGIONS } from "../../static/js/island.js";
+
+export default {
+  props: ["nodes", "edges", "problems"],
+  emits: ["add-node", "remove-node", "add-edge", "remove-edge"],
+  data() {
+    return {
+      kindNotes: NODE_KINDS,
+      regions: REGIONS,
+      draft: { name: "", kind: "service", region: "kingston", replicas: "1" },
+      link: { from: "", to: "" },
+    };
+  },
+  computed: {
+    kinds() {
+      return KIND_IDS;
+    },
+  },
+  methods: {
+    addNode() {
+      const name = String(this.draft.name || "").trim();
+      if (!name) return;
+      this.$emit("add-node", {
+        name,
+        kind: this.draft.kind,
+        region: this.draft.region,
+        replicas: Math.max(1, Number(this.draft.replicas) || 1),
+      });
+      this.draft.name = "";
+    },
+    addEdge() {
+      if (!this.link.from || !this.link.to || this.link.from === this.link.to) return;
+      this.$emit("add-edge", { from: this.link.from, to: this.link.to });
+    },
+    labelOf(id) {
+      const node = this.nodes.find((item) => item.id === id);
+      return node ? node.name : id;
+    },
+  },
+};
+</script>
+
+<style scoped>
+.editor {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 1rem;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+.grow { flex: 1 1 12rem; }
+.narrow input { width: 5rem; }
+.list { list-style: none; margin: 0.75rem 0 0; padding: 0; }
+.list li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid #22303d;
+}
+.tag {
+  min-width: 4.5rem;
+  text-align: center;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.15rem 0.35rem;
+  border-radius: 0.35rem;
+  background: #16323f;
+  color: #7fd7ff;
+}
+.name { flex: 1; }
+.problems { color: #ff8f8f; margin: 0.75rem 0 0; padding-left: 1.1rem; }
+.ok { color: #7ee2a8; }
+@media (max-width: 900px) {
+  .editor { grid-template-columns: 1fr; }
+}
+</style>
