@@ -34,6 +34,14 @@ Open [localhost:8000](http://127.0.0.1:8000/) to see your application. The start
 
 See the [getting started guide](https://github.com/aldanedev-create/flaxon/blob/main/docs/getting-started.md) for the complete setup.
 
+## 🎥 Watch the full course
+
+[![Learn Full-Stack Development by Building a Secure Project Manager (Python + TypeScript)](https://img.youtube.com/vi/tbqdrKcXywY/maxresdefault.jpg)](https://www.youtube.com/watch?v=tbqdrKcXywY)
+
+Build and deploy a complete full-stack Project Manager app with Python, Flaxon, Teloce and TypeScript, from authentication and APIs to tests and deployment on Render (about 5.5 hours).
+
+▶️ [Watch on YouTube](https://www.youtube.com/watch?v=tbqdrKcXywY)
+
 ## Documentation
 
 Visit the [Flaxon documentation](https://flaxon-website.vercel.app/docs.html) or browse the [repository guides](https://github.com/aldanedev-create/flaxon/blob/main/docs/index.md).
