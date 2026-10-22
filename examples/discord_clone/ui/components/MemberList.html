@@ -1,0 +1,69 @@
+<template>
+  <aside class="members">
+    <h4 class="members-title">Members — {{ members.length }}</h4>
+    <ul>
+      <li v-for="m in members" :key="m.user.id" :class="{ online: onlineIds.includes(m.user.id) }">
+        <span class="avatar" :style="{ background: m.user.avatar_color }">
+          {{ initial(m.user.display_name) }}
+        </span>
+        <span class="name" :style="{ color: m.role_color }">{{ m.user.display_name }}</span>
+        <span v-if="m.nickname" class="nick">({{ m.nickname }})</span>
+        <span class="role-pill" :style="{ borderColor: m.role_color }">{{ m.role }}</span>
+      </li>
+    </ul>
+  </aside>
+</template>
+
+<script lang="ts">
+import type { MemberView } from "../types.ts";
+
+export default {
+  props: ["members", "onlineIds"],
+  methods: {
+    initial(name: string): string {
+      return (name || "?").trim().charAt(0).toUpperCase();
+    },
+  },
+};
+</script>
+
+<style scoped>
+.members {
+  width: 14rem;
+  background: #2b2d31;
+  color: #b5bac1;
+  padding: 1rem 0.75rem;
+  overflow-y: auto;
+}
+.members-title { color: #80848e; font-size: 0.75rem; text-transform: uppercase; margin: 0 0 0.5rem; }
+.members ul { list-style: none; margin: 0; padding: 0; }
+.members li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.4rem;
+  border-radius: 0.3rem;
+  font-size: 0.85rem;
+}
+.members li:hover { background: #35373c; }
+.avatar {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.name { color: #dbdee1; }
+.nick { color: #80848e; font-size: 0.75rem; }
+.role-pill {
+  margin-left: auto;
+  font-size: 0.65rem;
+  border: 1px solid #80848e;
+  border-radius: 0.75rem;
+  padding: 0 0.4rem;
+  color: #b5bac1;
+}
+</style>

@@ -1,0 +1,193 @@
+<template>
+  <div class="bot-overlay" @click.self="$emit('close')">
+    <div class="bot-panel">
+      <header>
+        <h3>Bot platform</h3>
+        <button class="close" @click="$emit('close')">✕</button>
+      </header>
+
+      <div class="create">
+        <input v-model="name" placeholder="Bot name" @keyup.enter="createBot" />
+        <input v-model="description" placeholder="Description (optional)" />
+        <button @click="createBot" :disabled="!name.trim() || busy">Create bot</button>
+      </div>
+      <p v-if="token" class="token">New token (shown once): <code>{{ token }}</code></p>
+      <p v-if="error" class="error">{{ error }}</p>
+
+      <ul class="bot-list">
+        <li v-for="bot in bots" :key="bot.id">
+          <div class="bot-head">
+            <strong>{{ bot.name }}</strong>
+            <span class="desc">{{ bot.description }}</span>
+          </div>
+          <div class="bot-actions">
+            <button @click="join(bot)">Add to server</button>
+            <button @click="subscribe(bot)">Subscribe msg.create</button>
+            <button @click="addCommand(bot)">Add /ping cmd</button>
+            <button @click="invoke(bot)">Run /ping here</button>
+            <button @click="showTokens(bot)" class="ghost">Tokens</button>
+          </div>
+          <ul v-if="selected === bot.id" class="tokens">
+            <li v-for="t in tokenList" :key="t.id">
+              <code>{{ t.prefix }}…</code>
+              <span v-if="t.revoked" class="revoked">revoked</span>
+              <button v-else class="ghost" @click="revoke(bot, t)">revoke</button>
+            </li>
+            <li v-if="tokenList.length === 0" class="empty">No tokens</li>
+          </ul>
+        </li>
+        <li v-if="bots.length === 0" class="empty">You have no bots yet.</li>
+      </ul>
+    </div>
+  </div>
+</template>
+
+<script lang="ts">
+import { bots as botApi } from "../api.ts";
+import type { BotPublic, BotTokenView } from "../types.ts";
+
+export default {
+  props: ["serverId", "channelId"],
+  data() {
+    return {
+      bots: [] as BotPublic[],
+      name: "",
+      description: "",
+      busy: false,
+      token: "",
+      error: "",
+      selected: null as number | null,
+      tokenList: [] as BotTokenView[],
+    };
+  },
+  async mounted() {
+    await this.load();
+  },
+  methods: {
+    async load() {
+      try {
+        const res = await botApi.list();
+        this.bots = (res as { items: BotPublic[] }).items;
+      } catch (e) {
+        this.error = (e as Error).message;
+      }
+    },
+    async createBot() {
+      this.busy = true;
+      this.error = "";
+      this.token = "";
+      try {
+        const res = await botApi.create(this.name.trim(), this.description.trim());
+        const data = res as { bot: BotPublic; token: string };
+        this.token = data.token;
+        this.name = "";
+        this.description = "";
+        await this.load();
+      } catch (e) {
+        this.error = (e as Error).message;
+      } finally {
+        this.busy = false;
+      }
+    },
+    async join(bot: BotPublic) {
+      try {
+        await botApi.joinServer(bot.id, this.serverId);
+        this.error = "";
+      } catch (e) {
+        this.error = (e as Error).message;
+      }
+    },
+    async subscribe(bot: BotPublic) {
+      try {
+        await botApi.createSubscription(bot.id, { event_type: "message.create", is_enabled: true });
+      } catch (e) {
+        this.error = (e as Error).message;
+      }
+    },
+    async addCommand(bot: BotPublic) {
+      try {
+        await botApi.createCommand(bot.id, {
+          name: "ping",
+          description: "Replies with pong",
+          is_enabled: true,
+        });
+      } catch (e) {
+        this.error = (e as Error).message;
+      }
+    },
+    async invoke(bot: BotPublic) {
+      try {
+        const res = await botApi.invoke(bot.id, {
+          channel_id: this.channelId,
+          command: "ping",
+          args: [],
+        });
+        const data = res as { messages: unknown[] };
+        this.error = data.messages.length ? "" : "Bot did not respond.";
+      } catch (e) {
+        this.error = (e as Error).message;
+      }
+    },
+    async showTokens(bot: BotPublic) {
+      this.selected = this.selected === bot.id ? null : bot.id;
+      if (this.selected === null) return;
+      try {
+        const res = await botApi.tokens(bot.id);
+        this.tokenList = (res as { items: BotTokenView[] }).items;
+      } catch (e) {
+        this.error = (e as Error).message;
+      }
+    },
+    async revoke(bot: BotPublic, token: BotTokenView) {
+      try {
+        await botApi.revokeToken(bot.id, token.id);
+        await this.showTokens(bot);
+      } catch (e) {
+        this.error = (e as Error).message;
+      }
+    },
+  },
+};
+</script>
+
+<style scoped>
+.bot-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: grid;
+  place-items: center;
+  z-index: 50;
+}
+.bot-panel {
+  width: 32rem;
+  max-width: 94vw;
+  max-height: 86vh;
+  overflow-y: auto;
+  background: #2b2d31;
+  color: #dbdee1;
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+}
+header { display: flex; justify-content: space-between; align-items: center; }
+header h3 { margin: 0; color: #fff; }
+.close { background: none; border: none; color: #b5bac1; font-size: 1.2rem; cursor: pointer; }
+.create { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.75rem 0; }
+.create input { flex: 1; min-width: 8rem; padding: 0.4rem; background: #1e1f22; border: none; border-radius: 0.3rem; color: #dbdee1; }
+.create button { padding: 0.4rem 0.7rem; background: #5865f2; color: #fff; border: none; border-radius: 0.3rem; cursor: pointer; }
+.token { font-size: 0.8rem; background: #1e1f22; padding: 0.5rem; border-radius: 0.3rem; }
+.token code { color: #3ba55d; }
+.error { color: #f23f42; font-size: 0.8rem; }
+.bot-list { list-style: none; margin: 0; padding: 0; }
+.bot-list > li { border-top: 1px solid #1e1f22; padding: 0.6rem 0; }
+.bot-head { display: flex; align-items: baseline; gap: 0.5rem; }
+.desc { color: #80848e; font-size: 0.8rem; }
+.bot-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.4rem; }
+.bot-actions button { padding: 0.3rem 0.6rem; background: #404249; color: #dbdee1; border: none; border-radius: 0.3rem; cursor: pointer; font-size: 0.78rem; }
+.bot-actions button.ghost { background: none; color: #b5bac1; text-decoration: underline; }
+.tokens { list-style: none; margin: 0.4rem 0 0; padding: 0.4rem; background: #1e1f22; border-radius: 0.3rem; }
+.tokens li { display: flex; gap: 0.5rem; align-items: center; font-size: 0.8rem; padding: 0.2rem 0; }
+.tokens code { color: #3ba55d; }
+.revoked { color: #f23f42; }
+.empty { color: #80848e; font-size: 0.8rem; }
+</style>
