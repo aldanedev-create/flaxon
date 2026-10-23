@@ -1,49 +1,85 @@
-# Lesson 1: What we are building and how to run it
+# Lesson 1 — Overview: the system you are about to build
 
-Before any code, fix the shape of the system in your head. A Discord clone is
-three concerns stacked together:
+> **Track position:** lesson 1 of 19. Nothing exists yet.
+
+## Goal
+
+Fix the shape of the system in your head before writing a single line. Every
+later lesson is a decision you could defend in a design review; this lesson is
+the map of those decisions.
+
+## What you are building
+
+A Discord-style chat app **and** a Discord-style bot platform on one backend:
+three concerns stacked together.
 
 1. **Identity & authorization** — who you are (accounts) and what you may do
    (server membership, roles, a permission bitmask).
-2. **Chat** — servers, channels, messages, and a live layer (presence, typing,
+2. **Chat** — servers, channels, messages, plus a live layer (presence, typing,
    new-message pushes) that sits *on top of* durable history.
 3. **Extensibility** — a bot platform where third-party logic runs as registered
-   handlers, not arbitrary code in your web process.
+   handlers, not arbitrary code inside your web process.
 
-We keep these as separate Python modules and let Flaxon compose them. The
-browser talks to a JSON API; a Teloce SPA renders the UI. The same API serves
-both the human UI and the bot invoke/event surface, which is what makes the bot
-platform "Discord-style".
+## System design
 
-**Why this is a system-design course, not a feature list.** Each phase isolates
-one decision you would have to make in production:
+```mermaid
+graph TD
+    subgraph Browser
+        SPA["Teloce SPA (ui/)"]
+    end
 
-- storing passwords (argon2, never plaintext),
-- preventing cross-site request forgery on every mutation,
-- authorizing at the API layer *and* in the database (private channels),
-- keeping live traffic recoverable from durable history,
-- making a bot platform safe (no untrusted code, tokens one-way hashed), and
-- scaling realtime across multiple workers via a shared broadcaster.
+    subgraph Backend
+        API["API modules (/api/auth, /api/servers, /api/messages, /api/bots)"]
+        SVC["services/: auth, access, messages, bots, tokens"]
+        MODELS["models.py — Tortoise ORM"]
+        HUB["ChannelHub — presence, typing, fan-out"]
+        BOTS["Registered bot handlers"]
+    end
 
-**Checkpoint:** you can describe, in one sentence each, the job of `models.py`,
-`modules/`, `admin.py`, and `ui/`. If you cannot, re-read the index before
-continuing — the rest of the course is built on that separation.
+    DB[("SQLite dev / Postgres prod")]
+    BC{{"Broadcaster — memory dev / Redis prod"}}
+    STAFF["Staff"]
+    ADMIN["Flaxon Admin + CMS"]
 
-## Run the finished project
-
-The example is complete. Get it running first so every later lesson has a live
-thing to poke at:
-
-```bash
-cd examples/discord_clone
-python management.py migrate
-python seed.py            # creates a demo user, server, channels, and a bot
-python management.py runserver
+    SPA -->|JSON| API
+    SPA -->|WebSocket| HUB
+    API --> SVC
+    SVC --> MODELS
+    MODELS --> DB
+    HUB --> BC
+    BOTS -->|"invoke / events"| API
+    STAFF --> ADMIN
+    ADMIN --> MODELS
 ```
 
-Open the app at `http://127.0.0.1:8000` and the staff console at
-`http://127.0.0.1:8000/admin/` (create an admin with
-`python management.py setup-admin`). The seeded bot token is printed by
-`seed.py`; you can also mint one from the UI's bot panel.
+Read the diagram as three guarantees:
 
-In the next lesson we scaffold the application shell these commands rely on.
+- **The API is the only front door.** The human SPA and the bot invoke/event
+  surface both go through it. That is precisely what makes the bot platform
+  "Discord-style" rather than a separate system bolted on later.
+- **Live traffic is recoverable.** Because messages are rows first, a dropped
+  WebSocket is an inconvenience, not data loss — the client refetches history.
+- **Bots never execute foreign code.** A bot is data (tokens, commands,
+  subscriptions). Handlers live in your process. This is the single most
+  important safety property of the design.
+
+## The decisions you will make, in order
+
+| Phase | Decision | Lesson |
+|---|---|---|
+| Identity | Hash passwords with argon2; never store plaintext | 5 |
+| Web safety | CSRF-check every mutation; rate-limit by IP | 5, 16 |
+| Authorization | Enforce private channels in the **database**, not the UI | 6 |
+| Durability | Persist messages; treat presence/typing as ephemeral | 7, 10 |
+| Extensibility | One-way-hash bot tokens; deliver events idempotently | 8, 9 |
+| Scale | One hub per worker; hubs talk only via a broadcaster | 10, 11 |
+
+## Checkpoint
+
+You can state, in one sentence each, what `models.py`, `modules/`,
+`services/`, `admin.py`, and `ui/` are each responsible for. If you cannot,
+re-read the index — the rest of the course is built on that separation.
+
+## Next
+
+[Lesson 2 — Scaffold the app with `flaxon new`](02-scaffold.md).

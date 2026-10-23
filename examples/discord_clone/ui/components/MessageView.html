@@ -17,7 +17,7 @@
         class="message"
         :class="{ own: msg.author_id === currentUser.id }"
       >
-        <span class="avatar" :style="avatarStyle(msg)">{{ initial(nameOf(msg)) }}</span>
+        <span class="avatar" :style="avatarStyle(msg)">{{ initial(nameOf(msg).name) }}</span>
         <div class="body">
           <div class="meta">
             <span class="author" :style="{ color: nameOf(msg).color }">{{ nameOf(msg).name }}</span>
@@ -56,7 +56,10 @@ export default {
     return { draft: "" };
   },
   updated() {
-    const el = this.$refs.scroller as HTMLElement | undefined;
+    // teloce's RuntimeContext types only expose $emit/$attrs; the template ref
+    // is reached through a narrow cast so the scroll-to-bottom stays typed-safe.
+    const refs = (this as unknown as { $refs: Record<string, HTMLElement> }).$refs;
+    const el = refs["scroller"];
     if (el) el.scrollTop = el.scrollHeight;
   },
   methods: {
