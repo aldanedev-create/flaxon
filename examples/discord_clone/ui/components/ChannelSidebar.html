@@ -1,0 +1,131 @@
+<template>
+  <aside class="channels">
+    <header class="server-header">
+      <span class="server-name">{{ serverName }}</span>
+      <button class="icon-btn" title="New channel" @click="creating = !creating">+</button>
+    </header>
+
+    <div v-if="creating" class="channel-form">
+      <input v-model="newName" @keyup.enter="create" placeholder="channel-name" />
+      <input v-model="newTopic" placeholder="topic (optional)" />
+      <label class="private">
+        <input type="checkbox" v-model="newPrivate" /> Private
+      </label>
+      <button @click="create" :disabled="!newName.trim()">Create</button>
+      <p v-if="error" class="error">{{ error }}</p>
+    </div>
+
+    <ul class="channel-list">
+      <li
+        v-for="channel in channels"
+        :key="channel.id"
+        :class="{ active: channel.id === currentChannelId }"
+        @click="$emit('select', channel.id)"
+      >
+        <span class="hash">#</span>{{ channel.name }}
+        <span v-if="channel.is_private" class="lock" title="Private">🔒</span>
+      </li>
+      <li v-if="channels.length === 0" class="empty">No channels yet</li>
+    </ul>
+  </aside>
+</template>
+
+<script lang="ts">
+import { servers } from "../api.ts";
+import type { ChannelPublic } from "../types.ts";
+
+export default {
+  props: ["serverName", "channels", "currentChannelId", "serverId"],
+  data() {
+    return {
+      creating: false,
+      newName: "",
+      newTopic: "",
+      newPrivate: false,
+      error: "",
+    };
+  },
+  methods: {
+    async create() {
+      this.error = "";
+      try {
+        const res = await servers.createChannel(
+          this.serverId,
+          {
+            name: this.newName.trim().toLowerCase(),
+            topic: this.newTopic.trim(),
+            is_private: this.newPrivate,
+          },
+        );
+        this.newName = "";
+        this.newTopic = "";
+        this.newPrivate = false;
+        this.creating = false;
+        this.$emit("created", (res as { channel: ChannelPublic }).channel);
+      } catch (e) {
+        this.error = (e as Error).message;
+      }
+    },
+  },
+};
+</script>
+
+<style scoped>
+.channels {
+  width: 15rem;
+  background: #2b2d31;
+  color: #b5bac1;
+  display: flex;
+  flex-direction: column;
+}
+.server-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid #1e1f22;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+.server-name { font-weight: 700; color: #fff; }
+.icon-btn {
+  background: none;
+  border: none;
+  color: #b5bac1;
+  font-size: 1.3rem;
+  cursor: pointer;
+}
+.channel-form { padding: 0.75rem 1rem; background: #232428; }
+.channel-form input {
+  width: 100%;
+  margin-bottom: 0.4rem;
+  padding: 0.4rem;
+  background: #1e1f22;
+  border: none;
+  border-radius: 0.3rem;
+  color: #dbdee1;
+}
+.channel-form .private { font-size: 0.75rem; display: flex; gap: 0.4rem; align-items: center; }
+.channel-form button {
+  width: 100%;
+  margin-top: 0.3rem;
+  padding: 0.4rem;
+  background: #5865f2;
+  color: #fff;
+  border: none;
+  border-radius: 0.3rem;
+  cursor: pointer;
+}
+.channel-list { list-style: none; margin: 0; padding: 0.5rem; overflow-y: auto; }
+.channel-list li {
+  padding: 0.4rem 0.5rem;
+  border-radius: 0.3rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.channel-list li:hover { background: #35373c; color: #dbdee1; }
+.channel-list li.active { background: #404249; color: #fff; }
+.hash { color: #80848e; margin-right: 0.25rem; }
+.lock { margin-left: 0.35rem; }
+.empty { color: #80848e; font-size: 0.8rem; padding: 0.4rem 0.5rem; }
+.error { color: #f23f42; font-size: 0.75rem; }
+</style>

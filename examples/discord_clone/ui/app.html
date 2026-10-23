@@ -1,0 +1,337 @@
+<template>
+  <AuthScreen v-if="!currentUser" @authenticated="onAuthenticated" />
+
+  <div v-else class="app">
+    <ServerSidebar
+      :servers="servers"
+      :current-server-id="currentServerId"
+      @select="selectServer"
+      @created="onServerCreated"
+      @joined="onServerJoined"
+    />
+
+    <ChannelSidebar
+      v-if="currentServer"
+      :server-id="currentServer.id"
+      :server-name="currentServer.name"
+      :channels="channels"
+      :current-channel-id="currentChannelId"
+      @select="selectChannel"
+      @created="onChannelCreated"
+    />
+
+    <MessageView
+      v-if="currentChannel"
+      :messages="messages"
+      :current-user="currentUser"
+      :channel-name="currentChannel.name"
+      :channel-topic="currentChannel.topic"
+      :typing-names="typingNames"
+      :name-by-id="nameById"
+      @send="sendMessage"
+      @delete="deleteMessage"
+      @typing="notifyTyping"
+      @open-bots="botPanelOpen = true"
+    />
+
+    <MemberList v-if="members.length" :members="members" :online-ids="onlineIds" />
+
+    <BotPanel
+      v-if="botPanelOpen"
+      :server-id="currentServerId"
+      :channel-id="currentChannelId"
+      @close="botPanelOpen = false"
+    />
+
+    <div class="user-bar">
+      <span class="avatar" :style="{ background: currentUser.avatar_color }">
+        {{ initial(currentUser.display_name) }}
+      </span>
+      <span class="uname">{{ currentUser.display_name }}</span>
+      <button class="logout" @click="logout">Log out</button>
+    </div>
+  </div>
+</template>
+
+<script lang="ts">
+import AuthScreen from "./components/AuthScreen.html";
+import ServerSidebar from "./components/ServerSidebar.html";
+import ChannelSidebar from "./components/ChannelSidebar.html";
+import MessageView from "./components/MessageView.html";
+import MemberList from "./components/MemberList.html";
+import BotPanel from "./components/BotPanel.html";
+
+import { auth, servers as serverApi, messages as msgApi, bots as botApi, fetchCsrf } from "./api.ts";
+import type {
+  User,
+  ServerPublic,
+  ChannelPublic,
+  MemberView,
+  MessagePublic,
+  BotPublic,
+} from "./types.ts";
+
+export default {
+  components: { AuthScreen, ServerSidebar, ChannelSidebar, MessageView, MemberList, BotPanel },
+  data() {
+    return {
+      currentUser: null as User | null,
+      servers: [] as ServerPublic[],
+      currentServerId: null as number | null,
+      channels: [] as ChannelPublic[],
+      currentChannelId: null as number | null,
+      members: [] as MemberView[],
+      messages: [] as MessagePublic[],
+      nameById: {} as Record<number, { name: string; color: string }>,
+      onlineIds: [] as number[],
+      typingNames: [] as string[],
+      botPanelOpen: false,
+      bots: [] as BotPublic[],
+      socket: null as WebSocket | null,
+      reconnectTimer: null as number | null,
+      lastTypingAt: 0,
+    };
+  },
+  computed: {
+    currentServer(): ServerPublic | null {
+      return this.servers.find((s) => s.id === this.currentServerId) || null;
+    },
+    currentChannel(): ChannelPublic | null {
+      return this.channels.find((c) => c.id === this.currentChannelId) || null;
+    },
+  },
+  methods: {
+    initial(name: string): string {
+      return (name || "?").charAt(0).toUpperCase();
+    },
+    async onAuthenticated(user: User) {
+      this.currentUser = user;
+      await fetchCsrf();
+      this.connectWs();
+      await this.loadBots();
+      await this.loadServers();
+    },
+    async loadBots() {
+      try {
+        const res = await botApi.list();
+        this.bots = (res as { items: BotPublic[] }).items;
+        this.rebuildNameMap();
+      } catch {
+        /* bot list is optional for chat */
+      }
+    },
+    rebuildNameMap() {
+      const map: Record<number, { name: string; color: string }> = {};
+      for (const m of this.members) {
+        map[m.user.id] = { name: m.user.display_name, color: m.user.avatar_color };
+      }
+      for (const b of this.bots) {
+        map[b.id] = { name: b.name, color: "#5865f2" };
+      }
+      this.nameById = map;
+    },
+    async loadServers() {
+      const res = await serverApi.list();
+      this.servers = (res as { items: ServerPublic[] }).items;
+      if (this.servers.length && this.currentServerId === null) {
+        await this.selectServer(this.servers[0].id);
+      }
+    },
+    async onServerCreated(server: ServerPublic) {
+      this.servers.push(server);
+      await this.selectServer(server.id);
+    },
+    async onServerJoined() {
+      await this.loadServers();
+    },
+    async selectServer(id: number) {
+      this.currentServerId = id;
+      const [chRes, memRes] = await Promise.all([
+        serverApi.channels(id),
+        serverApi.members(id),
+      ]);
+      this.channels = (chRes as { items: ChannelPublic[] }).items;
+      this.members = (memRes as { items: MemberView[] }).items;
+      this.rebuildNameMap();
+      if (this.channels.length) {
+        await this.selectChannel(this.channels[0].id);
+      } else {
+        this.currentChannelId = null;
+        this.messages = [];
+      }
+    },
+    async onChannelCreated(channel: ChannelPublic) {
+      this.channels.push(channel);
+      await this.selectChannel(channel.id);
+    },
+    async selectChannel(id: number) {
+      this.currentChannelId = id;
+      this.messages = [];
+      const res = await msgApi.history(id, undefined, 100);
+      this.messages = (res as { items: MessagePublic[] }).items;
+      this.subscribeChannel();
+    },
+    async sendMessage(content: string) {
+      const cid = this.currentChannelId;
+      if (cid === null) return;
+      const res = await msgApi.send(cid, content);
+      const data = res as { message: MessagePublic; bot_messages: MessagePublic[] };
+      this.addMessage(data.message);
+      for (const m of data.bot_messages) this.addMessage(m);
+    },
+    async deleteMessage(messageId: number) {
+      const cid = this.currentChannelId;
+      if (cid === null) return;
+      this.messages = this.messages.filter((m) => m.id !== messageId);
+      try {
+        await msgApi.remove(cid, messageId);
+      } catch {
+        /* optimistic; server will confirm via WS */
+      }
+    },
+    addMessage(msg: MessagePublic) {
+      if (this.messages.some((m) => m.id === msg.id)) return;
+      this.messages.push(msg);
+    },
+    // --------------------------------------------------------------------- //
+    // Realtime (WebSocket)
+    // --------------------------------------------------------------------- //
+    connectWs() {
+      const proto = location.protocol === "https:" ? "wss" : "ws";
+      const url = `${proto}://${location.host}/ws`;
+      const socket = new WebSocket(url);
+      this.socket = socket;
+      socket.onmessage = (event) => this.handleWs(event);
+      socket.onclose = () => {
+        this.socket = null;
+        if (this.reconnectTimer === null && this.currentUser) {
+          this.reconnectTimer = window.setTimeout(() => this.connectWs(), 2000);
+        }
+      };
+      socket.onopen = () => {
+        if (this.reconnectTimer !== null) {
+          window.clearTimeout(this.reconnectTimer);
+          this.reconnectTimer = null;
+        }
+        this.subscribeChannel();
+      };
+    },
+    subscribeChannel() {
+      if (this.socket && this.socket.readyState === WebSocket.OPEN && this.currentChannelId !== null) {
+        this.socket.send(JSON.stringify({ type: "subscribe", channel_id: this.currentChannelId }));
+      }
+    },
+    notifyTyping() {
+      const now = Date.now();
+      if (now - this.lastTypingAt < 3000) return;
+      this.lastTypingAt = now;
+      if (this.socket && this.socket.readyState === WebSocket.OPEN && this.currentChannelId !== null) {
+        this.socket.send(JSON.stringify({ type: "typing", channel_id: this.currentChannelId }));
+      }
+    },
+    handleWs(event: MessageEvent) {
+      let payload: any;
+      try {
+        payload = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      switch (payload.type) {
+        case "subscribed":
+          this.onlineIds = payload.presence || [];
+          this.updateTyping(payload.typing || []);
+          break;
+        case "message.create":
+          if (payload.message.channel_id === this.currentChannelId) {
+            this.addMessage(payload.message);
+          }
+          break;
+        case "message.delete":
+          this.messages = this.messages.filter((m) => m.id !== payload.message_id);
+          break;
+        case "presence.update":
+          if (payload.channel_id === this.currentChannelId) {
+            this.onlineIds = payload.user_ids || [];
+          }
+          break;
+        case "typing.update":
+          if (payload.channel_id === this.currentChannelId) {
+            this.updateTyping(payload.user_ids || []);
+          }
+          break;
+        case "channel.created":
+          if (payload.server_id === this.currentServerId) {
+            this.refreshChannels();
+          }
+          break;
+        default:
+          break;
+      }
+    },
+    updateTyping(userIds: number[]) {
+      const self = this.currentUser ? this.currentUser.id : -1;
+      this.typingNames = userIds
+        .filter((id) => id !== self)
+        .map((id) => (this.nameById[id] ? this.nameById[id].name : "Someone"));
+    },
+    async refreshChannels() {
+      if (this.currentServerId === null) return;
+      const res = await serverApi.channels(this.currentServerId);
+      this.channels = (res as { items: ChannelPublic[] }).items;
+    },
+    async logout() {
+      try {
+        await auth.logout();
+      } catch {
+        /* ignore */
+      }
+      this.currentUser = null;
+      this.socket = null;
+      if (this.reconnectTimer !== null) {
+        window.clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+      }
+    },
+  },
+};
+</script>
+
+<style scoped>
+.app {
+  display: flex;
+  height: 100vh;
+  background: #313338;
+}
+.user-bar {
+  position: fixed;
+  bottom: 0.5rem;
+  right: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #2b2d31;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.5rem;
+  color: #dbdee1;
+  z-index: 30;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+.user-bar .avatar {
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-weight: 700;
+}
+.user-bar .uname { font-size: 0.85rem; }
+.user-bar .logout {
+  background: #5865f2;
+  color: #fff;
+  border: none;
+  border-radius: 0.3rem;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+}
+</style>

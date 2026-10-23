@@ -1,0 +1,137 @@
+<template>
+  <nav class="servers">
+    <button
+      v-for="server in servers"
+      :key="server.id"
+      class="server-icon"
+      :class="{ active: server.id === currentServerId }"
+      :style="{ background: server.icon_color }"
+      :title="server.name"
+      @click="$emit('select', server.id)"
+    >{{ initial(server.name) }}</button>
+
+    <button class="server-icon add" title="Create a server" @click="creating = !creating">+</button>
+
+    <div v-if="creating" class="popover">
+      <h4>Create or join</h4>
+      <label>New server name
+        <input v-model="newName" @keyup.enter="create" placeholder="My Server">
+      </label>
+      <button @click="create" :disabled="!newName.trim()">Create</button>
+      <hr>
+      <label>Invite code
+        <input v-model="invite" @keyup.enter="join" placeholder="abc123">
+      </label>
+      <button @click="join" :disabled="!invite.trim()">Join</button>
+      <p v-if="error" class="error">{{ error }}</p>
+    </div>
+  </nav>
+</template>
+
+<script lang="ts">
+import { servers } from "../api.ts";
+import type { ServerPublic } from "../types.ts";
+
+export default {
+  props: ["servers", "currentServerId"],
+  data() {
+    return {
+      creating: false,
+      newName: "",
+      invite: "",
+      error: "",
+    };
+  },
+  methods: {
+    initial(name: string): string {
+      return (name || "?").trim().charAt(0).toUpperCase();
+    },
+    async create() {
+      this.error = "";
+      try {
+        const res = await servers.create(this.newName.trim());
+        this.newName = "";
+        this.creating = false;
+        this.$emit("created", (res as { server: ServerPublic }).server);
+      } catch (e) {
+        this.error = (e as Error).message;
+      }
+    },
+    async join() {
+      this.error = "";
+      try {
+        await servers.join(this.invite.trim());
+        this.invite = "";
+        this.creating = false;
+        this.$emit("joined");
+      } catch (e) {
+        this.error = (e as Error).message;
+      }
+    },
+  },
+};
+</script>
+
+<style scoped>
+.servers {
+  width: 4.5rem;
+  background: #1e1f22;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0;
+  position: relative;
+}
+.server-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  border: none;
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: border-radius 0.15s;
+}
+.server-icon:hover { border-radius: 35%; }
+.server-icon.active { border-radius: 35%; box-shadow: 0 0 0 2px #5865f2; }
+.server-icon.add { background: #2b2d31; color: #3ba55d; font-size: 1.6rem; }
+.popover {
+  position: absolute;
+  left: 5rem;
+  top: 4rem;
+  width: 16rem;
+  background: #2b2d31;
+  color: #dbdee1;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  z-index: 20;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.popover h4 { margin: 0 0 0.5rem; color: #fff; }
+.popover label { display: block; font-size: 0.75rem; margin-bottom: 0.4rem; }
+.popover input {
+  width: 100%;
+  margin-top: 0.2rem;
+  padding: 0.4rem;
+  background: #1e1f22;
+  border: none;
+  border-radius: 0.3rem;
+  color: #dbdee1;
+}
+.popover button {
+  width: 100%;
+  margin-top: 0.3rem;
+  padding: 0.4rem;
+  background: #5865f2;
+  color: #fff;
+  border: none;
+  border-radius: 0.3rem;
+  cursor: pointer;
+}
+.popover hr { border-color: #3f4147; margin: 0.75rem 0; }
+.error { color: #f23f42; font-size: 0.75rem; }
+</style>

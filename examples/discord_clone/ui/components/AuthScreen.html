@@ -1,0 +1,121 @@
+<template>
+  <div class="auth">
+    <div class="auth-card">
+      <h1>Discord Clone</h1>
+      <p class="subtitle">A teaching system-design course built on Flaxon + Teloce.</p>
+
+      <div class="tabs">
+        <button :class="{ active: mode === 'login' }" @click="mode = 'login'">Log in</button>
+        <button :class="{ active: mode === 'register' }" @click="mode = 'register'">Register</button>
+      </div>
+
+      <form @submit.prevent="submit">
+        <label v-if="mode === 'register'">
+          Email
+          <input v-model="email" type="email" autocomplete="email" required>
+        </label>
+        <label>
+          Username
+          <input v-model="username" type="text" autocomplete="username" required>
+        </label>
+        <label>
+          Password
+          <input v-model="password" type="password" autocomplete="current-password" required>
+        </label>
+
+        <p v-if="error" class="error">{{ error }}</p>
+        <button type="submit" :disabled="busy">{{ busy ? "Working…" : (mode === 'login' ? 'Log in' : 'Create account') }}</button>
+      </form>
+    </div>
+  </div>
+</template>
+
+<script lang="ts">
+import { auth } from "../api.ts";
+import type { User } from "../types.ts";
+
+export default {
+  data() {
+    return {
+      mode: "login" as "login" | "register",
+      username: "",
+      email: "",
+      password: "",
+      busy: false,
+      error: "",
+    };
+  },
+  methods: {
+    async submit() {
+      if (this.busy) return;
+      this.busy = true;
+      this.error = "";
+      try {
+        const result =
+          this.mode === "login"
+            ? await auth.login(this.username, this.password)
+            : await auth.register(this.username, this.email, this.password);
+        this.$emit("authenticated", (result as { user: User }).user);
+      } catch (e) {
+        this.error = (e as Error).message;
+      } finally {
+        this.busy = false;
+      }
+    },
+  },
+};
+</script>
+
+<style scoped>
+.auth {
+  display: grid;
+  place-items: center;
+  height: 100vh;
+  background: #1e1f22;
+}
+.auth-card {
+  width: 22rem;
+  max-width: 92vw;
+  background: #313338;
+  border-radius: 0.5rem;
+  padding: 2rem;
+  color: #dbdee1;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+h1 { margin: 0 0 0.25rem; font-size: 1.6rem; color: #fff; }
+.subtitle { margin: 0 0 1.25rem; font-size: 0.85rem; color: #b5bac1; }
+.tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+.tabs button {
+  flex: 1;
+  padding: 0.5rem;
+  background: #2b2d31;
+  color: #b5bac1;
+  border: none;
+  border-radius: 0.35rem;
+  cursor: pointer;
+}
+.tabs button.active { background: #5865f2; color: #fff; }
+label { display: block; margin-bottom: 0.75rem; font-size: 0.8rem; color: #b5bac1; }
+input {
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.55rem;
+  background: #1e1f22;
+  border: 1px solid #1e1f22;
+  border-radius: 0.35rem;
+  color: #dbdee1;
+}
+button[type="submit"] {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.65rem;
+  background: #5865f2;
+  color: #fff;
+  border: none;
+  border-radius: 0.35rem;
+  cursor: pointer;
+}
+button[type="submit"]:disabled { opacity: 0.6; cursor: default; }
+.error { color: #f23f42; font-size: 0.8rem; }
+</style>
