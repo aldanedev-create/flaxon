@@ -1,0 +1,26 @@
+{
+  "name": "redoc",
+  "version": "2.5.4",
+  "license": "MIT",
+  "source": "https://registry.npmjs.org/redoc/-/redoc-2.5.4.tgz",
+  "npm_integrity": "sha512-M6jWhG1qoBnH6TFmzJnstyCZ87HmOY/UzDm78mHiYihEdlV/YcS9ogOo1NlElnJMeLsyxHFe2yFc4sNjHTrABQ==",
+  "retrieved": "2026-11-16",
+  "files": {
+    "LICENSE": {
+      "sha256": "d3026d549cf68ab7355bcfa85877bf8f845b3334a7efbfdc63936432fb34ff0e",
+      "bytes": 1091
+    },
+    "redoc.standalone.js": {
+      "sha256": "dcaf76612bc4a3fbcc923a8966dee2f6146a5f32e5ce1b6f02dd60cbbf89500b",
+      "bytes": 1103471
+    },
+    "redoc.standalone.js.LICENSE.txt": {
+      "sha256": "eed602ec32e00b2b9df1984fbcc26a687b1b3193ec01961389c4b8439e6edf73",
+      "bytes": 2729
+    },
+    "redoc.worker.js.LICENSE.txt": {
+      "sha256": "aa1f7119b828e7ac26dd17359a30fd698a1672fba879215271960bbc88201ac2",
+      "bytes": 1161
+    }
+  }
+}

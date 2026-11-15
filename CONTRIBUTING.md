@@ -10,7 +10,7 @@ By participating in this project, you agree to abide by our [Code of Conduct](CO
 
 ### Report a Bug
 
-1. Check if the bug is already reported in [Issues](https://github.com/aldanedev-create/Flaxon-Backend-Framework/issues)
+1. Check if the bug is already reported in [Issues](https://github.com/aldanedev-create/flaxon/issues)
 2. If not, create a new issue with:
    - Clear title and description
    - Steps to reproduce
@@ -42,7 +42,7 @@ By participating in this project, you agree to abide by our [Code of Conduct](CO
 ```bash
 # Clone the repository
 git clone https://github.com/aldanedev-create/flaxon.git
-cd Flaxon-Backend-Framework
+cd flaxon
 
 # Create a virtual environment
 python -m venv .venv
@@ -154,7 +154,7 @@ async def test_route():
 
 1. Update version in `src/flaxon/version.py`
 2. Update `CHANGELOG.md`
-3. Tag the release: `git tag v0.2.4`
+3. Tag the release: `git tag vX.Y.Z   # match src/flaxon/version.py, e.g. v0.3.3`
 4. Push tags: `git push --tags`
 5. GitHub Actions will build and publish to PyPI
 

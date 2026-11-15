@@ -1,0 +1,30 @@
+"""A server-rendered site: Flaxon routes + Jinax (Jinja2) templates. No JavaScript build step."""
+import settings
+from flaxon import Flaxon, Request
+from flaxon.jinax import Jinax
+from flaxon.middleware import TrustedHostsMiddleware
+
+
+def create_app() -> Flaxon:
+    app = Flaxon(settings.PROJECT_NAME, debug=settings.DEBUG)
+    app.add_middleware(TrustedHostsMiddleware, allowed_hosts=settings.ALLOWED_HOSTS)
+    app.mount_static("/assets", str(settings.BASE_DIR / "public"))
+    app.use_templates(Jinax(str(settings.BASE_DIR / "templates"), auto_reload=settings.DEBUG))
+
+    def page(template: str, **context):
+        return app.jinax.render_response(template, {"project_name": settings.PROJECT_NAME, **context})
+
+    @app.get("/")
+    async def home(request: Request):
+        # Jinax escapes HTML by default, so echoing user input here is safe.
+        name = (request.query_params.get("name") or "").strip()[:60]
+        return await page("home.html", visitor=name)
+
+    @app.get("/about")
+    async def about():
+        return await page("about.html")
+
+    return app
+
+
+app = create_app()

@@ -14,6 +14,7 @@ from typing import Any
 
 from flaxon.cli.base import Command
 from flaxon.cli.generator import Generator
+from flaxon.cli.project_templates import DEFAULT_TEMPLATE, TEMPLATES, detect_template, template_names
 
 
 def _timeout(value: str) -> float:
@@ -35,12 +36,20 @@ class NewCommand(Command):
         )
 
     def _add_arguments(self, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("directory", help="Project directory name")
+        parser.add_argument("directory", nargs="?", help="Project directory name")
         parser.add_argument(
             "--template",
-            default="fullstack",
-            choices=["fullstack", "basic"],
-            help="Project template (default: modular Teloce full-stack app)",
+            default=DEFAULT_TEMPLATE,
+            choices=template_names(),
+            help=(
+                "Project template (default: %(default)s). Choose the smallest that fits: "
+                + "; ".join(f"{name} = {t.summary.rstrip('.')}" for name, t in TEMPLATES.items())
+            ),
+        )
+        parser.add_argument(
+            "--list-templates",
+            action="store_true",
+            help="Show the available project templates and exit",
         )
         mode = parser.add_mutually_exclusive_group()
         mode.add_argument(
@@ -72,7 +81,16 @@ class NewCommand(Command):
         )
 
     @classmethod
-    def _next_steps(cls, directory: Path, console: Any, *, environment: bool, fullstack: bool) -> None:
+    def _next_steps(
+        cls,
+        directory: Path,
+        console: Any,
+        *,
+        environment: bool,
+        fullstack: bool,
+        template: str | None = None,
+    ) -> None:
+        template = template or ("fullstack" if fullstack else "basic")
         console.info("\nNext steps (install application dependencies separately):")
         command = "Set-Location -LiteralPath" if os.name == "nt" else "cd --"
         console.info(f"  {command} {cls._quote(str(directory))}")
@@ -83,33 +101,55 @@ class NewCommand(Command):
         )
         if environment:
             console.info("Activation is optional; these commands use your project's Python directly.")
-        dependencies = "-r requirements.txt" if (directory / "requirements.txt").is_file() else "-e ."
-        console.info(f"  {python} -m pip install {dependencies}")
-        if fullstack:
-            console.info(f"  {python} management.py check")
-            console.info(f"  {python} -m flaxon welcome")
-            console.info(f"  {python} management.py makemigrations")
-            console.info(f"  {python} management.py migrate")
-            console.info(f"  {python} management.py setup-admin")
-            console.info(f"  {python} management.py runserver")
+        if (directory / "requirements-dev.txt").is_file():
+            dependencies = "-r requirements-dev.txt"
+        elif (directory / "requirements.txt").is_file():
+            dependencies = "-r requirements.txt"
         else:
-            console.info(f"  {python} -m flaxon run app:app --reload")
+            dependencies = "-e ."
+        console.info(f"  {python} -m pip install {dependencies}")
+        for step in TEMPLATES[template].steps:
+            console.info(f"  {python} {step}")
 
-    def _run(self, args: argparse.Namespace, console: Any) -> int:
+    @staticmethod
+    def _list_templates(console: Any) -> None:
+        console.info(f"Project templates (use --template NAME; default: {DEFAULT_TEMPLATE}):")
+        for name, template in TEMPLATES.items():
+            console.info(f"  {name:<10} {template.summary}")
+            console.info(f"  {'':<10} includes: {template.includes}")
+
+    @staticmethod
+    def _preflight(args: argparse.Namespace, console: Any) -> int | None:
+        """Return an exit code if the request cannot proceed; ``None`` means go ahead."""
+        if getattr(args, "list_templates", False):
+            NewCommand._list_templates(console)
+            return 0
+        if not args.directory:
+            console.error("Provide a project directory, e.g. flaxon new my-app --template api")
+            return 2
         directory = Path(args.directory)
-        resume = getattr(args, "resume_venv", False)
-        if directory.exists() and not resume:
+        if getattr(args, "resume_venv", False):
+            if not (
+                (directory / "app.py").is_file()
+                and any((directory / name).is_file() for name in ("requirements.txt", "pyproject.toml"))
+            ):
+                console.error(
+                    "--resume-venv requires an existing project with app.py and requirements.txt "
+                    "(or legacy pyproject.toml)."
+                )
+                return 1
+        elif directory.exists():
             console.error(f"Directory '{args.directory}' already exists; no files were changed.")
             console.info("For a previously generated project, use --resume-venv to finish environment setup.")
             return 1
-        if resume and not ((directory / "app.py").is_file() and any(
-            (directory / name).is_file() for name in ("requirements.txt", "pyproject.toml")
-        )):
-            console.error(
-                "--resume-venv requires an existing project with app.py and requirements.txt "
-                "(or legacy pyproject.toml)."
-            )
-            return 1
+        return None
+
+    def _run(self, args: argparse.Namespace, console: Any) -> int:
+        early = self._preflight(args, console)
+        if early is not None:
+            return early
+        directory = Path(args.directory)
+        resume = getattr(args, "resume_venv", False)
         try:
             if not resume:
                 console.info(f"Creating Flaxon project: {args.directory}")
@@ -122,11 +162,13 @@ class NewCommand(Command):
                 if not args.no_venv
                 else "Project files created; environment setup skipped."
             )
+            detected = args.template if not resume else detect_template(directory)
             self._next_steps(
                 directory,
                 console,
                 environment=not args.no_venv,
-                fullstack=(directory / "management.py").is_file(),
+                fullstack=detected == "fullstack",
+                template=detected,
             )
             return 0
         except subprocess.TimeoutExpired as exc:

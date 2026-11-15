@@ -14,15 +14,14 @@ class TemplateEngine:
         return {
             "app.py": """from flaxon import Flaxon
 
-app = Flaxon("{name}", debug=True)
+# openapi=True turns on interactive docs at /docs, /redoc and /openapi.json
+app = Flaxon("{name}", debug=True, openapi=True)
 
 @app.get("/")
 async def home():
     return {{"message": "Hello from {name}"}}
 
-@app.get("/health")
-async def health():
-    return {{"status": "healthy", "service": "{name}"}}
+# Flaxon already serves /health, /health/live and /health/ready.
 """,
             "requirements.txt": "flaxon[standard]>=0.3.0\n",
             "gitignore": """.venv/
@@ -54,6 +53,8 @@ flaxon run app:app --reload
 
 ```
 
+Open <http://127.0.0.1:8000/docs> for the interactive API docs.
+
 ## Testing
 
 ```bash
@@ -70,7 +71,7 @@ router = Router(prefix="/api/{name}")
 async def index():
     return {{"message": "{name} controller"}}
 
-@router.get("/{id:int}")
+@router.get("/<int:id>")
 async def get(id: int):
     return {{"id": id, "name": "{name}"}}
 
@@ -83,14 +84,14 @@ async def create(request):
 
 class Create{name_capitalize}(Schema):
     name = fields.StrField(required=True, min_length=2, max_length=80)
-    email = fields.Email(required=True)
-    age = fields.Integer(required=False, minimum=13, maximum=120)
+    email = fields.EmailField(required=True)
+    age = fields.IntField(required=False, minimum=13, maximum=120)
 
 
 class Update{name_capitalize}(Schema):
     name = fields.StrField(required=False, min_length=2, max_length=80)
-    email = fields.Email(required=False)
-    age = fields.Integer(required=False, minimum=13, maximum=120)
+    email = fields.EmailField(required=False)
+    age = fields.IntField(required=False, minimum=13, maximum=120)
 """,
             "service.py": """class {name_capitalize}Service:
     def __init__(self, db):

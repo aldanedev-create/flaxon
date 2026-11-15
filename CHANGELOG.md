@@ -1,5 +1,38 @@
 # Changelog
 
+## Unreleased
+
+### Offline interactive docs
+
+- `/docs` and `/redoc` now serve pinned copies of Swagger UI (5.35.0) and ReDoc (2.5.4) that ship with Flaxon, instead of loading `unpkg.com/swagger-ui-dist@5` and `cdn.redoc.ly/redoc/latest` (unpinned third-party scripts that needed internet access). Both pages work fully offline, verified in a real browser with every external request blocked.
+- The files are served next to their page: `/docs/assets/<version>/swagger-ui.css` and `swagger-ui-bundle.js`, and `/redoc/redoc.standalone.js`. They use immutable caching, an `ETag` and `304` support, stay public when `docs_guard` protects the pages, and are hidden from the OpenAPI document.
+- `enable_openapi(swagger_asset_url=..., redoc_asset_url=...)` now default to `None`, meaning "use the bundled copy". Passing a URL keeps the previous behavior, so existing overrides keep working.
+- Swagger UI's online validator is now switched off (`validatorUrl: null`), because its built-in default points at a third-party service.
+- Licenses and notices ship with the bundles (Apache-2.0 for Swagger UI, MIT for ReDoc, plus the libraries inside them such as React and DOMPurify), with a `MANIFEST.json` per bundle recording the npm source, the npm integrity hash and each file's SHA-256.
+- Add `scripts/vendor_docs_assets.py` to upgrade a bundle (`redoc|swagger-ui --version X.Y.Z`, verified against npm's integrity hash) or verify all of them (`--check`). Tests fail if a vendored file changes without its manifest, and cover what the script refuses (a tampered tarball, a foreign host, unsupported versions).
+- The release check (`scripts/verify_wheel.py`) now requires both bundles and the new starter templates in the wheel.
+- Installed size grows by about 820 KB compressed (3.1 MB unpacked).
+- Not changed: ReDoc's footer still requests one decorative logo from Redocly's CDN; the page renders without it. See `docs/guides/openapi.md`.
+
+### Fixes
+
+- `flaxon generate controller` produced a `/{id:int}` route that never matched (always 404). It now uses `/<int:id>`.
+- `flaxon generate model` produced a file that crashed on import. It now generates a Tortoise ORM model. It also refuses to overwrite an existing file, like the other generators.
+- `flaxon generate schema` used field types that do not exist (`Email`, `Integer`); it now uses `EmailField` and `IntField`.
+- `flaxon generate task` now writes `NAME_task.py` like the other generators instead of `NAME.py`.
+- The `basic` starter now enables the interactive docs (`/docs`, `/redoc`) and no longer defines its own `/health`, which logged a route-collision warning on every start.
+- `CHANGELOG.md` headings now use real release versions, `SECURITY.md` lists the versions that exist, and a test-ID that differed between pytest-xdist workers is now deterministic.
+
+### Documentation
+
+- The README now follows a tutorial flow: key features, requirements, a backend/API path (create, run, check, interactive and alternative docs, an example upgrade, a recap) and a full-stack path, with screenshots. It also gains Performance and Dependencies sections. A test runs its code and checks its links, commands, templates, extras and dependency claims.
+
+### Project templates
+
+- `flaxon new` now offers `api` (modular JSON API), `api-db` (API with ORM and migrations) and `web` (server-rendered Jinax site) alongside `basic` and the default `fullstack`. Each generated project includes its own tests. Run `flaxon new --list-templates` to compare them; see `docs/guides/project-templates.md`.
+- Add `orm`, `teloce`, `typecheck` and `fullstack` extras and put `python-dotenv` in `standard`, so projects can declare exactly what they need. Core dependencies are unchanged in this release.
+- Add `httpx`, `fastmcp` and `pytest-benchmark` to the `dev` extra; the test suite already required them.
+
 - Generated full-stack and basic starters use `requirements.txt` with `pip install -r requirements.txt`; legacy projects with `pyproject.toml` still support environment recovery.
 
 ### Recoverable project creation
@@ -13,7 +46,7 @@
 
 
 
-## 3.2
+## [0.3.2]
 
 - Log expected route overlaps at DEBUG when specificity determines the winner. Keep WARNING for equal-specificity conflicts resolved by registration order, including duplicate dynamic routes. Avoid false collisions for distinct trailing-slash paths and static paths that do not match a converter. Route selection is unchanged.
 
@@ -27,7 +60,7 @@
 
 - Validate and filter annotated Pydantic HTTP responses, including returned dictionaries, subclass instances, nested models, and model containers. Explicit responses bypass filtering. Invalid output returns 500.
 
-## 3.0
+## [0.3.0]
 
 ### Added
 - `python management.py typecheck` type-checks TypeScript in Teloce components and template expressions through pytscheck (`pip install "flaxon[typecheck]"`; requires a Teloce release that includes `teloce typecheck`).
@@ -90,7 +123,7 @@
 - Require CMS authentication by default and publishing rights across writes/imports/restores; support async authorization.
 
 
-## 2.6
+## [0.2.6]
 
 - Add synchronous and asynchronous module-owned starter commands, exposed through project CLI discovery.
 - Refresh the welcome page with an installation-success design, hosted Flaxon logo and website links, and a working Jinax page alongside Teloce. Explain both complete-app options in the generated README and getting-started guide.
@@ -99,7 +132,7 @@
 - Package the starter assets in Flaxon distributions and correct the generated Flaxon dependency name.
 - Add a canonical getting-started guide and a complete documentation directory.
 
-## 2.6 — Readable full-stack course
+## [0.2.6] — Readable full-stack course
 
 - Shorten the README around Python server and Teloce browser development, keeping the logo.
 - Split the full-stack course into ten numbered lesson files with navigation and API coverage maps.
@@ -107,7 +140,7 @@
 - Add compilation/API and browser tests for the Taskboard.
 
 
-## 2.6 — Full-stack page configuration
+## [0.2.6] — Full-stack page configuration
 
 - Add optional favicon, description, language, theme color, stylesheet and script settings to Teloce page shells.
 - Escape head values and validate resource schemes and supported attributes.
@@ -120,7 +153,7 @@ All notable changes to Flaxon will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.6]
+## [0.2.6]
 
 ### Teloce integration
 

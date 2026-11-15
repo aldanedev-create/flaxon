@@ -45,12 +45,20 @@ class GenerateCommand(Command):
             return 1
 
     def _generate_model(self, name: str, path: Path) -> None:
-        template = f"""class {name.capitalize()}(Schema):
-    id = fields.Integer(required=True)
-    name = fields.StrField(required=True, max_length=255)
-    created_at = fields.DateTime()
-    updated_at = fields.DateTime()
+        template = f"""from flaxon.db import Model, fields
+
+
+class {name.capitalize()}(Model):
+    id = fields.IntField(primary_key=True)
+    name = fields.CharField(max_length=255)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return self.name
 """
         path.mkdir(parents=True, exist_ok=True)
         file_path = path / f"{name}_model.py"
+        if file_path.exists():
+            raise FileExistsError(f"File '{file_path}' already exists")
         file_path.write_text(template, encoding="utf-8")

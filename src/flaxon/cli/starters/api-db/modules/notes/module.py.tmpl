@@ -1,0 +1,51 @@
+"""Notes API: a database-backed CRUD feature."""
+from flaxon import Request
+from flaxon.exceptions import BadRequest, NotFound
+from flaxon.http.response import JSONResponse
+from flaxon.modules import FlaxonModule
+
+from models import Note
+
+notes = FlaxonModule("notes")
+
+
+def present(note: Note) -> dict:
+    return {
+        "id": note.id,
+        "title": note.title,
+        "body": note.body,
+        "created_at": note.created_at.isoformat(),
+    }
+
+
+@notes.get("/")
+async def list_notes():
+    return {"notes": [present(note) for note in await Note.all().order_by("-id")]}
+
+
+@notes.get("/<int:note_id>")
+async def get_note(note_id: int):
+    note = await Note.get_or_none(id=note_id)
+    if note is None:
+        raise NotFound("Note not found")
+    return present(note)
+
+
+@notes.post("/")
+async def create_note(request: Request):
+    body = await request.json() or {}
+    if not isinstance(body, dict):
+        raise BadRequest("Send a JSON object")
+    title, text = body.get("title"), body.get("body", "")
+    if not isinstance(title, str) or not title.strip() or len(title.strip()) > 200:
+        raise BadRequest("`title` is required (1-200 characters)")
+    if not isinstance(text, str):
+        raise BadRequest("`body` must be text")
+    return JSONResponse(present(await Note.create(title=title.strip(), body=text)), status_code=201)
+
+
+@notes.delete("/<int:note_id>")
+async def delete_note(note_id: int):
+    if not await Note.filter(id=note_id).delete():
+        raise NotFound("Note not found")
+    return {"deleted": note_id}

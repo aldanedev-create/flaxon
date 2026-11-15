@@ -1,0 +1,28 @@
+# __PROJECT_NAME__
+
+A Flaxon JSON API with a database (Tortoise ORM) and Python migrations. No admin
+site or frontend tooling; add those later if you want them.
+
+```bash
+python -m pip install -r requirements-dev.txt
+cp .env.example .env
+python management.py check
+python management.py makemigrations
+python management.py migrate
+python management.py runserver
+python -m pytest
+```
+
+Open http://127.0.0.1:8000/docs for the interactive API docs.
+
+- `app.py`: app factory; database lifecycle comes from `Flaxon.from_settings()`.
+- `settings.py`: configuration (`DATABASE_URL` defaults to SQLite in `data/`).
+- `models.py`: ORM models. Re-run `makemigrations` and `migrate` after editing.
+- `migrations/`: generated migrations; commit them.
+- `modules/notes/module.py`: a sample CRUD feature. Copy it for each new feature.
+- `tests/`: use a temporary database and never touch `data/`.
+
+Before deploying, set `FLAXON_ALLOWED_HOSTS` and a production `DATABASE_URL`.
+Back up `data/` if you keep SQLite.
+
+[Documentation](https://flaxon-website.vercel.app/docs.html)

@@ -298,6 +298,40 @@ class Flaxon:
     # ADMIN METHODS
     # ============================================================
 
+    def _bundled_docs_assets(
+        self,
+        docs_url: str | None,
+        redoc_url: str | None,
+        swagger_asset_url: str | None,
+        redoc_asset_url: str | None,
+    ) -> tuple[str | None, str | None]:
+        """Serve the Swagger UI and ReDoc files that ship with Flaxon, so the docs work offline.
+
+        Each is registered next to its page, so path-prefix rules written for the page (in
+        middleware or a reverse proxy) cover it too. They are public even when ``docs_guard``
+        protects the pages: they are the same open-source files for everyone. A URL passed by the
+        caller wins, and nothing is served locally for it. Returns the URLs the pages load from.
+        """
+        openapi = "flaxon.openapi"
+        if docs_url and swagger_asset_url is None:
+            base = import_attribute(openapi, "swagger_asset_base")(docs_url)
+            serve = import_attribute(openapi, "swagger_asset_response")
+            for name in import_attribute(openapi, "SWAGGER_ASSETS"):
+                self._add_asset_route(f"{base}/{name}", f"flaxon_swagger_asset_{name}", serve, name)
+            swagger_asset_url = str(base)
+        if redoc_url and redoc_asset_url is None:
+            path = import_attribute(openapi, "redoc_asset_path")(redoc_url)
+            self._add_asset_route(
+                path, "flaxon_redoc_asset", import_attribute(openapi, "redoc_asset_response")
+            )
+            redoc_asset_url = str(import_attribute(openapi, "redoc_asset_url")(redoc_url))
+        return swagger_asset_url, redoc_asset_url
+
+    def _add_asset_route(self, path: str, name: str, serve: Callable[..., Any], *args: Any) -> None:
+        @self.router.get(path, name=name)
+        async def asset(request: Request) -> Any:
+            return serve(*args, request.headers.get("if-none-match"))
+
     def enable_openapi(  # noqa: PLR0917 - preserve existing positional API
         self,
         title: str = "Flaxon API",
@@ -311,8 +345,8 @@ class Flaxon:
         docs_guard: Callable[[Request], Any] | None = None,
         protect_docs: bool = False,
         persist_authorization: bool = False,
-        swagger_asset_url: str = "https://unpkg.com/swagger-ui-dist@5",
-        redoc_asset_url: str = "https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js",
+        swagger_asset_url: str | None = None,
+        redoc_asset_url: str | None = None,
     ) -> Any:
         """Enable OpenAPI documentation derived from routes, docstrings, and schemas.
 
@@ -325,6 +359,10 @@ class Flaxon:
 
         if self._openapi_generator is not None:
             return self._openapi_generator
+
+        swagger_asset_url, redoc_asset_url = self._bundled_docs_assets(
+            docs_url, redoc_url, swagger_asset_url, redoc_asset_url
+        )
         if spec_url is not None:
             openapi_url = spec_url
         if protect_docs and docs_guard is None:

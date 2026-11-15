@@ -1,0 +1,55 @@
+"""Items API. State lives in memory, so it resets when the process restarts.
+
+Need persistence? Generate the `api-db` template (flaxon new <name> --template api-db)
+and keep this module's route shapes.
+"""
+from flaxon import Request
+from flaxon.exceptions import BadRequest, NotFound
+from flaxon.http.response import JSONResponse
+from flaxon.modules import FlaxonModule
+
+items = FlaxonModule("items")
+
+
+class ItemStore:
+    def __init__(self) -> None:
+        self.rows: dict[int, dict] = {}
+        self.next_id = 1
+
+    def clear(self) -> None:
+        self.rows.clear()
+        self.next_id = 1
+
+
+store = ItemStore()
+
+
+@items.get("/")
+async def list_items():
+    return {"items": list(store.rows.values())}
+
+
+@items.get("/<int:item_id>")
+async def get_item(item_id: int):
+    if item_id not in store.rows:
+        raise NotFound("Item not found")
+    return store.rows[item_id]
+
+
+@items.post("/")
+async def create_item(request: Request):
+    body = await request.json() or {}
+    name = body.get("name") if isinstance(body, dict) else None
+    if not isinstance(name, str) or not name.strip():
+        raise BadRequest("`name` is required")
+    row = {"id": store.next_id, "name": name.strip()}
+    store.rows[row["id"]] = row
+    store.next_id += 1
+    return JSONResponse(row, status_code=201)
+
+
+@items.delete("/<int:item_id>")
+async def delete_item(item_id: int):
+    if store.rows.pop(item_id, None) is None:
+        raise NotFound("Item not found")
+    return {"deleted": item_id}

@@ -93,6 +93,7 @@ Use the guides for explanations, the API pages for reference, and the examples f
 - [Mobile Development](guides/mobile-developement.md)
 - [Modules Guide](guides/Modules.md)
 - [OpenAPI, Swagger UI, and ReDoc](guides/openapi.md)
+- [Project templates](guides/project-templates.md)
 - [Plugins](guides/plugins.md)
 - [Optional Teloce plugins: PWA, forms, i18n, accessibility and head](guides/teloce-first-party-plugins.md)
 - [Pydantic Integration](guides/pydantic.md)
@@ -179,6 +180,7 @@ Use the guides for explanations, the API pages for reference, and the examples f
 - [Flaxon VS Code Extension - Quick Cheat Sheet](vs%20Code%20%28Extension%29/Quick%20Cheat%20Sheet.md)
 
 - [ORM, settings, and management commands](guides/orm.md)
+- [ORM Admin custom pages](guides/orm-admin-custom-pages.md)
 
 - [01 | Preview and CLI setup](fullstack/project-manager/01.md)
 
@@ -221,3 +223,26 @@ Use the guides for explanations, the API pages for reference, and the examples f
 - [Type-check Teloce interfaces](guides/typecheck.md)
 
 - [Publishing releases](publishing.md)
+
+## Tutorial: Discord clone and bot platform
+
+- [Discord clone tutorial overview](tutorials/discord-clone/index.md)
+  - [Lesson 1 — Overview: the system you are about to build](tutorials/discord-clone/01-overview.md)
+  - [Lesson 2 — Scaffold the app with `flaxon new`](tutorials/discord-clone/02-scaffold.md)
+  - [Lesson 3 — The data model and migrations](tutorials/discord-clone/03-data-model.md)
+  - [Lesson 4 — App context and dependency injection](tutorials/discord-clone/04-context-and-di.md)
+  - [Lesson 5 — Authentication](tutorials/discord-clone/05-authentication.md)
+  - [Lesson 6 — Servers, channels, and permissions](tutorials/discord-clone/06-servers-channels.md)
+  - [Lesson 7 — Messages: durable history and cursor pagination](tutorials/discord-clone/07-messages.md)
+  - [Lesson 8 — Bot tokens and slash commands](tutorials/discord-clone/08-bot-tokens-commands.md)
+  - [Lesson 9 — Bot events: subscriptions, idempotency, retries](tutorials/discord-clone/09-bot-events.md)
+  - [Lesson 10 — Realtime: ChannelHub and the WebSocket module](tutorials/discord-clone/10-realtime-hub.md)
+  - [Lesson 11 — Multi-worker: making realtime survive more than one process](tutorials/discord-clone/11-multi-worker.md)
+  - [Lesson 12 — Flaxon Admin: moderation without custom CRUD](tutorials/discord-clone/12-admin.md)
+  - [Lesson 13 — CMS: an editorial layer beside the app data](tutorials/discord-clone/13-cms.md)
+  - [Lesson 14 — The SPA: types, API client, and app shell](tutorials/discord-clone/14-spa.md)
+  - [Lesson 15 — Wiring the UI: components and the WebSocket layer](tutorials/discord-clone/15-wiring-ui.md)
+  - [Lesson 16 — Security review: audit what you actually built](tutorials/discord-clone/16-security.md)
+  - [Lesson 17 — Seed it and run it](tutorials/discord-clone/17-seed-and-run.md)
+  - [Lesson 18 — Testing the whole system](tutorials/discord-clone/18-testing.md)
+  - [Lesson 19 — Deployment and hardening](tutorials/discord-clone/19-deployment.md)

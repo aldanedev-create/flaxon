@@ -4,7 +4,10 @@ import re
 from pathlib import Path
 from typing import Any
 
+from .project_templates import DEFAULT_TEMPLATE, TEMPLATES
 from .templates import TemplateEngine
+
+_DOTFILES = {"env.example": ".env.example", "gitignore": ".gitignore"}
 
 
 class Generator:
@@ -13,9 +16,9 @@ class Generator:
     def __init__(self) -> None:
         self.templates = TemplateEngine()
 
-    def generate(self, directory: Path, template: str = "fullstack") -> None:
-        """Perform the generate operation for generator."""
-        if template not in {"fullstack", "basic"}:
+    def generate(self, directory: Path, template: str = DEFAULT_TEMPLATE) -> None:
+        """Create a project from one of the registered templates."""
+        if template not in TEMPLATES:
             raise ValueError(f"Unknown project template: {template}")
         if directory.exists():
             raise FileExistsError(f"Directory '{directory}' already exists")
@@ -23,10 +26,13 @@ class Generator:
         if not package_name:
             raise ValueError("Project name must contain a letter or number")
         directory.mkdir(parents=True, exist_ok=False)
-        if template == "fullstack":
-            self._generate_fullstack(directory, package_name)
+        source = TEMPLATES[template].source
+        if source is not None:
+            self._render_tree(Path(__file__).parent / source, directory, package_name)
             return
+        self._generate_basic(directory)
 
+    def _generate_basic(self, directory: Path) -> None:
         app_py = self.templates.render("app.py", {"name": directory.name})
         (directory / "app.py").write_text(app_py, encoding="utf-8")
 
@@ -39,14 +45,10 @@ class Generator:
         readme = self.templates.render("README.md", {"name": directory.name})
         (directory / "README.md").write_text(readme, encoding="utf-8")
 
-    def _generate_fullstack(self, directory: Path, package_name: str) -> None:
-        starter = Path(__file__).with_name("starter")
+    def _render_tree(self, starter: Path, directory: Path, package_name: str) -> None:
         for source in sorted(starter.rglob("*.tmpl")):
             relative = source.relative_to(starter).with_suffix("")
-            if relative.name == "env.example":
-                relative = relative.with_name(".env.example")
-            if relative.name == "gitignore":
-                relative = relative.with_name(".gitignore")
+            relative = relative.with_name(_DOTFILES.get(relative.name, relative.name))
             target = directory / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             content = source.read_text(encoding="utf-8")
@@ -62,6 +64,7 @@ class Generator:
             "schema": f"{name}_schema.py",
             "service": f"{name}_service.py",
             "middleware": f"{name}_middleware.py",
+            "task": f"{name}_task.py",
         }
 
         filename = filename_map.get(type, f"{name}.py")

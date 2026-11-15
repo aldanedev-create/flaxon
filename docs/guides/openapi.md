@@ -217,8 +217,41 @@ that its documentation is protected. The default Swagger UI does not persist
 authorization tokens in browser storage. Set `persist_authorization=True` only
 when that tradeoff is intentional.
 
-For an offline or security-sensitive deployment, point `swagger_asset_url` and
-`redoc_asset_url` at assets served by your own application or reverse proxy.
+## Offline use and third-party assets
+
+**Swagger UI and ReDoc are bundled with Flaxon.** `/docs` and `/redoc` load pinned
+copies (Swagger UI 5.35.0, Apache-2.0; ReDoc 2.5.4, MIT) that your application serves
+itself, so both pages work with no internet access and do not depend on a CDN.
+
+| Page | Files are served at | Config to host your own |
+| --- | --- | --- |
+| `/docs` (Swagger UI) | `/docs/assets/<version>/swagger-ui.css` and `swagger-ui-bundle.js` | `swagger_asset_url` (a base URL) |
+| `/redoc` (ReDoc) | `/redoc/redoc.standalone.js` | `redoc_asset_url` (the script URL) |
+
+- The files are served next to their page (beside whatever `docs_url` or
+  `redoc_url` you set), with long-lived caching, an `ETag` and `304` support. The
+  Swagger UI version is part of its path, so an upgrade is fetched automatically.
+- They stay public even when `docs_guard` protects the pages: they are the same
+  open-source files for everyone. They never appear in the OpenAPI document.
+- Pass `swagger_asset_url` or `redoc_asset_url` to use your own copy or a CDN
+  instead. Flaxon then serves nothing locally for that page.
+- The licenses and notices of both projects, and of the libraries inside their
+  bundles, ship in `flaxon/openapi/assets/`, with a `MANIFEST.json` recording the npm
+  source, its integrity hash and each file's SHA-256.
+- Swagger UI's online validator is switched off (`validatorUrl: null`), because its
+  default points at a third-party service.
+- ReDoc's footer ("API docs by Redocly") still asks Redocly's CDN for a small
+  decorative logo. The page renders normally when that request fails. Block it
+  with a `Content-Security-Policy` `img-src` rule if you want no third-party
+  requests at all.
+
+Maintainers upgrade a bundle with
+`python scripts/vendor_docs_assets.py redoc --version X.Y.Z` or
+`python scripts/vendor_docs_assets.py swagger-ui --version X.Y.Z`. The script
+verifies the npm tarball against its published integrity hash and updates the
+manifest and the pinned version. `python scripts/vendor_docs_assets.py --check`
+confirms every file is unchanged, and the tests fail if one is modified. ReDoc 3.x
+is not supported, because its standalone bundle is an ES module.
 
 ## Generate a checked-in specification
 

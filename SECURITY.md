@@ -2,14 +2,13 @@
 
 ## Supported Versions
 
-Flaxon follows a security-focused maintenance policy. The current 2.x release
-series is the primary supported version.
+Flaxon is pre-1.0. Security fixes are made for the latest release series and
+published to PyPI as a new patch version.
 
 | Version | Supported |
 | ------- | --------- |
-| 2.x     | ✅ Fully supported |
-| 1.x     | ⚠️ Legacy / limited support |
-| 0.x     | ❌ Unsupported |
+| 0.3.x   | ✅ Fully supported |
+| < 0.3   | ❌ Unsupported: upgrade to the latest 0.3.x |
 
 Security fixes will be prioritized for the actively supported release series.
 

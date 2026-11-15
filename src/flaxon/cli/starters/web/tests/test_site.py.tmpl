@@ -1,0 +1,33 @@
+import pytest
+from flaxon.testing import TestClient
+
+from app import create_app
+
+
+@pytest.fixture
+def client():
+    return TestClient(create_app())
+
+
+def test_pages_render(client):
+    home = client.get("/")
+    assert home.status_code == 200
+    assert __PROJECT_NAME_LITERAL__ in home.text
+    assert "<!doctype html>" in home.text.lower()
+    assert "About" in client.get("/about").text
+
+
+def test_user_input_is_escaped(client):
+    response = client.get("/", query={"name": "<script>alert(1)</script>"})
+    assert response.status_code == 200
+    assert "<script>alert(1)</script>" not in response.text
+
+
+def test_static_assets_are_served(client):
+    response = client.get("/assets/site.css")
+    assert response.status_code == 200
+    assert "font-family" in response.text
+
+
+def test_unknown_page_is_404(client):
+    assert client.get("/nope").status_code == 404

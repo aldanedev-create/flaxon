@@ -1,2 +1,2 @@
-# Verify against the published compiler required by Flaxon 0.3.0.
-teloce-py==0.3.0
+# Verify against the oldest Teloce compiler Flaxon supports (see pyproject.toml).
+teloce-py==0.3.1

@@ -138,7 +138,13 @@ async def test_s3_unexpected_failure_propagates_and_existing_object_is_true(s3_e
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "encoding, data", [("gzip", b"bad"), ("gzip", gzip.compress(b"ok")[:-3]), ("deflate", b"bad")]
+    "encoding, data",
+    [
+        pytest.param("gzip", b"bad", id="gzip-not-gzip"),
+        # mtime=0 keeps the bytes (and therefore the test id) identical across xdist workers.
+        pytest.param("gzip", gzip.compress(b"ok", mtime=0)[:-3], id="gzip-truncated"),
+        pytest.param("deflate", b"bad", id="deflate-not-deflate"),
+    ],
 )
 async def test_invalid_compressed_body_remains_bad_request(encoding, data):
     with pytest.raises(BadRequest):

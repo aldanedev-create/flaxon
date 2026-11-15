@@ -1,0 +1,12 @@
+"""Configuration for the API. Real environment variables override .env."""
+from pathlib import Path
+
+from flaxon.config import env
+
+BASE_DIR = Path(__file__).resolve().parent
+env.load(BASE_DIR / ".env")
+
+PROJECT_NAME = __PROJECT_NAME_LITERAL__
+# Off unless you opt in (copy .env.example to .env for local development).
+DEBUG = env.bool("FLAXON_DEBUG", default=False)
+ALLOWED_HOSTS = env.list("FLAXON_ALLOWED_HOSTS", default=["localhost", "127.0.0.1", "testserver"])

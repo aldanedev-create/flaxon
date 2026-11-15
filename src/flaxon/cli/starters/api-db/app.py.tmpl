@@ -1,0 +1,21 @@
+"""App factory. Settings and commands are shared with management.py."""
+from flaxon import Flaxon
+from modules.notes.module import notes
+
+
+def create_app() -> Flaxon:
+    app = Flaxon.from_settings()  # wires the database lifecycle and trusted hosts
+    app.mount_module(notes, prefix="/api/notes")
+
+    # `python management.py ...` imports this file; nothing below needs to run then.
+    if app.is_management:
+        return app
+
+    @app.get("/")
+    async def index():
+        return {"name": app.settings.PROJECT_NAME, "docs": "/docs", "health": "/health"}
+
+    return app
+
+
+app = create_app()

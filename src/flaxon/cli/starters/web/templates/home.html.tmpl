@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{% if visitor %}Hello, {{ visitor }}!{% else %}Welcome to {{ project_name }}{% endif %}</h1>
+<p>This page is rendered on the server by Jinax. Try <code>/?name=Ada</code>.</p>
+<p>Edit <code>templates/home.html</code> and the routes in <code>app.py</code> to make it yours.</p>
+{% endblock %}

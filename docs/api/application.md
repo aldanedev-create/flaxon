@@ -216,11 +216,15 @@ enable_openapi(
     docs_guard: Callable[[Request], Any] | None = None,
     protect_docs: bool = False,
     persist_authorization: bool = False,
+    swagger_asset_url: str | None = None,
+    redoc_asset_url: str | None = None,
 ) -> Any
 ```
 
 Register the generated OpenAPI JSON endpoint and interactive Swagger UI and
-ReDoc pages. This is equivalent to passing `openapi=True` or an options mapping
+ReDoc pages. By default (`swagger_asset_url=None`, `redoc_asset_url=None`) Flaxon
+serves the Swagger UI and ReDoc files that ship with it, so both pages work
+offline; pass a URL to use your own copy. This is equivalent to passing `openapi=True` or an options mapping
 to the constructor. See the [OpenAPI guide](../guides/openapi.md).
 
 ---

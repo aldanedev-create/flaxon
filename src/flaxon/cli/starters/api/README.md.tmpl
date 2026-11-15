@@ -1,0 +1,25 @@
+# __PROJECT_NAME__
+
+A modular Flaxon JSON API. No database, admin or frontend tooling: just routes,
+validation, OpenAPI docs and tests.
+
+```bash
+python -m pip install -r requirements-dev.txt
+cp .env.example .env        # local development settings
+python -m flaxon run app:app --reload
+python -m pytest
+```
+
+Open http://127.0.0.1:8000/docs for the interactive API docs.
+
+- `app.py`: app factory; mounts modules and applies trusted-host protection.
+- `settings.py`: configuration read from the environment (`.env` is optional).
+- `modules/items/module.py`: a sample feature. Copy it for each new feature.
+- `tests/`: runs through Flaxon's `TestClient`; no server needed.
+
+Items are stored in memory and reset on restart. For a database with migrations,
+create a project with `flaxon new <name> --template api-db`.
+
+Before deploying, set `FLAXON_ALLOWED_HOSTS` to your real hostnames.
+
+[Documentation](https://flaxon-website.vercel.app/docs.html)

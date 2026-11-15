@@ -1,0 +1,22 @@
+# __PROJECT_NAME__
+
+A server-rendered Flaxon website using Jinax templates. No database, admin or
+JavaScript toolchain; add them later if you need them.
+
+```bash
+python -m pip install -r requirements-dev.txt
+cp .env.example .env
+python -m flaxon run app:app --reload
+python -m pytest
+```
+
+Open http://127.0.0.1:8000.
+
+- `app.py`: routes, static files and template setup.
+- `templates/`: Jinax (Jinja2) pages; `base.html` is the shared layout.
+- `public/`: static files served at `/assets`.
+- `tests/`: run through Flaxon's `TestClient`.
+
+Before deploying, set `FLAXON_ALLOWED_HOSTS` to your real hostnames.
+
+[Documentation](https://flaxon-website.vercel.app/docs.html)

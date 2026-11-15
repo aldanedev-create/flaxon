@@ -1,0 +1,9 @@
+"""Run tests against a throwaway SQLite database, never your development data."""
+import os
+import tempfile
+from pathlib import Path
+
+_directory = tempfile.mkdtemp(prefix="flaxon-test-")
+os.environ["DATABASE_URL"] = f"sqlite://{Path(_directory) / 'test.sqlite3'}"
+os.environ["FLAXON_DEBUG"] = "true"  # tests never depend on your local .env
+os.environ.setdefault("FLAXON_ALLOWED_HOSTS", "localhost,127.0.0.1,testserver")
