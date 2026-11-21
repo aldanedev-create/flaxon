@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import json
+import logging
 import secrets
 import time
 import traceback
@@ -32,11 +33,13 @@ from flaxon.routing.execution import EndpointPlan, is_scalar_query
 from flaxon.sessions import SessionManager
 from flaxon.sessions.backends.memory import MemoryBackend
 from flaxon.validation import Schema, ValidationError
-from flaxon.websocket import WebSocket, WebSocketManager
+from flaxon.websocket import WebSocket, WebSocketDataError, WebSocketDisconnect, WebSocketManager
 
 from .configuration import Config
 from .lifecycle import Lifecycle
 from .state import State
+
+logger = logging.getLogger(__name__)
 
 _UNRESOLVED = object()
 
@@ -80,6 +83,7 @@ class Flaxon:
         self.jinax: Any = None
         self.teloce: Any = None
         self.websocket_manager = WebSocketManager()
+        self.lifecycle.on_shutdown(self.websocket_manager.close_all)
         self.error_store = ErrorStore()
         self.debugger = Debugger(debug=self.debug)
         self.plugins = PluginManager(self)
@@ -769,12 +773,26 @@ class Flaxon:
     async def _handle_websocket(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
         socket = WebSocket(scope, receive, send, self.websocket_manager)
         try:
-            matched = self.router.match_websocket(str(scope.get("path", "/")))
+            try:
+                matched = self.router.match_websocket(str(scope.get("path", "/")))
+            except HTTPException:
+                await socket.close(code=4404, reason="WebSocket route not found")
+                return
             socket.path_params = matched.params
             await self._invoke(matched.route.endpoint, socket, matched.params)
-        except HTTPException:
-            await socket.close(code=4404, reason="WebSocket route not found")
+        except WebSocketDisconnect:
+            pass  # the peer left, or the connection limit was reached: nothing to report
+        except HTTPException as exc:
+            # 4000 + the HTTP status, so a client can tell 4401 (unauthorized) from 4403 (forbidden).
+            await socket.close(code=4000 + exc.status_code, reason=str(exc.detail)[:100])
+        except json.JSONDecodeError:
+            await socket.close(code=1007, reason="Invalid JSON")
+        except WebSocketDataError as exc:
+            await socket.close(code=exc.code, reason=str(exc)[:100])
         except Exception as exc:
+            logger.error(
+                "Unhandled WebSocket error on %s (%s)", scope.get("path"), type(exc).__name__, exc_info=exc
+            )
             if self.debug:
                 print(f"\n--- Unhandled WebSocket error on {scope.get('path')} ---")
                 traceback.print_exc()
@@ -786,6 +804,9 @@ class Flaxon:
                     "timestamp": time.time(),
                 })
             await socket.close(code=1011, reason="Internal server error")
+        finally:
+            # Whatever happened, never leave a finished connection registered in the manager.
+            await self.websocket_manager.disconnect(socket)
 
     async def _handle_lifespan(self, receive: Any, send: Any) -> None:
         while True:

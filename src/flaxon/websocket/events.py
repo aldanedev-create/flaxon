@@ -8,13 +8,14 @@ connection events, message events, and disconnect events.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
-from .connection import WebSocket
+from .connection import NO_STATUS_RECEIVED, WebSocket, WebSocketDisconnect
 
 
 class EventType(Enum):
@@ -241,31 +242,48 @@ class WebSocketEvents:
         self._leave_handlers.append(func)
         return func
 
-    async def _call_handlers(self, handlers, value):
-        for handler in handlers:
-            result = handler(value)
-            if asyncio.iscoroutine(result):
-                await result
+    @staticmethod
+    async def _call(handler: Callable, value: Any) -> None:
+        """Call a handler with the value, or with no arguments if it takes none."""
+        try:
+            takes_value = any(
+                p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD, p.VAR_POSITIONAL)
+                for p in inspect.signature(handler).parameters.values()
+            )
+        except (TypeError, ValueError):
+            takes_value = True
+        result = handler(value) if takes_value else handler()
+        if inspect.isawaitable(result):
+            await result
 
-    async def _handle_message(self, data):
+    async def _call_handlers(self, handlers: list[Callable], value: Any) -> None:
+        for handler in handlers:
+            await self._call(handler, value)
+
+    async def _handle_message(self, data: Any) -> None:
         for handler in self._message_handlers:
             try:
-                result = handler(data)
-                if asyncio.iscoroutine(result):
-                    await result
+                await self._call(handler, data)
             except Exception as exc:
                 await self._call_handlers(self._error_handlers, exc)
 
     async def run(self) -> None:
-        """Run connection handlers, deliver messages, and always report disconnection."""
+        """Accept the connection and dispatch events until the peer disconnects."""
+        close_code = NO_STATUS_RECEIVED
         try:
             await self.socket.accept()
             await self._call_handlers(self._connect_handlers, self.socket)
-            async for raw in self.socket:
-                data = raw.get("text") if isinstance(raw, dict) else getattr(raw, "text", raw)
+            while True:
+                message = await self.socket.receive()
+                data = message.get("text")
+                if data is None:
+                    data = message.get("bytes")
                 if data is not None:
                     await self._handle_message(data)
+        except WebSocketDisconnect as exc:
+            close_code = exc.code
         except Exception as exc:
             await self._call_handlers(self._error_handlers, exc)
+            close_code = 1011
         finally:
-            await self._call_handlers(self._disconnect_handlers, getattr(self.socket, "_close_code", 1000))
+            await self._call_handlers(self._disconnect_handlers, close_code)

@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### WebSocket production hardening
+
+- **`flaxon[standard]` could not serve WebSockets.** Plain Uvicorn has no WebSocket implementation, so every handshake got HTTP 404. `standard`, `fullstack` and `server` now include `websockets`.
+- **Token expiry is enforced.** `WebSocketAuth` accepted expired tokens forever. It now rejects expired tokens, tokens without a numeric `exp`, and non-ASCII signatures (which raised instead of failing). New options: `leeway` and `allow_query_token`; `Bearer` is matched case-insensitively.
+- **Add `WebSocketOriginMiddleware`** to block cross-site WebSocket hijacking (opt-in; see the WebSocket guide).
+- **Connections no longer leak.** A socket is now always removed from the manager and its rooms when its handler ends, returns, fails, or the peer vanishes. `close()` no longer raises when the peer is already gone, and empty rooms are deleted (leaving or joining unknown rooms used to grow `rooms` without bound).
+- **One bad client no longer breaks a broadcast.** A dead peer used to abort delivery to the rest of the room and raise into the *sender*; slow peers were served one after another. Broadcasts are now concurrent and isolated, and a failing or slow peer (`send_timeout`, default 10 s) is dropped with close code 1013.
+- **Multi-worker rooms are reliable.** A failing socket used to kill a room's cross-worker listener silently, rooms joined after `configure_broadcaster` were never subscribed, and a message sent right after joining could be dropped before the subscription existed. Local clients now receive messages directly, other workers deliver them once, a lost subscription is re-established with backoff, and a broadcaster outage degrades instead of crashing the sender. **Deploy all workers together:** published messages now carry an origin marker.
+- **`RedisBroadcaster`:** channels are prefixed (`flaxon:ws:`, set `prefix=""` for the old bare names), values round-trip with their type (the string `"123"` no longer arrives as the number 123), connections are health-checked, and `close()` releases the clients. `MemoryBroadcaster` queues are bounded.
+- **Accurate close codes.** Errors raised in a handler were all reported as `4404 "route not found"`. They are now `4000 + HTTP status` (4401, 4403, ...); invalid JSON is 1007, a binary frame where text was expected is 1003 (it used to become an empty string), and unhandled errors are logged server-side with 1011.
+- **New:** `WebSocketManager(max_connections=..., send_timeout=...)`, `manager.close_all()` (run on shutdown with close code 1001), `accept(subprotocol=, headers=)`, `receive_bytes()`, `WebSocket.close_code`, and `send_*` raises `WebSocketDisconnect` on a closed connection.
+- **Fix the documented APIs.** `WebSocketEvents` and `Heartbeat` could not be imported as the guide shows, `WebSocketEvents.run()` could not iterate the socket, event handlers had to accept an argument the docs omit, and `Heartbeat` never recorded `"pong"` replies, so healthy clients were dropped. A heartbeat timeout now closes with 4408 instead of 1000, so clients reconnect. `Message.from_raw` now understands real `websocket.receive` messages.
+
 ### Offline interactive docs
 
 - `/docs` and `/redoc` now serve pinned copies of Swagger UI (5.35.0) and ReDoc (2.5.4) that ship with Flaxon, instead of loading `unpkg.com/swagger-ui-dist@5` and `cdn.redoc.ly/redoc/latest` (unpinned third-party scripts that needed internet access). Both pages work fully offline, verified in a real browser with every external request blocked.

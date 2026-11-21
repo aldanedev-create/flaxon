@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 from collections.abc import AsyncIterator
 from typing import Any
@@ -11,66 +12,95 @@ from .broadcaster import Broadcaster
 
 
 class RedisBroadcaster(Broadcaster):
-    """Redis broadcaster implementation for the websocket subsystem."""
+    """Redis broadcaster implementation for the websocket subsystem.
+
+    Args:
+        redis_url: Where Redis is.
+        protocol: Redis protocol version.
+        max_connections: Connection pool size for each client.
+        prefix: Prepended to every channel name so apps sharing a Redis server cannot read or write each
+            other's rooms. Use ``prefix=""`` to publish on the bare room name.
+        health_check_interval: Seconds between connection health checks, so a silently dropped
+            connection (for example behind a load balancer) is noticed and re-established.
+    """
 
     def __init__(
-        self, redis_url: str = "redis://localhost:6379/0", *, protocol: int = 2, max_connections: int = 100
+        self,
+        redis_url: str = "redis://localhost:6379/0",
+        *,
+        protocol: int = 2,
+        max_connections: int = 100,
+        prefix: str = "flaxon:ws:",
+        health_check_interval: float = 30.0,
     ) -> None:
         self.redis_url = redis_url
         self.protocol = protocol
         self.max_connections = max_connections
-        self._pub = None
-        self._sub = None
+        self.prefix = prefix
+        self.health_check_interval = health_check_interval
+        self._pub: Any = None
+        self._sub: Any = None
         self._lock = asyncio.Lock()
 
-    async def _get_pub(self):
-        if self._pub is None:
-            redis = import_module("redis.asyncio")
+    def _client(self) -> Any:
+        redis = import_module("redis.asyncio")
+        return redis.from_url(
+            self.redis_url,
+            decode_responses=True,
+            protocol=self.protocol,
+            max_connections=self.max_connections,
+            health_check_interval=self.health_check_interval,
+            socket_keepalive=True,
+        )
 
-            self._pub = redis.from_url(
-                self.redis_url,
-                decode_responses=True,
-                protocol=self.protocol,
-                max_connections=self.max_connections,
-            )
+    async def _get_pub(self) -> Any:
+        if self._pub is None:
+            self._pub = self._client()
         return self._pub
 
-    async def _get_sub(self):
+    async def _get_sub(self) -> Any:
         if self._sub is None:
-            redis = import_module("redis.asyncio")
-
-            self._sub = redis.from_url(
-                self.redis_url,
-                decode_responses=True,
-                protocol=self.protocol,
-                max_connections=self.max_connections,
-            )
+            self._sub = self._client()
         return self._sub
 
     async def publish(self, channel: str, message: Any) -> None:
-        """Perform the publish operation for redis broadcaster."""
+        """Publish a message. Every value is JSON encoded, so it arrives with the type it was sent."""
         pub = await self._get_pub()
-        if not isinstance(message, str):
-            message = json.dumps(message)
-        await pub.publish(channel, message)
+        await pub.publish(f"{self.prefix}{channel}", json.dumps(message))
 
     async def subscribe(self, channel: str) -> AsyncIterator[Any]:
-        """Register a subscription for the supplied event or operation."""
+        """Yield messages for a channel until cancelled. Raises if the Redis connection is lost."""
         sub = await self._get_sub()
         pubsub = sub.pubsub()
-        await pubsub.subscribe(channel)
-
+        name = f"{self.prefix}{channel}"
         try:
+            await pubsub.subscribe(name)
             async for message in pubsub.listen():
                 if message["type"] == "message":
                     data = message["data"]
                     try:
                         yield json.loads(data)
                     except (json.JSONDecodeError, TypeError):
-                        yield data
+                        yield data  # published by something other than Flaxon
         finally:
-            await pubsub.unsubscribe(channel)
-            await pubsub.close()
+            with contextlib.suppress(Exception):
+                await pubsub.unsubscribe(name)
+            with contextlib.suppress(Exception):
+                await _close(pubsub)
+
+    async def close(self) -> None:
+        """Release both Redis clients."""
+        clients, self._pub, self._sub = (self._pub, self._sub), None, None
+        for client in clients:
+            if client is not None:
+                with contextlib.suppress(Exception):
+                    await _close(client)
+
+
+async def _close(resource: Any) -> None:
+    """Close a redis-py object using whichever method this redis-py version provides."""
+    closer = getattr(resource, "aclose", None) or resource.close
+    await closer()
 
 
 class RedisBackend:

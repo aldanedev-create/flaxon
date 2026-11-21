@@ -7,6 +7,7 @@ across multiple workers or servers.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from typing import Any
@@ -62,8 +63,14 @@ class MemoryBroadcaster(Broadcaster):
     single process.
     """
 
-    def __init__(self) -> None:
-        """Initialize the memory broadcaster."""
+    def __init__(self, queue_size: int = 1000) -> None:
+        """Initialize the memory broadcaster.
+
+        Args:
+            queue_size: Messages buffered per subscriber. A subscriber that falls this far behind
+                drops its oldest messages instead of growing memory without limit.
+        """
+        self.queue_size = queue_size
         self._subscribers: dict[str, list[asyncio.Queue]] = {}
         self._lock = asyncio.Lock()
 
@@ -78,7 +85,10 @@ class MemoryBroadcaster(Broadcaster):
             queues = list(self._subscribers.get(channel, []))
 
         for queue in queues:
-            await queue.put(message)
+            if queue.full():  # a subscriber that cannot keep up loses its oldest message, not our memory
+                with contextlib.suppress(asyncio.QueueEmpty):
+                    queue.get_nowait()
+            queue.put_nowait(message)
 
     async def subscribe(self, channel: str) -> AsyncIterator[Any]:
         """Subscribe to a channel.
@@ -89,7 +99,7 @@ class MemoryBroadcaster(Broadcaster):
         Returns:
             An async iterator of messages.
         """
-        queue: asyncio.Queue = asyncio.Queue()
+        queue: asyncio.Queue = asyncio.Queue(maxsize=self.queue_size)
 
         async with self._lock:
             if channel not in self._subscribers:

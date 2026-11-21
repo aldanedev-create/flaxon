@@ -49,7 +49,7 @@ class Message:
         Returns:
             A Message instance.
         """
-        if raw["type"] == "websocket.send":
+        if raw["type"] in {"websocket.receive", "websocket.send"}:
             if "text" in raw and raw["text"] is not None:
                 return cls(MessageType.TEXT, raw["text"], raw)
             if "bytes" in raw and raw["bytes"] is not None:

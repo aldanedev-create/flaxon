@@ -40,14 +40,27 @@ class WebSocketAuth:
         ```
     """
 
-    def __init__(self, secret_key: str, token_header: str = "authorization") -> None:
+    def __init__(
+        self,
+        secret_key: str,
+        token_header: str = "authorization",
+        *,
+        allow_query_token: bool = True,
+        leeway: int = 0,
+    ) -> None:
         """Initialize the WebSocket authentication.
 
         Args:
             secret_key: The secret key for token validation.
             token_header: The header name for the token.
+            allow_query_token: Accept the token from a ``?token=`` query parameter. Browsers cannot set
+                headers on a WebSocket, but URLs are logged by proxies and servers, so prefer short-lived
+                tokens, or turn this off if your clients can send the header.
+            leeway: Seconds of clock skew tolerated when checking the token's expiry.
         """
         self.secret_key = secret_key.encode()
+        self.allow_query_token = allow_query_token
+        self.leeway = leeway
         self.token_header = token_header.lower().encode("latin-1")
 
     def require_auth(self, func: Callable) -> Callable:
@@ -99,12 +112,12 @@ class WebSocketAuth:
             for key, value in headers:
                 if key.lower() == self.token_header:
                     auth = value.decode("latin-1")
-                    if auth.startswith("Bearer "):
+                    if auth[:7].lower() == "bearer ":
                         return auth[7:]
                     return auth
 
             query_string = scope.get("query_string", b"").decode("utf-8")
-            if query_string:
+            if query_string and self.allow_query_token:
                 params = urllib.parse.parse_qs(query_string)
                 if "token" in params:
                     return params["token"][0]
@@ -120,21 +133,24 @@ class WebSocketAuth:
         Returns:
             The user object or None if invalid.
         """
-        try:
-            parts = token.split(".", 2)
-            if len(parts) != 3:
-                return None
-
-            header, payload, signature = parts
-
-            expected = self._sign(f"{header}.{payload}")
-            if not hmac.compare_digest(expected, signature):
-                return None
-
-            return json.loads(base64.urlsafe_b64decode(payload + "=="))
-
-        except (ValueError, UnicodeDecodeError):
+        claims = self._decode(token)
+        if claims is None:
             return None
+        expires = claims.get("exp")
+        if isinstance(expires, bool) or not isinstance(expires, (int, float)):
+            return None  # a token without a numeric expiry is never valid
+        return claims if time.time() <= expires + self.leeway else None
+
+    def _decode(self, token: str) -> dict[str, Any] | None:
+        """Return the signed claims, or ``None`` if the token is malformed or its signature is wrong."""
+        try:
+            header, payload, signature = token.split(".", 2)
+            if not hmac.compare_digest(self._sign(f"{header}.{payload}"), signature):
+                return None
+            claims = json.loads(base64.urlsafe_b64decode(payload + "=="))
+        except (ValueError, UnicodeDecodeError, TypeError):
+            return None
+        return claims if isinstance(claims, dict) else None
 
     def _sign(self, data: str) -> str:
         """Sign data with HMAC."""
@@ -192,6 +208,9 @@ class WebSocketAuthMiddleware:
         secret_key: str,
         require_auth: bool = True,
         token_header: str = "authorization",
+        *,
+        allow_query_token: bool = True,
+        leeway: int = 0,
     ) -> None:
         """Initialize the WebSocket authentication middleware.
 
@@ -200,9 +219,13 @@ class WebSocketAuthMiddleware:
             secret_key: The secret key for token validation.
             require_auth: Whether to require authentication for all connections.
             token_header: The header name for the token.
+            allow_query_token: Accept the token from a ``?token=`` query parameter.
+            leeway: Seconds of clock skew tolerated when checking the token's expiry.
         """
         self.app = app
-        self.auth = WebSocketAuth(secret_key, token_header)
+        self.auth = WebSocketAuth(
+            secret_key, token_header, allow_query_token=allow_query_token, leeway=leeway
+        )
         self.require_auth = require_auth
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:

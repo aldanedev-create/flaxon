@@ -15,6 +15,10 @@ from typing import Any
 
 from .connection import WebSocket, WebSocketDisconnect
 
+#: Close code for a connection that stopped answering pings. Not 1000, so clients treat it as a failure
+#: and reconnect (4408 follows the 4000 + HTTP status scheme: 408 Request Timeout).
+HEARTBEAT_TIMEOUT = 4408
+
 
 class Heartbeat:
     """
@@ -66,6 +70,7 @@ class Heartbeat:
                 return
 
             self._last_pong[socket] = time.time()
+            socket.heartbeat = self  # lets socket.receive() record the client's "pong" replies
             task = asyncio.create_task(self._heartbeat_loop(socket))
             self._tasks[socket] = task
 
@@ -84,6 +89,8 @@ class Heartbeat:
                     await task
 
             self._last_pong.pop(socket, None)
+            if getattr(socket, "heartbeat", None) is self:
+                socket.heartbeat = None
 
     async def _heartbeat_loop(self, socket: WebSocket) -> None:
         """Heartbeat loop for a connection."""
@@ -94,7 +101,7 @@ class Heartbeat:
                 last_pong = self._last_pong.get(socket, time.time())
                 if time.time() - last_pong > self.timeout:
                     try:
-                        await socket.close(1000, "Heartbeat timeout")
+                        await socket.close(HEARTBEAT_TIMEOUT, "Heartbeat timeout")
                     except Exception as exc:
                         logging.getLogger(__name__).warning(
                             "Isolated callback or cleanup failed (%s)", type(exc).__name__

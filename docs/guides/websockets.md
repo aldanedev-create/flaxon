@@ -471,3 +471,71 @@ authorization and privileged operations on the server; components call those
 endpoints and present their results. Follow the [full-stack lessons](../fullstack/index.md)
 and [Teloce integration reference](../api/teloce.md) to connect this capability
 to pages, components and application modules.
+
+## Production checklist
+
+**Install a WebSocket implementation.** Plain Uvicorn cannot serve WebSockets: every handshake gets
+HTTP 404. `pip install "flaxon[standard]"` includes `websockets`; with your own requirements, add
+`websockets` or use `uvicorn[standard]`.
+
+**Check the Origin if sockets use cookies or sessions.** Browsers do not apply the same-origin policy
+to WebSockets, so any web page can open a socket to your server with the visitor's cookies attached
+(cross-site WebSocket hijacking).
+
+```python
+from flaxon.websocket import WebSocketOriginMiddleware
+
+app.add_middleware(WebSocketOriginMiddleware, allowed_origins=["https://app.example.com"])
+```
+
+Pages served from your own host are allowed automatically, `allow_missing_origin` (default `True`)
+admits non-browser clients that send no `Origin`, and a refused handshake gets HTTP 403. Pair it
+with `TrustedHostsMiddleware`.
+
+**Tokens expire.** `WebSocketAuth` rejects expired tokens, tokens without a numeric `exp`, and
+tokens with a bad signature. Browsers cannot set headers on a WebSocket, so a `?token=` query
+parameter is accepted by default; URLs end up in logs, so keep those tokens short-lived or pass
+`allow_query_token=False` if your clients can send an `Authorization` header.
+
+**Know the close codes.** Clients can react to why a connection ended:
+
+| Code | Meaning |
+| --- | --- |
+| 1003 | Binary frame where text was expected |
+| 1007 | Invalid JSON |
+| 1008 | Origin not allowed (sent before the handshake, so the client sees HTTP 403) |
+| 1011 | Unhandled error in your handler (logged server-side, details never sent) |
+| 1013 | Too slow to keep up (dropped from a broadcast) |
+| 4000 + HTTP status | An `HTTPException` raised in the handler: 4401 unauthorized, 4403 forbidden |
+| 4408 | Heartbeat timeout |
+
+**Broadcasts are isolated.** A dead or slow client never affects the others: sends run
+concurrently, a client that fails or takes longer than `send_timeout` (default 10 s) is dropped, and
+connections are always removed from the manager and its rooms when a handler ends, however it ends.
+
+**Limit connections.** `app.websocket_manager.max_connections = 10_000` refuses new handshakes when
+full. Message size and protocol pings are server settings, for example
+`uvicorn --ws-max-size 1048576 --ws-ping-interval 20 --ws-ping-timeout 20`. Behind nginx, forward the
+`Upgrade` and `Connection` headers and raise `proxy_read_timeout`.
+
+**Several workers need a broadcaster.** Each process has its own connections. Configure Redis once at
+startup so rooms span workers:
+
+```python
+from flaxon.websocket.redis_backend import RedisBroadcaster
+
+await app.websocket_manager.configure_broadcaster(RedisBroadcaster("redis://localhost:6379/0"))
+```
+
+Local clients get a message immediately and other workers deliver it to theirs, once. Rooms joined
+later are subscribed automatically, a lost Redis connection is re-established with backoff, and an
+outage never crashes the sender. Delivery is at-most-once: messages sent while Redis is unreachable
+are not replayed. Channels are prefixed with `flaxon:ws:` (change it with `prefix=`). Deploy all
+workers together when upgrading, because messages now carry an origin marker.
+
+**Shutdown is graceful.** On shutdown every open connection is closed with 1001 so clients can
+reconnect, and broadcaster resources are released.
+
+**Heartbeats.** `Heartbeat` sends the text `"ping"` and expects the text `"pong"`; replies are recorded
+for you and never reach your `receive` loop. Clients should answer pings and treat close code 4408 as
+a reason to reconnect.

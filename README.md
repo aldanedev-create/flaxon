@@ -413,7 +413,7 @@ Install only what you need:
 
 | Extra | Adds |
 | --- | --- |
-| `flaxon[standard]` | Uvicorn, Jinja2, JWT, Argon2, YAML and `.env` support |
+| `flaxon[standard]` | Uvicorn with WebSocket support, Jinja2, JWT, Argon2, YAML and `.env` support |
 | `flaxon[pydantic]` | Pydantic request and response models |
 | `flaxon[orm]` | Tortoise ORM |
 | `flaxon[admin]` | Admin dashboard and CMS dependencies |
