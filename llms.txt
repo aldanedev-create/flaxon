@@ -1,0 +1,58 @@
+# Flaxon
+
+> Flaxon 0.3.2: Python APIs, Teloce interfaces and a production admin in one framework.
+> Full documentation: llms-full.txt (version-stamped concatenation of the core pages below).
+
+- [Flaxon documentation](index.md): Flaxon brings Python APIs, Teloce interfaces, TypeScript, modules, persistence, and administration into one full-stack application. Teloce compiles your HTML co
+- [Getting started with Flaxon](getting-started.md): Build a complete application with Python APIs, Teloce HTML components, TypeScript, scoped styles, and a protected admin in one project.
+- [Full-stack quick start](quickstart.md): For generated projects, use the shared `settings.py`, `Flaxon.from_settings()`,
+- [Routing](guides/routing.md): Flaxon provides a fast, flexible, and familiar routing system for building web applications and APIs. Routes are registered using decorators on your application
+- [Requests](guides/requests.md): The `Request` object provides access to everything sent by the client, including:
+- [Responses](guides/responses.md): Flaxon automatically converts Python return values into HTTP responses. In most cases you can simply return a dictionary, list, string, or bytes, and Flaxon wil
+- [Validation](guides/validation.md): Flaxon provides declarative validation schemas that automatically validate request data and inject validated objects into route handlers.
+- [Databases](guides/databases.md): Generated projects use Flaxon's thin Tortoise ORM integration. Define tables in
+- [Authentication](guides/authentication.md): Flaxon provides flexible authentication support through pluggable authentication backends.
+- [WebSockets](guides/websockets.md): Flaxon provides built-in WebSocket support with:
+- [Testing](guides/testing.md): For generated projects, use the shared `settings.py`, `Flaxon.from_settings()`,
+- [Declarative admin resources](guides/admin-resources.md): A `Resource` turns a model into a full admin without hand-writing views. It is
+- [Metrics and dashboard cards](guides/admin-metrics.md): Flaxon Admin can render SQL-backed metric cards on the dashboard index and on
+- [Admin actions](guides/admin-actions.md): Flaxon Admin actions are reusable, class-based operations that an operator runs
+- [Filters, lenses, discovery and safety](guides/admin-filters-and-safety.md): This guide covers the Phase 4 admin surface: declarative filters, lenses, saved
+- [Admin extensions with Teloce](guides/admin-extensions.md): An admin extension adds **custom fields, dashboard cards, tools and pages** to the
+- [Optional first-party plugins](guides/teloce-first-party-plugins.md): These modules ship inside `teloce-py`, but builds include only modules you enable.
+- [Application API](api/application.md): For generated projects, use the shared `settings.py`, `Flaxon.from_settings()`,
+- [HTTP API](api/http.md): ---
+- [Routing API](api/routing.md): The main routing class used to register HTTP and WebSocket endpoints.
+- [Validation API](api/validation.md): Base schema class for data validation.
+- [WebSocket API](api/websocket.md): WebSocket connection handler.
+- [Testing API](api/testing.md): Synchronous test client.
+- [Admin API Reference](api/admin.md): For generated projects, use the shared `settings.py`, `Flaxon.from_settings()`,
+- [Admin extension API](api/admin-extensions.md): Generated from `flaxon.admin.extensions` by `scripts/generate_admin_extension_docs.py`.
+- [Teloce full-stack integration: API reference](api/teloce.md): Flaxon owns HTTP, APIs and WebSockets. Teloce compiles UI components and handles
+- [Tutorial ladder: build a Flask-free Flaxon app in five steps](tutorial-ladder.md): This ladder teaches the framework in small, verified steps. Each rung has a
+- [Flaxon cookbook](cookbook.md): Four end-to-end patterns, each with code that is executed by
+- [Verified Flaxon pitfalls (0.3.2)](ai/pitfalls.md): Generated from `scripts/generate_ai_docs.py`; every row is checked
+- [Flaxon public API reference (0.3.2)](ai/api-reference.md): Generated from each module's `__all__`, signatures and docstrings by
+
+## Key facts (verified against code)
+
+- Route parameters use `<int:id>` converters, never `{id}` or `{id:int}`.
+- Enable `/docs` with `Flaxon('app', openapi=True)`; a plain app has no docs route.
+- Install `flaxon[standard]` so WebSockets work (plain uvicorn returns 404).
+- Minimum runtime dependencies: `orjson`, `PyJWT`, `argon2-cffi`.
+- Validation errors are HTTP 422 with `error.code == 'FX-VAL-001'` and `error.fields`.
+- Test clients send JSON bodies with `json_data=`, query strings with `query=`.
+- `flaxon new NAME --template` accepts `basic`, `api`, `api-db`, `web`, `fullstack`.
+- A bad WebSocket `Origin` is rejected before accept with close code `1008` (HTTP 403).
+- A model becomes a full admin with a `Resource` subclass then `dashboard.register(...)`.
+- A Teloce admin field is `TeloceField(name, Component(...), fallback=...)` with a real HTML control.
+
+## Recipes
+
+- [Recipe: a class-based admin action](docs/ai/recipes/action.md)
+- [Recipe: a declarative admin resource](docs/ai/recipes/admin-resource.md)
+- [Recipe: a minimal API](docs/ai/recipes/api.md)
+- [Recipe: a Tortoise model and query](docs/ai/recipes/database.md)
+- [Recipe: a dashboard metric](docs/ai/recipes/metric.md)
+- [Recipe: a Teloce admin field](docs/ai/recipes/teloce-field.md)
+- [Recipe: a WebSocket chat room](docs/ai/recipes/websocket-room.md)

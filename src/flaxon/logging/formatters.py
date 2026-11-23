@@ -5,6 +5,11 @@ import logging
 import traceback
 from datetime import datetime
 
+from flaxon.debugging.redaction import Redactor
+
+# A single shared redactor keeps secrets and PII out of every structured log sink.
+_REDACTOR = Redactor()
+
 
 class ConsoleFormatter(logging.Formatter):
     """Format readable console records, prefixing any available request ID."""
@@ -57,7 +62,14 @@ class JSONFormatter(logging.Formatter):
             }
 
         if hasattr(record, "extra") and isinstance(record.extra, dict):
-            log_data.update(record.extra)
+            log_data.update(_REDACTOR.redact(record.extra))
+
+        # Redact the message and any string identifier fields as a last line of
+        # defence before the record is serialized.
+        log_data["message"] = _REDACTOR.redact(log_data["message"])
+        for key in ("request_id", "user_id", "session_id"):
+            if key in log_data and isinstance(log_data[key], str):
+                log_data[key] = _REDACTOR.redact(log_data[key])
 
         return json.dumps(log_data, default=str, ensure_ascii=False)
 
@@ -79,9 +91,11 @@ class AccessFormatter(logging.Formatter):
             "status": getattr(record, "status", "-"),
             "duration_ms": getattr(record, "duration_ms", "-"),
             "client_ip": getattr(record, "client_ip", "-"),
-            "user_agent": getattr(record, "user_agent", "-"),
+            "user_agent": _REDACTOR.redact(getattr(record, "user_agent", "-")),
             "request_id": getattr(record, "request_id", "-"),
         }
+        # Query strings often carry tokens/emails; scrub the path before emitting.
+        log_data["path"] = _REDACTOR.redact(log_data["path"])
 
         return json.dumps(log_data, default=str, ensure_ascii=False)
 
@@ -99,11 +113,19 @@ class AuditFormatter(logging.Formatter):
             "type": "audit",
             "level": record.levelname,
             "action": getattr(record, "action", "-"),
-            "user_id": getattr(record, "user_id", "-"),
+            "user_id": _REDACTOR.redact(getattr(record, "user_id", "-")),
             "resource": getattr(record, "resource", "-"),
-            "changes": getattr(record, "changes", {}),
+            # Audit payloads frequently carry form data (passwords, tokens); redact them.
+            "changes": _REDACTOR.redact(getattr(record, "changes", {})),
             "ip": getattr(record, "ip", "-"),
-            "user_agent": getattr(record, "user_agent", "-"),
+            "user_agent": _REDACTOR.redact(getattr(record, "user_agent", "-")),
+            "status": getattr(record, "status", "success"),
         }
+        error = getattr(record, "error", None)
+        if error:
+            log_data["error"] = _REDACTOR.redact(error)
+        extra = getattr(record, "extra", None)
+        if isinstance(extra, dict):
+            log_data.update(_REDACTOR.redact(extra))
 
         return json.dumps(log_data, default=str, ensure_ascii=False)

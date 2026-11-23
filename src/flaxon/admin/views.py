@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, cast
 
 from flaxon._imports import import_attribute
 from flaxon.exceptions import BadRequest, Conflict, Forbidden
 from flaxon.http import HTMLResponse, RedirectResponse, Request
 
+from .filters import apply_python_filters
+from .policies import evaluate_policy
 from .registry import evaluate_permission_hook
+from .resources import Resource, augment_schema
 
 WRITE_HOOKS = (
     "get_instances",
@@ -47,9 +50,7 @@ def unsupported_write(admin_model: Any, hook: str) -> BadRequest:
         )
     return BadRequest(
         f"'{name}' cannot be saved from the admin: {hook}() is missing. {detail} "
-        "Inherit the model from flaxon.db.Model, or implement "
-        + "/".join(WRITE_HOOKS)
-        + "."
+        "Inherit the model from flaxon.db.Model, or implement " + "/".join(WRITE_HOOKS) + "."
     )
 
 
@@ -65,6 +66,7 @@ class AdminView:
         """Perform the invalid form operation for admin view."""
         adapter = self.admin_model.model
         schema = await adapter.form_schema() if hasattr(adapter, "form_schema") else {}
+        schema = augment_schema(schema, getattr(self.admin_model, "resource", None))
         context = {
             "model": self.admin_model,
             "models": self.dashboard.registry.get_all(),
@@ -112,9 +114,62 @@ class AdminView:
             return dict(form)
         return dict(form or {})
 
+    def _validate_resource(self, form_data: dict[str, Any]) -> tuple[dict[str, Any], dict[str, str]]:
+        """Run declarative field rules before writing anything to storage."""
+        resource: Resource | None = getattr(self.admin_model, "resource", None)
+        if resource is None:
+            return form_data, {}
+        cleaned, errors = resource.validate(form_data)
+        # Preserve adapter-only keys (inline payloads, relation helpers, ...).
+        return {**form_data, **cleaned}, errors
+
+    async def _invalid_resource_form(
+        self,
+        errors: dict[str, str],
+        data: dict[str, Any],
+        template: str,
+        obj: Any = None,
+    ) -> HTMLResponse | RedirectResponse:
+        error = BadRequest("Correct the highlighted fields before saving.")
+        setattr(error, "field_errors", errors)  # noqa: B010 - admin errors carry per-field messages
+        return cast(
+            "HTMLResponse | RedirectResponse",
+            await self.invalid_form(error, data, template, obj),  # type: ignore[no-untyped-call]
+        )
+
 
 class ChangeListView(AdminView):
     """Change list view implementation for the admin subsystem."""
+
+    def _query_string(self) -> str:
+        """Return the raw query string, for 'save this view' links."""
+        scope = getattr(self.request, "scope", None) or {}
+        raw = scope.get("query_string", b"")
+        return raw.decode("utf-8") if isinstance(raw, bytes) else str(raw or "")
+
+    def _effective_params(self) -> dict[str, Any]:
+        """Merge lens defaults with the request query (request wins)."""
+        params: dict[str, Any] = {}
+        lens = self._resolve_lens()
+        if lens is not None:
+            params.update(lens.query)
+        query = self.request.query
+        if hasattr(query, "to_dict"):
+            params.update(query.to_dict())
+        elif hasattr(query, "items"):
+            params.update(dict(query))
+        return params
+
+    def _resolve_lens(self) -> Any | None:
+        """Return the requested lens, or ``None``; unknown names are a 400."""
+        name = self.request.query.get("lens", "")
+        if not name:
+            return None
+        lens = next((item for item in getattr(self.admin_model, "lenses", []) if item.name == name), None)
+        if lens is None:
+            bad_request_type = import_attribute("flaxon.exceptions", "BadRequest")
+            raise bad_request_type(f"Unknown lens '{name}'")
+        return lens
 
     def _filter_legacy_objects(self, objects):
         needle = self.request.query.get("q", "").lower()
@@ -146,10 +201,14 @@ class ChangeListView(AdminView):
             )
         return objects
 
-    async def render(self) -> HTMLResponse:
+    async def render(self) -> HTMLResponse:  # noqa: C901 - list assembly
         """Render the requested content using the supplied context."""
         model_class = self.admin_model.model
         objects: list[Any] = []
+        params = self._effective_params()
+        lens = self._resolve_lens()
+        filters = [*getattr(self.admin_model, "filters", []), *(lens.filters if lens else [])]
+        active_filters = [filt for filt in filters if filt.active(params)]
         try:
             page = max(1, int(self.request.query.get("page", "1") or 1))
             per_page = min(200, max(1, int(self.request.query.get("per_page", "25") or 25)))
@@ -159,9 +218,15 @@ class ChangeListView(AdminView):
             raise bad_request_type("page and per_page must be integers") from exc
         query_result = None
         if hasattr(model_class, "query"):
-            query_options = {"q": self.request.query.get("q") or None, "page": page, "per_page": per_page}
+            query_options: dict[str, Any] = {
+                "q": self.request.query.get("q") or None,
+                "page": page,
+                "per_page": per_page,
+            }
             if hasattr(model_class, "orm_model"):
-                query_options["query_params"] = self.request.query
+                query_options["query_params"] = params
+                conditions = [filt.orm_q(params) for filt in active_filters]
+                query_options["_flaxon_filters"] = [item for item in conditions if item is not None]
             result = model_class.query(**query_options)
             query_result = await result if hasattr(result, "__await__") else result
             objects = list(query_result.get("items", []))
@@ -169,6 +234,7 @@ class ChangeListView(AdminView):
             result = model_class.get_instances()
             objects = list(await result if hasattr(result, "__await__") else result)
             objects = self._filter_legacy_objects(objects)
+            objects = apply_python_filters(filters, params, objects)
             total = len(objects)
             objects = objects[(page - 1) * per_page : page * per_page]
             query_result = {
@@ -195,13 +261,40 @@ class ChangeListView(AdminView):
                     "pages": page + int(len(objects) == per_page),
                 }
 
+        # Record-level view policy: denied rows never reach the template.
+        policy = getattr(self.admin_model, "policy", None)
+        view_rule = policy.rule("view") if policy is not None else None
+        if view_rule is not None:
+            user = getattr(self.request, "user", None)
+            objects = [obj for obj in objects if await evaluate_policy(view_rule, user, obj)]
+            if query_result is not None:
+                query_result = {**query_result, "total": len(objects), "pages": 1}
+
         context = {
             "model": self.admin_model,
             "models": self.dashboard.registry.get_all(),
             "objects": objects,
             "verbose_name": self.admin_model.get_verbose_name(),
             "verbose_name_plural": self.admin_model.get_verbose_name_plural(),
-            "list_display": self.admin_model.list_display,
+            "list_display": lens.columns if lens and lens.columns else self.admin_model.list_display,
+            "filters": [filt.context(params) for filt in filters],
+            "lenses": [
+                {
+                    "name": item.name,
+                    "label": item.get_label(),
+                    "active": lens is not None and item.name == lens.name,
+                }
+                for item in getattr(self.admin_model, "lenses", [])
+            ],
+            "active_lens": lens.name if lens else "",
+            "saved_views": [
+                {"name": item.name, "slug": item.slug, "query": item.query}
+                for item in self.dashboard.saved_views.list(
+                    getattr(getattr(self.request, "user", None), "username", "anonymous"),
+                    self.admin_model.get_name(),
+                )
+            ],
+            "query_string": self._query_string(),
             "list_filter": self.admin_model.list_filter,
             "search_fields": self.admin_model.search_fields,
             "actions": {
@@ -211,6 +304,9 @@ class ChangeListView(AdminView):
             },
             "user": getattr(self.request, "user", None),
             "request": self.request,
+            "metrics": await self.dashboard._metric_context(
+                getattr(self.request, "user", None), placement=self.admin_model.get_name()
+            ),
             "query": self.request.query.get("q", ""),
             "pagination": query_result
             or {"total": len(objects), "pages": 1, "page": 1, "per_page": len(objects)},
@@ -297,6 +393,9 @@ class CreateView(AdminView):
             form_data.pop("_save", None)
             readonly = set(self.admin_model.readonly_fields) | {"id"}
             form_data = {key: value for key, value in form_data.items() if key not in readonly}
+            form_data, errors = self._validate_resource(form_data)
+            if errors:
+                return await self._invalid_resource_form(errors, form_data, "admin/add.html")
 
             # Hook for model saving instance if supported by model manager
             model_class = self.admin_model.model
@@ -332,17 +431,21 @@ class CreateView(AdminView):
                 status_code=302,
             )
 
+        schema = (
+            await self.admin_model.model.form_schema()
+            if hasattr(self.admin_model.model, "form_schema")
+            else {}
+        )
+        schema = augment_schema(schema, getattr(self.admin_model, "resource", None))
         context = {
             "inline_schema": await self.admin_model.model.inline_schema(locals().get("obj"))
             if hasattr(self.admin_model.model, "inline_schema")
             else {},
-            "form_schema": await self.admin_model.model.form_schema()
-            if hasattr(self.admin_model.model, "form_schema")
-            else {},
+            "form_schema": schema,
             "model": self.admin_model,
             "models": self.dashboard.registry.get_all(),
             "verbose_name": self.admin_model.get_verbose_name(),
-            "fields": self.admin_model.fields,
+            "fields": getattr(self.admin_model, "fields_for_form", None) or self.admin_model.fields,
             "readonly_fields": self.admin_model.readonly_fields,
             "version": "",
             "user": getattr(self.request, "user", None),
@@ -428,19 +531,23 @@ class UpdateView(AdminView):
         record_label = field_values.get(label_field, self.object_id) if label_field else self.object_id
         last_modified = field_values.get("updated_at") or field_values.get("created_at") or ""
 
+        schema = (
+            await self.admin_model.model.form_schema()
+            if hasattr(self.admin_model.model, "form_schema")
+            else {}
+        )
+        schema = augment_schema(schema, getattr(self.admin_model, "resource", None))
         context = {
             "inline_schema": await self.admin_model.model.inline_schema(locals().get("obj"))
             if hasattr(self.admin_model.model, "inline_schema")
             else {},
-            "form_schema": await self.admin_model.model.form_schema()
-            if hasattr(self.admin_model.model, "form_schema")
-            else {},
+            "form_schema": schema,
             "model": self.admin_model,
             "models": self.dashboard.registry.get_all(),
             "object": obj,
             "verbose_name": self.admin_model.get_verbose_name(),
             "object_id": self.object_id,
-            "fields": self.admin_model.fields,
+            "fields": getattr(self.admin_model, "fields_for_form", None) or self.admin_model.fields,
             "verbose_name_plural": self.admin_model.get_verbose_name_plural(),
             "readonly_fields": self.admin_model.readonly_fields,
             "version": await model_class.version(obj)
@@ -462,7 +569,7 @@ class UpdateView(AdminView):
         }
         return await self.dashboard.jinax.render_response("admin/edit.html", context)
 
-    async def _render_post(self, *, model_class):
+    async def _render_post(self, *, model_class):  # noqa: C901 - form validation + audit path
         """Handle post behavior for render."""
         form_data = await self.request.form() if hasattr(self.request, "form") else {}
         form_data = self._form_dict(form_data)
@@ -480,6 +587,11 @@ class UpdateView(AdminView):
         save_mode = str(form_data.pop("_save", "list"))
         readonly_fields = set(self.admin_model.readonly_fields) | {"id"}
         form_data = {key: value for key, value in form_data.items() if key not in readonly_fields}
+        form_data, errors = self._validate_resource(form_data)
+        if errors:
+            return await self._invalid_resource_form(
+                errors, form_data, "admin/edit.html", await self._get_object()
+            )
         current = await self._get_object()
         if expected_version not in (None, "") and not hasattr(model_class, "version"):
             current_version = (

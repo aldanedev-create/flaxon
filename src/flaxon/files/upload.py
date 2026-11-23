@@ -91,6 +91,12 @@ class FileUpload:
         if not body:
             return []
 
+        # Bound the total body before parsing so an oversized request cannot be
+        # expanded into many in-memory/temporary file objects.
+        total_cap = self.max_size * self.max_files
+        if len(body) > total_cap:
+            raise BadRequest(f"Upload body too large: exceeds {total_cap} bytes")
+
         return await self._parse_multipart(body, boundary)
 
     def _extract_boundary(self, content_type: str) -> str | None:
@@ -107,6 +113,8 @@ class FileUpload:
         files = []
 
         for raw_part in parts:
+            if len(files) >= self.max_files:
+                raise BadRequest(f"Too many uploaded files: maximum is {self.max_files}")
             part = raw_part
             if not part or part in {b"--\r\n", b"--"}:
                 continue
@@ -121,6 +129,11 @@ class FileUpload:
                 filename = self._get_filename(headers)
                 content_type = self._get_content_type(headers)
                 field_name = self._get_field_name(headers)
+
+                if len(content) > self.max_size:
+                    raise BadRequest(
+                        f"Uploaded file '{filename}' is too large: exceeds {self.max_size} bytes"
+                    )
 
                 with ExitStack() as stack:
                     file_obj = stack.enter_context(tempfile.NamedTemporaryFile(delete=False))

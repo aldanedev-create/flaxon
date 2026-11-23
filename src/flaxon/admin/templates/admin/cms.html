@@ -6,10 +6,11 @@
   <title>__CMS_TITLE__</title>
   <meta name="csrf-token" content="__CMS_CSRF_TOKEN__">
 
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Vendored assets (offline, no CDN). Built by scripts/vendor_admin_assets.py -->
+  <link rel="stylesheet" href="/static/admin/vendor/tailwind/tailwind.min.css">
   <script defer src="/static/admin/js/alpine.min.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/admin/vendor/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/static/admin/vendor/inter/inter.css">
   <link rel="stylesheet" href="/static/admin/css/admin.css?v=20260916-2">
   <link rel="stylesheet" href="/static/admin/css/cms.css?v=20260916-1">
 
@@ -28,29 +29,29 @@
     <nav class="bg-slate-800/80 backdrop-blur border-b border-slate-700/50 sticky top-0 z-40">
       <div class="px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <div class="flex items-center gap-3 cursor-pointer" @click="goHome()">
-          <i class="fa-solid fa-layer-group text-indigo-400 text-xl"></i>
+          <i aria-hidden="true" class="fa-solid fa-layer-group text-indigo-400 text-xl"></i>
           <span class="font-semibold text-lg" x-text="title"></span>
         </div>
         <div class="flex items-center gap-4 text-sm text-slate-400">
-          <a href="/admin/" class="hover:text-slate-200 transition"><i class="fa-solid fa-arrow-left mr-1"></i> Back to Admin</a>
-          <button @click="openResource('comments')" class="hover:text-slate-200 transition"><i class="fa-solid fa-comments mr-1"></i> Comments</button>
-          <button @click="openResource('taxonomies')" class="hover:text-slate-200 transition"><i class="fa-solid fa-tags mr-1"></i> Taxonomies</button>
-          <button @click="openResource('menu')" class="hover:text-slate-200 transition"><i class="fa-solid fa-list mr-1"></i> Menus</button>
-          <button @click="openResource('schedule')" class="hover:text-slate-200 transition"><i class="fa-solid fa-calendar-days mr-1"></i> Schedule</button>
+          <a href="/admin/" class="hover:text-slate-200 transition"><i aria-hidden="true" class="fa-solid fa-arrow-left mr-1"></i> Back to Admin</a>
+          <button @click="openResource('comments')" class="hover:text-slate-200 transition"><i aria-hidden="true" class="fa-solid fa-comments mr-1"></i> Comments</button>
+          <button @click="openResource('taxonomies')" class="hover:text-slate-200 transition"><i aria-hidden="true" class="fa-solid fa-tags mr-1"></i> Taxonomies</button>
+          <button @click="openResource('menu')" class="hover:text-slate-200 transition"><i aria-hidden="true" class="fa-solid fa-list mr-1"></i> Menus</button>
+          <button @click="openResource('schedule')" class="hover:text-slate-200 transition"><i aria-hidden="true" class="fa-solid fa-calendar-days mr-1"></i> Schedule</button>
           <button @click="toggleTheme()" title="Toggle theme" aria-label="Toggle theme" class="theme-toggle-button hover:text-slate-200 transition"><span class="theme-icon" x-text="darkMode ? '\u2600' : '\u263E'" aria-hidden="true">&#9728;</span></button>
         </div>
       </div>
       <div class="border-t border-slate-700/40 bg-slate-900/30">
         <div class="cms-content-nav px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto flex items-center gap-1 overflow-x-auto" aria-label="CMS content navigation">
-          <button type="button" @click="goHome()" class="cms-nav-link shrink-0" :class="view === 'dashboard' ? 'is-active' : ''"><i class="fa-solid fa-table-cells mr-1"></i>Overview</button>
+          <button type="button" @click="goHome()" class="cms-nav-link shrink-0" :class="view === 'dashboard' ? 'is-active' : ''"><i aria-hidden="true" class="fa-solid fa-table-cells mr-1"></i>Overview</button>
           <template x-for="ct in types" :key="'nav-' + ct.name">
             <button type="button" @click="openList(ct.name)" class="cms-nav-link shrink-0" :class="view !== 'resource' && currentType?.name === ct.name ? 'is-active' : ''">
-              <i class="fa-solid mr-1" :class="ct.icon || 'fa-file-lines'"></i><span x-text="ct.label_plural"></span>
+              <i aria-hidden="true" class="fa-solid mr-1" :class="ct.icon || 'fa-file-lines'"></i><span x-text="ct.label_plural"></span>
             </button>
           </template>
           <template x-for="workspace in workspaceLinks" :key="'workspace-' + workspace.name">
             <button type="button" @click="openWorkspace(workspace.name)" class="cms-nav-link shrink-0" :class="view === 'workspace' && workspaceSection === workspace.name ? 'is-active' : ''">
-              <i class="fa-solid mr-1" :class="workspace.icon"></i><span x-text="workspace.label"></span>
+              <i aria-hidden="true" class="fa-solid mr-1" :class="workspace.icon"></i><span x-text="workspace.label"></span>
             </button>
           </template>
         </div>
@@ -62,7 +63,7 @@
       <!-- Error banner -->
       <div x-show="error" x-cloak class="mb-4 px-4 py-3 rounded-lg bg-red-900/40 border border-red-700/50 text-red-200 text-sm flex items-center justify-between">
         <span x-text="error"></span>
-        <button @click="error = null" class="text-red-300 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+        <button @click="error = null" class="text-red-300 hover:text-white"><i aria-hidden="true" class="fa-solid fa-xmark"></i></button>
       </div>
 
       <!-- ============== DASHBOARD ============== -->
@@ -79,9 +80,9 @@
               >
                 <div class="flex items-center justify-between mb-3">
                   <div class="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-                    <i class="fa-solid" :class="ct.icon || 'fa-file-lines'" style="color:#818cf8"></i>
+                    <i aria-hidden="true" class="fa-solid" :class="ct.icon || 'fa-file-lines'" style="color:#818cf8"></i>
                   </div>
-                  <i class="fa-solid fa-arrow-right text-slate-600 group-hover:text-indigo-400 transition"></i>
+                  <i aria-hidden="true" class="fa-solid fa-arrow-right text-slate-600 group-hover:text-indigo-400 transition"></i>
                 </div>
                 <div class="font-semibold text-slate-100" x-text="ct.label_plural"></div>
                 <div class="text-sm text-slate-400 mt-1" x-show="stats[ct.name]">
@@ -105,11 +106,11 @@
         <div>
           <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
             <div>
-              <button @click="goHome()" class="text-sm text-slate-400 hover:text-slate-200 mb-1"><i class="fa-solid fa-arrow-left mr-1"></i> All content</button>
+              <button @click="goHome()" class="text-sm text-slate-400 hover:text-slate-200 mb-1"><i aria-hidden="true" class="fa-solid fa-arrow-left mr-1"></i> All content</button>
               <h1 class="text-2xl font-bold" x-text="currentType.label_plural"></h1>
             </div>
             <button x-show="can('create')" @click="openCreate(currentType.name)" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition">
-              <i class="fa-solid fa-plus mr-1"></i> Add <span x-text="currentType.label"></span>
+              <i aria-hidden="true" class="fa-solid fa-plus mr-1"></i> Add <span x-text="currentType.label"></span>
             </button>
             <div class="flex gap-2"><a x-show="can('read')" :href="exportUrl('json')" class="px-3 py-2 rounded-lg bg-slate-700 text-sm">Export JSON</a><a x-show="can('read')" :href="exportUrl('csv')" class="px-3 py-2 rounded-lg bg-slate-700 text-sm">Export CSV</a></div>
             <label x-show="can('create')" class="px-3 py-2 rounded-lg bg-slate-700 text-sm cursor-pointer">Import<input type="file" accept=".json,.csv" @change="importFile($event)" class="hidden"></label>
@@ -118,7 +119,7 @@
           <!-- Toolbar -->
           <div class="flex flex-wrap items-center gap-3 mb-4">
             <div class="relative flex-1 min-w-[200px]">
-              <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+              <i aria-hidden="true" class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
               <input
                 type="text" placeholder="Search..." x-model="listQuery.q"
                 @input.debounce.300ms="fetchList()"
@@ -179,8 +180,8 @@
                       </td>
                     </template>
                     <td class="px-4 py-3 text-right">
-                      <button @click="openEdit(currentType.name, item.id)" class="text-slate-500 hover:text-indigo-400 mr-3"><i class="fa-solid fa-pen"></i></button>
-                      <button x-show="can('delete')" @click="deleteItem(item.id)" class="text-slate-500 hover:text-red-400"><i class="fa-solid fa-trash"></i></button>
+                      <button @click="openEdit(currentType.name, item.id)" class="text-slate-500 hover:text-indigo-400 mr-3"><i aria-hidden="true" class="fa-solid fa-pen"></i></button>
+                      <button x-show="can('delete')" @click="deleteItem(item.id)" class="text-slate-500 hover:text-red-400"><i aria-hidden="true" class="fa-solid fa-trash"></i></button>
                     </td>
                   </tr>
                 </template>
@@ -209,7 +210,7 @@
           <div class="flex items-center justify-between"><div><button @click="goHome()" class="text-sm text-slate-400 hover:text-white">Back to CMS</button><h1 class="text-2xl font-bold capitalize" x-text="resource"></h1></div></div>
           <template x-if="resource === 'comments'"><div class="space-y-2"><template x-for="comment in resourceItems" :key="comment.id"><article class="bg-slate-800/60 border border-slate-700 rounded-lg p-4 flex items-center justify-between gap-4"><div><p x-text="comment.content || comment.body || 'Comment'"></p><p class="text-xs text-slate-400" x-text="comment.created_at + ' · ' + comment.status"></p></div><div class="flex gap-2"><button @click="moderateComment(comment.id,'approved')" class="px-3 py-1 bg-emerald-700 rounded text-xs">Approve</button><button @click="moderateComment(comment.id,'spam')" class="px-3 py-1 bg-amber-700 rounded text-xs">Spam</button><button @click="moderateComment(comment.id,'rejected')" class="px-3 py-1 bg-red-700 rounded text-xs">Reject</button></div></article></template></div></template>
           <template x-if="resource === 'taxonomies'"><div class="space-y-4"><form @submit.prevent="createTaxonomy()" class="flex gap-2"><input x-model="taxonomyName" required placeholder="New taxonomy name" class="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-2"><button class="px-3 py-2 bg-indigo-600 rounded">Create</button></form><template x-for="(terms,name) in resourceItems" :key="name"><section class="bg-slate-800/60 border border-slate-700 rounded-lg p-4"><div class="flex items-center justify-between"><h2 class="font-semibold" x-text="name"></h2><button @click="deleteTaxonomy(name)" class="text-red-400 text-sm">Delete taxonomy</button></div><div class="mt-3 flex gap-2"><input x-model="taxonomyTerm" placeholder="Add category or tag" class="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2"><button @click="addTaxonomyTerm(name)" class="px-3 py-2 bg-slate-700 rounded">Add term</button></div><p class="mt-3 text-sm text-slate-400" x-text="Object.keys(terms || {}).join(', ') || 'No terms yet.'"></p></section></template></div></template>
-          <template x-if="resource === 'menu'"><div class="space-y-3"><p class="text-sm text-slate-400">Arrange navigation items and save their hierarchy.</p><template x-for="(item,index) in resourceItems" :key="index"><div draggable="true" class="flex gap-2 items-center"><i class="fa-solid fa-grip-vertical text-slate-500"></i><input x-model="resourceItems[index].label" placeholder="Label" class="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-2"><input x-model="resourceItems[index].url" placeholder="URL" class="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-2"><button @click="moveMenuItem(index,-1)" class="px-2 bg-slate-700 rounded" title="Move up">↑</button><button @click="moveMenuItem(index,1)" class="px-2 bg-slate-700 rounded" title="Move down">↓</button><button @click="resourceItems.splice(index,1)" class="px-3 bg-red-700 rounded">Delete</button></div></template><button @click="resourceItems.push({label:'',url:'',children:[]})" class="px-3 py-2 bg-slate-700 rounded">Add menu item</button><button @click="saveMenu()" class="px-3 py-2 bg-indigo-600 rounded">Save menu</button></div></template>
+          <template x-if="resource === 'menu'"><div class="space-y-3"><p class="text-sm text-slate-400">Arrange navigation items and save their hierarchy.</p><template x-for="(item,index) in resourceItems" :key="index"><div draggable="true" class="flex gap-2 items-center"><i aria-hidden="true" class="fa-solid fa-grip-vertical text-slate-500"></i><input x-model="resourceItems[index].label" placeholder="Label" class="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-2"><input x-model="resourceItems[index].url" placeholder="URL" class="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-2"><button @click="moveMenuItem(index,-1)" class="px-2 bg-slate-700 rounded" title="Move up">↑</button><button @click="moveMenuItem(index,1)" class="px-2 bg-slate-700 rounded" title="Move down">↓</button><button @click="resourceItems.splice(index,1)" class="px-3 bg-red-700 rounded">Delete</button></div></template><button @click="resourceItems.push({label:'',url:'',children:[]})" class="px-3 py-2 bg-slate-700 rounded">Add menu item</button><button @click="saveMenu()" class="px-3 py-2 bg-indigo-600 rounded">Save menu</button></div></template>
         </div>
       </template>
 
@@ -217,8 +218,8 @@
       <template x-if="view === 'workspace'">
         <div class="space-y-6">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div><button @click="goHome()" class="text-sm text-slate-400 hover:text-white"><i class="fa-solid fa-arrow-left mr-1"></i> CMS overview</button><h1 class="text-2xl font-bold mt-1" x-text="workspaceTitle"></h1><p class="text-sm text-slate-400 mt-1" x-text="workspaceDescription"></p></div>
-            <button @click="openWorkspace(workspaceSection, false)" class="px-3 py-2 rounded-lg bg-slate-700 text-sm"><i class="fa-solid fa-rotate mr-1"></i>Refresh</button>
+            <div><button @click="goHome()" class="text-sm text-slate-400 hover:text-white"><i aria-hidden="true" class="fa-solid fa-arrow-left mr-1"></i> CMS overview</button><h1 class="text-2xl font-bold mt-1" x-text="workspaceTitle"></h1><p class="text-sm text-slate-400 mt-1" x-text="workspaceDescription"></p></div>
+            <button @click="openWorkspace(workspaceSection, false)" class="px-3 py-2 rounded-lg bg-slate-700 text-sm"><i aria-hidden="true" class="fa-solid fa-rotate mr-1"></i>Refresh</button>
           </div>
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-3" x-show="Object.keys(workspaceStats).length">
             <template x-for="(value,key) in workspaceStats" :key="key"><div class="cms-workspace-stat"><span x-text="key.replaceAll('_',' ')"></span><strong x-text="value"></strong></div></template>
@@ -241,7 +242,7 @@
 
       <template x-if="view === 'form' && currentType">
         <div class="max-w-2xl">
-          <button @click="openList(currentType.name)" class="text-sm text-slate-400 hover:text-slate-200 mb-1"><i class="fa-solid fa-arrow-left mr-1"></i> Back to list</button>
+          <button @click="openList(currentType.name)" class="text-sm text-slate-400 hover:text-slate-200 mb-1"><i aria-hidden="true" class="fa-solid fa-arrow-left mr-1"></i> Back to list</button>
           <h1 class="text-2xl font-bold mb-6" x-text="(editingId ? 'Edit ' : 'New ') + currentType.label"></h1>
 
           <form @submit.prevent="saveItem()" @input="dirty = true" class="space-y-5 bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
@@ -280,7 +281,7 @@
                     <div class="flex gap-2">
                       <input type="text" x-model="formData[f.name]" :required="f.required" placeholder="Select an asset or paste its URL"
                         class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm focus:outline-none focus:border-indigo-500">
-                      <button type="button" @click="openMediaPicker(f.name)" class="shrink-0 px-3 py-2 rounded-lg bg-slate-700 text-sm"><i class="fa-solid fa-photo-film mr-1"></i>Media</button>
+                      <button type="button" @click="openMediaPicker(f.name)" class="shrink-0 px-3 py-2 rounded-lg bg-slate-700 text-sm"><i aria-hidden="true" class="fa-solid fa-photo-film mr-1"></i>Media</button>
                     </div>
                     <input type="file" :name="f.name" @change="dirty = true" :accept="f.type === 'image' ? 'image/*' : undefined"
                       class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm file:mr-3 file:rounded file:border-0 file:bg-slate-700 file:px-3 file:py-1.5 file:text-slate-100">
@@ -295,7 +296,7 @@
                     :type="f.type === 'number' ? 'number' : (f.type === 'date' ? 'date' : (f.type === 'datetime' ? 'datetime-local' : (f.type === 'email' ? 'email' : (f.type === 'url' ? 'url' : 'text'))))"
                     x-model="formData[f.name]" :required="f.required"
                     class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm focus:outline-none focus:border-indigo-500"
-                  ><button x-show="f.type === 'url'" type="button" @click="openMediaPicker(f.name)" class="shrink-0 px-3 py-2 rounded-lg bg-slate-700 text-sm"><i class="fa-solid fa-photo-film mr-1"></i>Media</button></div>
+                  ><button x-show="f.type === 'url'" type="button" @click="openMediaPicker(f.name)" class="shrink-0 px-3 py-2 rounded-lg bg-slate-700 text-sm"><i aria-hidden="true" class="fa-solid fa-photo-film mr-1"></i>Media</button></div>
                 </template>
 
                 <p x-show="f.help_text" class="text-xs text-slate-500 mt-1" x-text="f.help_text"></p>
@@ -322,7 +323,7 @@
 
             <div class="flex items-center gap-3 pt-2">
               <button type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition">
-                <i class="fa-solid fa-check mr-1"></i> Save
+                <i aria-hidden="true" class="fa-solid fa-check mr-1"></i> Save
               </button>
               <button type="button" @click="openList(currentType.name)" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm transition">
                 Cancel
@@ -335,7 +336,7 @@
 
     </div>
   </div>
-      <div x-show="mediaPickerField" x-cloak class="fixed inset-0 z-50 grid place-items-center bg-slate-950/70 p-4"><section class="w-full max-w-3xl max-h-[80vh] overflow-y-auto rounded-xl border border-slate-700 bg-slate-800 p-5 shadow-2xl"><div class="flex items-center justify-between mb-4"><h2 class="font-semibold">Select media</h2><div class="flex items-center gap-3"><button type="button" @click="openMediaPicker(mediaPickerField)" class="text-sm text-slate-300 hover:text-white"><i class="fa-solid fa-rotate mr-1"></i>Refresh</button><button type="button" @click="mediaPickerField = null" aria-label="Close media picker"><i class="fa-solid fa-xmark"></i></button></div></div><div class="grid grid-cols-2 sm:grid-cols-3 gap-3"><template x-for="item in mediaItems" :key="item.relative_name"><button type="button" @click="selectMedia(item)" class="text-left rounded-lg border border-slate-700 p-2 hover:border-indigo-400"><img :src="item.metadata?.thumbnail_url || item.url" :alt="item.name" class="h-24 w-full object-contain bg-slate-900 rounded"><span class="block mt-2 text-xs truncate" x-text="item.name"></span></button></template></div><div x-show="!mediaItems.length" class="py-8 text-center"><p class="text-sm text-slate-500">No media available yet.</p><a href="/admin/media" class="inline-block mt-3 text-sm text-indigo-400 hover:text-indigo-300">Open the Admin media library</a></div></section></div>
+      <div x-show="mediaPickerField" x-cloak class="fixed inset-0 z-50 grid place-items-center bg-slate-950/70 p-4"><section class="w-full max-w-3xl max-h-[80vh] overflow-y-auto rounded-xl border border-slate-700 bg-slate-800 p-5 shadow-2xl"><div class="flex items-center justify-between mb-4"><h2 class="font-semibold">Select media</h2><div class="flex items-center gap-3"><button type="button" @click="openMediaPicker(mediaPickerField)" class="text-sm text-slate-300 hover:text-white"><i aria-hidden="true" class="fa-solid fa-rotate mr-1"></i>Refresh</button><button type="button" @click="mediaPickerField = null" aria-label="Close media picker"><i aria-hidden="true" class="fa-solid fa-xmark"></i></button></div></div><div class="grid grid-cols-2 sm:grid-cols-3 gap-3"><template x-for="item in mediaItems" :key="item.relative_name"><button type="button" @click="selectMedia(item)" class="text-left rounded-lg border border-slate-700 p-2 hover:border-indigo-400"><img :src="item.metadata?.thumbnail_url || item.url" :alt="item.name" class="h-24 w-full object-contain bg-slate-900 rounded"><span class="block mt-2 text-xs truncate" x-text="item.name"></span></button></template></div><div x-show="!mediaItems.length" class="py-8 text-center"><p class="text-sm text-slate-500">No media available yet.</p><a href="/admin/media" class="inline-block mt-3 text-sm text-indigo-400 hover:text-indigo-300">Open the Admin media library</a></div></section></div>
  <script>window.FLAXON_CMS_API_BASE = "__CMS_API_BASE__"; window.FLAXON_CMS_CSRF_TOKEN = "__CMS_CSRF_TOKEN__";</script>
   <!-- cms.js-->
  <script src="/static/admin/js/cms.js"></script>

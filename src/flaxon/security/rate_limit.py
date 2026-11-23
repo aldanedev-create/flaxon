@@ -138,7 +138,10 @@ class DistributedRateLimiter:
         # ZADD to overwrite same-second requests instead of counting them.
         member = str(time.time_ns())
 
-        pipeline = self.redis.pipeline()
+        # MULTI/EXEC is required for correctness: without an explicit transaction a
+        # non-transactional client lets concurrent checks observe the same ZCARD and
+        # admit a thundering herd past the limit.
+        pipeline = self.redis.pipeline(transaction=True)
         pipeline.zremrangebyscore(full_key, 0, window_start)
         pipeline.zcard(full_key)
         pipeline.zadd(full_key, {member: now})

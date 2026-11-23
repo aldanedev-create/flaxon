@@ -79,6 +79,11 @@ Use the guides for explanations, the API pages for reference, and the examples f
 ### Feature guides
 
 - [Admin and CMS Production Guide](guides/admin-cms.md)
+- [Declarative admin resources](guides/admin-resources.md)
+- [Metrics and dashboard cards](guides/admin-metrics.md)
+- [Admin actions](guides/admin-actions.md)
+- [Filters, lenses and safety](guides/admin-filters-and-safety.md)
+- [Admin extensions with Teloce](guides/admin-extensions.md)
 - [Flaxon Admin in Production](guides/admin-production.md)
 - [Authentication](guides/authentication.md)
 - [Request performance and authentication migration](guides/request-security-upgrade.md)
@@ -112,6 +117,7 @@ Use the guides for explanations, the API pages for reference, and the examples f
 
 - [Admin and CMS API Reference](api/admin-cms.md)
 - [Admin API Reference](api/admin.md)
+- [Admin extension API](api/admin-extensions.md)
 - [Application API](api/application.md)
 - [GraphQL API Reference](api/graphql.md)
 - [HTTP API](api/http.md)
@@ -171,6 +177,24 @@ Use the guides for explanations, the API pages for reference, and the examples f
 - [Building a Production App with Modules](lessons/production-app-guide.md)
 - [Teloce Integration Reference](api/teloce.md)
 - [Flaxon VS Code Extension Cheat Sheet](lessons/vscode%20Cheatsheet.md)
+
+### AI-facing docs (generated)
+
+- [Tutorial ladder](tutorial-ladder.md)
+- [Cookbook](cookbook.md)
+- [Verified pitfalls](ai/pitfalls.md)
+- [AI API reference](ai/api-reference.md)
+- [Recipe: minimal API](ai/recipes/api.md)
+- [Recipe: database](ai/recipes/database.md)
+- [Recipe: admin resource](ai/recipes/admin-resource.md)
+- [Recipe: metric](ai/recipes/metric.md)
+- [Recipe: action](ai/recipes/action.md)
+- [Recipe: Teloce field](ai/recipes/teloce-field.md)
+- [Recipe: WebSocket room](ai/recipes/websocket-room.md)
+
+### Internal
+
+- [Production Readiness Audit](internal/production-audit.md)
 
 ### VS Code extension
 

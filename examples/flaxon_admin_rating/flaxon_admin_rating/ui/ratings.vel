@@ -1,0 +1,40 @@
+<template>
+  <div class="fx-ratings-page">
+    <p class="fx-ratings-empty" v-for="note in notes" :key="note">{{ note }}</p>
+    <table class="fx-ratings-table">
+      <caption>Average rating per model, calculated from stored records.</caption>
+      <thead>
+        <tr>
+          <th scope="col">Model</th>
+          <th scope="col">Average</th>
+          <th scope="col">Rated</th>
+          <th scope="col">Distribution</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="row in models" :key="row.name">
+          <th scope="row"><a href="{{ row.url }}">{{ row.label }}</a></th>
+          <td><strong>{{ row.average_label }}</strong> / 5</td>
+          <td>{{ row.total }}</td>
+          <td class="fx-ratings-summary">{{ row.summary }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</template>
+<script lang="ts">
+export default {
+  props: {
+    models: { type: Array, default: [] },
+    notes: { type: Array, default: [] }
+  }
+};
+</script>
+<style scoped>
+.fx-ratings-page { display: grid; gap: 1rem; }
+.fx-ratings-table { width: 100%; border-collapse: collapse; }
+.fx-ratings-table caption { text-align: left; color: #94a3b8; padding-bottom: .5rem; }
+.fx-ratings-table th, .fx-ratings-table td { text-align: left; padding: .5rem .75rem; border-bottom: 1px solid #334155; vertical-align: top; }
+.fx-ratings-summary { font-size: .8125rem; color: #94a3b8; }
+.fx-ratings-empty { color: #94a3b8; }
+</style>

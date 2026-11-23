@@ -5,6 +5,10 @@ from typing import Any
 
 from flaxon._imports import import_attribute
 
+from .filters import build_filters
+from .lenses import Lens
+from .resources import Resource
+
 
 class AdminModel:
     """Admin model implementation for the admin subsystem."""
@@ -31,12 +35,19 @@ class AdminModel:
         fieldsets: dict[str, list[str]] | None = None,
         widgets: dict[str, str] | None = None,
         inlines: dict[str, Any] | None = None,
+        resource: Any | None = None,
+        fields_for_form: list[str] | None = None,
+        filters: Any = None,
+        lenses: Any = None,
+        policy: Any = None,
     ) -> None:
         self.fieldsets = fieldsets or {}
         self.widgets = widgets or {}
         self.inlines = inlines or {}
         self.queryset = queryset
         self.model = model
+        self.resource = resource
+        self.fields_for_form = fields_for_form or fields or []
         self.list_display = list_display or ["__str__"]
         self.list_filter = list_filter or []
         self.search_fields = search_fields or []
@@ -53,6 +64,11 @@ class AdminModel:
             "delete": can_delete,
         }
         self.validate_import = validate_import
+        # Class-based filters are additive; legacy ``list_filter`` keeps its
+        # existing ORM/Python path untouched.
+        self.filters = build_filters(filters or [])
+        self.lenses = [item if isinstance(item, Lens) else Lens(str(item)) for item in (lenses or [])]
+        self.policy = policy
         if isinstance(actions, dict):
             self.actions.update(actions)
         elif actions:
@@ -103,8 +119,28 @@ class Registry:
         self._model_classes: dict[Any, str] = {}
 
     def register(self, model: Any, **options: Any) -> None:
-        """Perform the register operation for registry."""
+        """Perform the register operation for registry.
+
+        A ``Resource`` subclass is an additive shorthand: it is translated into
+        the same options the legacy ``register(Model, **options)`` call accepts.
+        Every pre-existing registration path is untouched.
+        """
+        submitted = model
         original = model
+        if isinstance(model, Resource):
+            resource = model
+        elif isinstance(model, type) and issubclass(model, Resource):
+            resource = model()
+        else:
+            resource = None
+
+        if resource is not None:
+            options = {**resource.to_options(), **options}
+            options["resource"] = resource
+            model = resource.model
+            if model is None:
+                raise ValueError(f"{type(resource).__name__} must define a model")
+            original = model
         model_type = import_attribute("tortoise.models", "Model")
 
         if isinstance(model, type) and issubclass(model, model_type):
@@ -117,6 +153,7 @@ class Registry:
         self._models[admin_model.get_name()] = admin_model
         self._model_classes[model] = admin_model.get_name()
         self._model_classes[original] = admin_model.get_name()
+        self._model_classes[submitted] = admin_model.get_name()
 
     def unregister(self, model: Any) -> None:
         """Perform the unregister operation for registry."""

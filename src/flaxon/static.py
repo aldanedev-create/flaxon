@@ -6,6 +6,7 @@ Example:
 
 from __future__ import annotations
 
+import asyncio
 import mimetypes
 from pathlib import Path
 
@@ -38,7 +39,9 @@ class StaticFiles:
             raise NotFound("File not found.")
 
         content_type, _ = mimetypes.guess_type(str(target))
-        content = target.read_bytes()
+        # Reading a file is blocking I/O: run it in a worker thread so a slow
+        # disk never stalls the event loop serving other requests.
+        content = await asyncio.to_thread(target.read_bytes)
 
         headers = {}
         if self.cache_control:

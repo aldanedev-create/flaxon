@@ -1,0 +1,42 @@
+{
+  "name": "@fontsource/inter",
+  "version": "5.1.1",
+  "license": "OFL-1.1",
+  "source": "https://registry.npmjs.org/@fontsource/inter/-/inter-5.1.1.tgz",
+  "npm_integrity": "sha512-weN3E+rq0Xb3Z93VHJ+Rc7WOQX9ETJPTAJ+gDcaMHtjft67L58sfS65rAjC5tZUXQ2FdZ/V1/sSzCwZ6v05kJw==",
+  "retrieved": "2026-11-21",
+  "files": {
+    "LICENSE": {
+      "sha256": "8c8fa881d9091ee315d2c80d207bb73afd4e90a66c9782ca445c5642f25db6dc",
+      "bytes": 4375
+    },
+    "files/inter-latin-300-normal.woff2": {
+      "sha256": "1484800cb0056acaef74e22c5add27a8bc106cc38a4c20aa2bcc25a4a0cdf1d2",
+      "bytes": 24064
+    },
+    "files/inter-latin-400-normal.woff2": {
+      "sha256": "dd05e326cf8eac3b55acecf29c842ed73e6e6dd06491cf47f7e8800680ab3e33",
+      "bytes": 23692
+    },
+    "files/inter-latin-500-normal.woff2": {
+      "sha256": "b0e7558f4710a1e255b93e3deefe3aebb19f3bb41c150f685a74d3b1a1c79e87",
+      "bytes": 24368
+    },
+    "files/inter-latin-600-normal.woff2": {
+      "sha256": "62553d159189834af73c9a6264704be5b2bee9a08da66a14768d8e5c6ffd2cdb",
+      "bytes": 24304
+    },
+    "files/inter-latin-700-normal.woff2": {
+      "sha256": "aac638f7503cebb084ec494cf00f75f7d8260d50c2f4e7820bccabba09626a3a",
+      "bytes": 24352
+    },
+    "files/inter-latin-800-normal.woff2": {
+      "sha256": "e4a6db93190ce6c09e9871496bc63a2b7a59838435e8ec23996afd9619bc3883",
+      "bytes": 24508
+    },
+    "inter.css": {
+      "sha256": "73af2ee3959e603ded3bc76e304fb2199257dca686ca4bfb8b361893ee85925e",
+      "bytes": 1101
+    }
+  }
+}

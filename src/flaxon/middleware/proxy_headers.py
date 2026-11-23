@@ -15,19 +15,27 @@ from .base import Middleware
 class ProxyHeadersMiddleware(Middleware):
     """Proxy headers middleware."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0917 - additive option on existing positional API
         self,
         app: Any,
         trusted_proxies: list[str] | tuple[str, ...] | None = None,
         forward_for: bool = True,
         forward_proto: bool = True,
         forward_host: bool = True,
+        trusted_proxy_count: int | None = None,
     ) -> None:
         super().__init__(app)
         self.trusted_proxies = set(trusted_proxies or [])
         self.forward_for = forward_for
         self.forward_proto = forward_proto
         self.forward_host = forward_host
+        # When set, the client is chosen by POSITION from the right of the
+        # X-Forwarded-For chain rather than by trusting IP values in the header
+        # (which an attacker behind a proxy can inject). This is the hardened
+        # mode: configure the known number of proxy hops in front of the app.
+        if trusted_proxy_count is not None and trusted_proxy_count < 1:
+            raise ValueError("trusted_proxy_count must be >= 1")
+        self.trusted_proxy_count = trusted_proxy_count
 
     def _is_trusted_proxy(self, ip: str) -> bool:
         if not self.trusted_proxies:
@@ -65,6 +73,17 @@ class ProxyHeadersMiddleware(Middleware):
             return []
 
         ips = [ip.strip() for ip in header.split(",") if ip.strip()]
+
+        # Hardened mode: trust exactly ``trusted_proxy_count`` hops from the right;
+        # the client is the next entry to the left. IP values inside the header are
+        # never consulted, so injected "trusted-looking" IPs cannot move the client.
+        if self.trusted_proxy_count is not None:
+            count = self.trusted_proxy_count
+            client_index = len(ips) - 1 - count
+            if client_index < 0:
+                # Chain shorter than the configured hop count: it cannot be trusted.
+                return []
+            return [ips[client_index], *ips[:client_index]]
 
         if not self.trusted_proxies:
             return ips

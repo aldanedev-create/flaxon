@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from flaxon._imports import import_attribute, import_module
-from flaxon.exceptions import BadRequest, Forbidden, NotFound
+from flaxon.exceptions import BadRequest, Forbidden, NotFound, PayloadTooLarge
 from flaxon.files import FileStorage
 from flaxon.http import JSONResponse, RedirectResponse, Request, Response
 from flaxon.jinax import Jinax
@@ -31,6 +31,11 @@ from .authorization import (
     default_group_definitions,
 )
 from .config import AdminConfig
+from .extensions import ExtensionRegistry
+from .impersonation import ImpersonationManager
+from .importing import csv_safe, enforce_limits, map_columns, parse_mapping
+from .metrics import Metric, TTLCache
+from .policies import evaluate_policy
 from .production import (
     DurableJobStore,
     DurableJobWorker,
@@ -40,6 +45,7 @@ from .production import (
     WebAuthnService,
 )
 from .registry import Registry, default_registry, evaluate_permission_hook
+from .saved_views import SavedViewStore
 from .services import (
     AdminActivity,
     AdminAuth,
@@ -56,7 +62,7 @@ _PACKAGE_TEMPLATE_DIR = str(Path(__file__).parent / "templates")
 class AdminDashboard:
     """Admin dashboard implementation for the admin subsystem."""
 
-    def __init__(  # noqa: PLR0917 - preserve existing positional API
+    def __init__(  # noqa: PLR0917, PLR0915 - preserve existing positional API
         self,
         app: Any,
         config: AdminConfig | None = None,
@@ -99,6 +105,16 @@ class AdminDashboard:
         self.registry = registry if registry is not None else default_registry
         self.permission_catalog = PermissionCatalog()
         self.widgets: list[Any] = []
+        self.metrics: list[Metric] = []
+        self.metric_cache = TTLCache()
+        self.saved_views = SavedViewStore(self)
+        self.extensions = ExtensionRegistry(self)
+        self.impersonation = ImpersonationManager(self)
+        self.impersonation.enabled = bool(self.config.allow_impersonation)
+        self._impersonation_banner: ContextVar[dict[str, Any] | None] = ContextVar(
+            "flaxon_admin_impersonation", default=None
+        )
+        self.actions: dict[str, Any] = {}
         self.custom_views: list[dict[str, Any]] = []
         self.hooks: dict[str, list[Any]] = {}
         self.jinax = Jinax(template_dir or _PACKAGE_TEMPLATE_DIR, auto_reload=True)
@@ -183,6 +199,8 @@ class AdminDashboard:
         if hasattr(self.app, "on_startup") and self.job_worker:
             self.app.on_startup(self._start_job_worker)
         self._register_routes()
+        if self.config.enable_extensions:
+            self.load_extensions(include=self.config.extensions)
         # Keep the service control plane additive. Existing model, CMS, and
         # custom-page routes remain the public compatibility surface; the
         # microservice pages reserve their own named Admin resources.
@@ -380,7 +398,7 @@ class AdminDashboard:
             static_dir = str(Path(__file__).parent / "static")
             self.app.mount_static("/static", static_dir)
 
-    def _register_routes(self) -> None:
+    def _register_routes(self) -> None:  # noqa: PLR0915 - one flat route table
         router = self.app.router
 
         router.get(f"{self.url_prefix}/login")(self.login)
@@ -401,6 +419,15 @@ class AdminDashboard:
         router.delete(f"{self.url_prefix}/users/<username>")(self.user_api)
         self._mount_media_routes(router)
         router.get(f"{self.url_prefix}/search")(self.search)
+        router.get(f"{self.url_prefix}/search/palette")(self.palette_api)
+        router.get(f"{self.url_prefix}/extensions/bundle.js")(self.extension_bundle)
+        router.get(f"{self.url_prefix}/extensions/assets/<filename>")(self.extension_asset)
+        router.post(f"{self.url_prefix}/impersonate")(self.impersonate_start)
+        router.post(f"{self.url_prefix}/impersonate/exit")(self.impersonate_stop)
+        router.post(f"{self.url_prefix}/<model_name>/saved-views")(self.saved_view_save)
+        router.get(f"{self.url_prefix}/<model_name>/saved-views/<name>")(self.saved_view_apply)
+        router.post(f"{self.url_prefix}/<model_name>/saved-views/<name>/delete")(self.saved_view_delete)
+        router.post(f"{self.url_prefix}/<model_name>/<object_id>/duplicate")(self.duplicate_view)
         router.get(f"{self.url_prefix}/<model_name>/relationships/<field_name>")(self.relationship_choices)
         router.get(f"{self.url_prefix}/<model_name>/export")(self.model_export)
         router.post(f"{self.url_prefix}/<model_name>/import")(self.model_import)
@@ -456,6 +483,51 @@ class AdminDashboard:
         router.patch(f"{self.url_prefix}/media/<path:filename>")(self.media_api)
         router.delete(f"{self.url_prefix}/media/<path:filename>")(self.media_api)
 
+    @property
+    def extension_bundle_url(self) -> str:
+        """Return the URL of the extension bundle, or an empty string when unused."""
+        return self.extensions.bundle_url
+
+    def register_extension(self, extension: Any) -> Any:
+        """Register a Teloce admin extension and its contributions immediately."""
+        return self.extensions.register(extension)
+
+    def load_extensions(self, *, include: Any = None) -> list[Any]:
+        """Discover installed ``flaxon-admin-*`` extensions and register them."""
+        return self.extensions.load(include=include)
+
+    async def extension_bundle(self, request: Request) -> Response:
+        """Serve the ES module that mounts every registered component."""
+        await self._require_user(request, "admin.view_dashboard")
+        if not self.extensions.component_names:
+            raise NotFound("No admin extensions are installed")
+        body = await asyncio.to_thread(self.extensions.bundle)
+        return self._extension_asset_response(request, body, "bundle.js")
+
+    async def extension_asset(self, request: Request, filename: str) -> Response:
+        """Serve one compiled component as JavaScript."""
+        await self._require_user(request, "admin.view_dashboard")
+        name = filename[:-3] if filename.endswith(".js") else filename
+        if name not in self.extensions.component_names:
+            raise NotFound("Unknown admin extension component")
+        body = await asyncio.to_thread(self.extensions.code, name)
+        return self._extension_asset_response(request, body, f"{name}.js")
+
+    def _extension_asset_response(self, request: Request, body: str, filename: str) -> Response:
+        """Return a cache-validated JavaScript response for an extension asset."""
+        payload = body.encode("utf-8")
+        etag = '"' + hashlib.sha256(payload).hexdigest()[:32] + '"'
+        headers = {
+            "content-type": "application/javascript; charset=utf-8",
+            "x-content-type-options": "nosniff",
+            "etag": etag,
+            "cache-control": "no-cache" if self.app.debug else "private, max-age=3600",
+        }
+        if request.headers.get("if-none-match") == etag:
+            return Response(b"", status_code=304, headers=headers)
+        headers["content-disposition"] = f'inline; filename="{filename}"'
+        return Response(payload, headers=headers)
+
     def register(self, model: Any, **options: Any) -> None:
         """Register a model with the dashboard's registry."""
         self.registry.register(model, **options)
@@ -464,11 +536,66 @@ class AdminDashboard:
             self.permission_catalog.register_model(
                 registered.get_name(), registered.get_verbose_name_plural()
             )
+            for extension in self.extensions.extensions:
+                extension.model_registered(self, registered)
 
     def register_widget(self, widget: Any) -> Any:
         """Register the widget."""
         self.widgets.append(widget)
         return widget
+
+    def register_metric(self, metric: Metric, *, placement: str = "dashboard") -> Metric:
+        """Register a metric card.
+
+        ``placement`` is ``"dashboard"`` for the index page or a registered
+        model name for that model's change-list page. Registration is
+        additive and never changes the metric object returned to the caller.
+        """
+        metric.placement = placement
+        # Share the dashboard cache so invalidate_metrics() reaches every card.
+        metric.cache = self.metric_cache
+        self.metrics.append(metric)
+        return metric
+
+    def invalidate_metrics(self, prefix: str | None = None) -> int:
+        """Invalidate cached metric results (optionally by card-key prefix)."""
+        return self.metric_cache.invalidate(prefix)
+
+    async def _metric_context(self, user: Any, *, placement: str = "dashboard") -> list[dict[str, Any]]:
+        """Calculate and render the authorized metric cards for ``placement``."""
+        rendered: list[dict[str, Any]] = []
+        for metric in self.metrics:
+            if metric.placement != placement:
+                continue
+            if not await metric.authorized(self, user=user):
+                continue
+            data = await metric.cached_calculate()
+            rendered_card = metric.render(data)
+            if hasattr(rendered_card, "__await__"):
+                rendered_card = await rendered_card
+            rendered.append({
+                "title": metric.title,
+                "description": metric.description,
+                "kind": metric.kind,
+                "range": metric.range,
+                "svg": rendered_card,
+                "data": data,
+            })
+        return rendered
+
+    async def _extension_tool_context(self, user: Any) -> list[dict[str, str]]:
+        """Return the dashboard shortcuts the current user may open."""
+        tools = []
+        for tool in self.extensions.tools:
+            if not await self.auth.has_permission_async(user, tool.permission):
+                continue
+            tools.append({
+                "label": tool.label,
+                "description": tool.description,
+                "url": f"{self.url_prefix}/{tool.url.strip('/')}",
+                "icon": tool.icon,
+            })
+        return tools
 
     async def _widget_context(self, user: Any) -> list[Any]:
         """Evaluate extension widgets once per dashboard request."""
@@ -604,6 +731,10 @@ class AdminDashboard:
         """Current request's staff identity, including views with sparse contexts."""
         return self._navigation_user.get()
 
+    def impersonation_banner(self) -> dict[str, Any] | None:
+        """Return the active impersonation banner for the current request."""
+        return self._impersonation_banner.get()
+
     def can_access_model(self, user: Any, model_name: str, action: str = "read") -> bool:
         """Return whether a template or extension may show a model action."""
         return self.auth.has_permission(user, canonical_model_permission(model_name, action))
@@ -640,7 +771,9 @@ class AdminDashboard:
                 1 for item in self.notifications if user.username not in item.get("read_by", [])
             ),
             "custom_views": self.custom_views,
+            "extension_tools": await self._extension_tool_context(user),
             "widgets": await self._widget_context(user),
+            "metrics": await self._metric_context(user),
         }
         return await self.jinax.render_response("admin/index.html", context)
 
@@ -689,24 +822,100 @@ class AdminDashboard:
         view = DeleteView(admin_model, request, self, object_id)
         return await view.render()
 
+    def register_action(self, action: Any, model: Any | None = None) -> Any:
+        """Register a class-based :class:`~flaxon.admin.actions.Action`.
+
+        The action is tracked by name for background execution and attached to
+        ``model`` (when given) so it appears in that model's action selector.
+        Legacy callable actions are unaffected.
+        """
+        action_type = import_attribute("flaxon.admin.actions", "Action")
+        name = action.get_name() if isinstance(action, action_type) else getattr(action, "__name__", "action")
+        self.actions[name] = action
+        if model is not None:
+            admin_model = self.registry.get_by_model(model) or self.registry.get(str(model).lower())
+            if admin_model is not None:
+                admin_model.add_action(name, action)
+        return action
+
+    async def run_action_job(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Execute a queued action without an HTTP request (background path)."""
+        name = str(payload.get("action", ""))
+        action = self.actions.get(name)
+        if action is None:
+            return {"status": "skipped", "action": name}
+        model_name = payload.get("model")
+        admin_model = self.registry.get(model_name) if model_name else None
+        user = type("BackgroundUser", (), {"username": payload.get("actor", "system")})()
+        context_type = import_attribute("flaxon.admin.actions", "ActionContext")
+        context = context_type(
+            dashboard=self,
+            request=None,
+            user=user,
+            model_name=model_name,
+            admin_model=admin_model,
+            params=dict(payload.get("params", {})),
+        )
+        ids = [str(value) for value in payload.get("ids", [])]
+        result = action.handle(ids, dict(payload.get("params", {})), context)
+        if hasattr(result, "__await__"):
+            result = await result
+        self.record_activity(
+            "action",
+            str(model_name or "admin"),
+            type("Request", (), {"user": user, "scope": {}, "headers": {}})(),
+            details={"action": name, "count": len(ids), "background": True},
+        )
+        return dict(result.to_schema())
+
+    def _action_response(self, result: Any, model_name: str) -> Response:
+        """Translate an ActionResult into an HTTP response."""
+        kind = getattr(result, "kind", "message")
+        if kind == "download":
+            return Response(
+                result.content,
+                media_type=result.content_type,
+                headers={"content-disposition": f'attachment; filename="{result.filename}"'},
+            )
+        if kind == "redirect":
+            return RedirectResponse(result.url or f"{self.url_prefix}/{model_name}", status_code=302)
+        return RedirectResponse(f"{self.url_prefix}/{model_name}", status_code=302)
+
     async def model_action(self, request: Request, model_name: str, action_name: str) -> Response:
         """Perform the model action operation for admin dashboard."""
         user = await self._require_user(request)
-        permission_action = "delete" if action_name == "delete" else action_name
-        await self.auth.authorize_async(user, self.permission_for_action(model_name, permission_action))
         admin_model = self.registry.get(model_name)
         if not admin_model:
             return await self._not_found()
         action = admin_model.get_actions().get(action_name)
         if action is None:
             raise NotFound(f"Unknown action '{action_name}'.")
+        action_type = import_attribute("flaxon.admin.actions", "Action")
+        class_based = isinstance(action, action_type)
+        if class_based and action.permission:
+            await self.auth.authorize_async(user, action.permission)
+        else:
+            permission_action = "delete" if action_name == "delete" else action_name
+            await self.auth.authorize_async(user, self.permission_for_action(model_name, permission_action))
         form = await request.form()
-        self.validate_csrf(form.to_dict() if hasattr(form, "to_dict") else form)
+        form_data = form.to_dict() if hasattr(form, "to_dict") else dict(form or {})
+        self.validate_csrf(dict(form_data))
         if hasattr(form, "get_list"):
             ids = form.get_list("ids")
         else:
             selected = form.get("ids", [])
             ids = selected if isinstance(selected, list) else ([selected] if selected else [])
+        if class_based:
+            result = await action.run(
+                ids,
+                form_data,
+                dashboard=self,
+                request=request,
+                user=user,
+                model_name=model_name,
+                admin_model=admin_model,
+            )
+            return self._action_response(result, model_name)
         if len(ids) > 1000:
             raise BadRequest("Select at most 1000 records per action")
         ids = list(dict.fromkeys(str(value) for value in ids))
@@ -728,6 +937,19 @@ class AdminDashboard:
     async def _require_user(self, request: Request, permission: str | None = None) -> Any:
         await self._load_database()
         user = await self.auth.current_user(request)
+        # Impersonation is session-bound: the actor's session carries the target.
+        entry = self.impersonation.active(request)
+        banner = None
+        if entry is not None:
+            target = self.auth.user(entry.get("target", ""))
+            if target is None or entry.get("actor") != getattr(user, "username", None):
+                self.impersonation.clear(request)
+            else:
+                request.__dict__["impersonator"] = user
+                banner = {"actor": entry["actor"], "target": entry["target"]}
+                user = target
+                request.user = target
+        self._impersonation_banner.set(banner)
         self._navigation_user.set(user)
         admin_context = import_attribute("flaxon.db.admin", "admin_context")
 
@@ -851,17 +1073,32 @@ class AdminDashboard:
         if admin_model is None:
             raise NotFound(f"Unknown admin model '{model_name}'.")
         await self.auth.authorize_async(user, self.permission_for_action(model_name, action))
+        target = None
+        if object_id is not None and hasattr(admin_model.model, "get_instance"):
+            target = admin_model.model.get_instance(object_id)
+            if hasattr(target, "__await__"):
+                target = await target
         hook = admin_model.get_permission_hook(action)
         if hook is not None:
-            target = None
-            if object_id is not None and hasattr(admin_model.model, "get_instance"):
-                target = admin_model.model.get_instance(object_id)
-                if hasattr(target, "__await__"):
-                    target = await target
             allowed = await evaluate_permission_hook(hook, user, target)
             if not allowed:
                 raise Forbidden("Insufficient model permissions")
+        # Policies are deny-only: an unconfigured action keeps the permission
+        # outcome above, so registering a policy can never widen access.
+        policy_action = {"read": "view" if object_id is not None else "view_any"}.get(action, action)
+        await self._enforce_policy(admin_model, policy_action, user, target)
         return user
+
+    async def _enforce_policy(self, admin_model: Any, action: str, user: Any, target: Any = None) -> None:
+        """Raise ``Forbidden`` when the resource policy denies ``action``."""
+        policy = getattr(admin_model, "policy", None)
+        if policy is None:
+            return
+        rule = policy.rule(action)
+        if rule is None:
+            return
+        if not await evaluate_policy(rule, user, target):
+            raise Forbidden("This record is not available to you")
 
     async def _instances(self, model: Any) -> list[Any]:
         if not hasattr(model, "get_instances"):
@@ -2024,6 +2261,129 @@ class AdminDashboard:
             "admin/search.html", {"query": needle, "results": results, "models": self.registry.get_all()}
         )
 
+    async def palette_api(self, request: Request) -> Response:
+        """Return command-palette results (models + readable records) as JSON."""
+        user = await self._require_user(request, "admin.view_dashboard")
+        needle = str(request.query.get("q", "")).strip()[:100].lower()
+        models: list[dict[str, Any]] = []
+        records: list[dict[str, Any]] = []
+        for model in self.registry.get_all():
+            if not await self.auth.has_permission_async(
+                user, self.permission_for_action(model.get_name(), "read")
+            ):
+                continue
+            models.append({
+                "name": model.get_name(),
+                "label": model.get_verbose_name_plural(),
+                "url": f"{self.url_prefix}/{model.get_name()}",
+            })
+            if not needle or len(records) >= 20:
+                continue
+            policy = getattr(model, "policy", None)
+            rule = policy.rule("view") if policy is not None else None
+            for obj in await self._visible_instances(model, user):
+                if rule is not None and not await evaluate_policy(rule, user, obj):
+                    continue
+                values = self._safe_record(UpdateView._snapshot(obj))
+                haystack = " ".join(str(value) for value in values.values()).lower()
+                if needle not in haystack:
+                    continue
+                identifier = str(values.get("id", ""))
+                title = str(values.get("reference") or values.get("name") or identifier)
+                records.append({
+                    "model": model.get_name(),
+                    "label": model.get_verbose_name(),
+                    "id": identifier,
+                    "title": title,
+                    "url": f"{self.url_prefix}/{model.get_name()}/{identifier}",
+                })
+                if len(records) >= 20:
+                    break
+        return JSONResponse({"query": needle, "models": models, "records": records[:20]})
+
+    async def saved_view_save(self, request: Request, model_name: str) -> Response:
+        """Persist the current query string as a named, per-user view."""
+        user = await self._require_model_user(request, model_name, "read")
+        form = await request.form()
+        self.validate_csrf(self._form_dict(form))
+        username = getattr(user, "username", "anonymous")
+        try:
+            view = self.saved_views.save(
+                username, model_name, str(form.get("name", "")), str(form.get("query", ""))
+            )
+        except ValueError as exc:
+            raise BadRequest(str(exc)) from exc
+        self.record_activity("saved_view_created", model_name, request, details={"view": view.name})
+        target = f"{self.url_prefix}/{model_name}"
+        if view.query:
+            target = f"{target}?{view.query}"
+        return RedirectResponse(target, status_code=303)
+
+    async def saved_view_apply(self, request: Request, model_name: str, name: str) -> Response:
+        """Redirect to the list URL captured by a saved view."""
+        user = await self._require_model_user(request, model_name, "read")
+        view = self.saved_views.get(getattr(user, "username", "anonymous"), model_name, name)
+        if view is None:
+            raise NotFound("Unknown saved view")
+        target = f"{self.url_prefix}/{model_name}"
+        if view.query:
+            target = f"{target}?{view.query}"
+        return RedirectResponse(target, status_code=302)
+
+    async def saved_view_delete(self, request: Request, model_name: str, name: str) -> Response:
+        """Delete one of the current user's saved views."""
+        user = await self._require_model_user(request, model_name, "read")
+        form = await request.form()
+        self.validate_csrf(self._form_dict(form))
+        if not self.saved_views.delete(getattr(user, "username", "anonymous"), model_name, name):
+            raise NotFound("Unknown saved view")
+        self.record_activity("saved_view_deleted", model_name, request, details={"view": name})
+        return RedirectResponse(f"{self.url_prefix}/{model_name}", status_code=303)
+
+    async def duplicate_view(self, request: Request, model_name: str, object_id: str) -> Response:
+        """Create a copy of a record; the copy gets a fresh primary key."""
+        await self._require_model_user(request, model_name, "create", object_id)
+        admin_model = self.registry.get(model_name)
+        if not admin_model:
+            return await self._not_found()
+        form = await request.form()
+        self.validate_csrf(self._form_dict(form))
+        adapter = admin_model.model
+        source = None
+        if hasattr(adapter, "get_instance"):
+            source = adapter.get_instance(object_id)
+            source = await source if hasattr(source, "__await__") else source
+        if source is None:
+            raise NotFound("Unknown record")
+        data = UpdateView._snapshot(source)
+        data.pop("id", None)
+        pk_name = getattr(getattr(adapter, "_meta", None), "pk_attr", None)
+        if pk_name:
+            data.pop(pk_name, None)
+        creator = getattr(adapter, "create_instance", None)
+        if creator is None:
+            raise BadRequest("This model cannot be duplicated")
+        created = creator(data)
+        created = await created if hasattr(created, "__await__") else created
+        self.record_activity("duplicated", model_name, request, object_id)
+        return RedirectResponse(f"{self.url_prefix}/{model_name}", status_code=302)
+
+    async def impersonate_start(self, request: Request) -> Response:
+        """Begin impersonating another user for this session."""
+        await self._require_user(request)
+        form = await request.form()
+        self.validate_csrf(self._form_dict(form))
+        await self.impersonation.start(request, str(form.get("username", "")))
+        return RedirectResponse(f"{self.url_prefix}/", status_code=303)
+
+    async def impersonate_stop(self, request: Request) -> Response:
+        """End impersonation for this session."""
+        await self._require_user(request)
+        form = await request.form()
+        self.validate_csrf(self._form_dict(form))
+        await self.impersonation.stop(request)
+        return RedirectResponse(f"{self.url_prefix}/", status_code=303)
+
     async def relationship_choices(self, request: Request, model_name: str, field_name: str) -> Response:
         """Perform the relationship choices operation for admin dashboard."""
         await self._require_model_user(request, model_name, "read")
@@ -2057,7 +2417,8 @@ class AdminDashboard:
             fields = sorted({key for record in records for key in record})
             writer = csv.DictWriter(output, fieldnames=fields, extrasaction="ignore")
             writer.writeheader()
-            writer.writerows(records)
+            # Neutralise spreadsheet formulas so exported text cannot execute.
+            writer.writerows([{key: csv_safe(value) for key, value in record.items()} for record in records])
             return Response(
                 output.getvalue(),
                 media_type="text/csv; charset=utf-8",
@@ -2073,11 +2434,36 @@ class AdminDashboard:
         admin_model = self.registry.get(model_name)
         if not admin_model:
             return await self._not_found()
-        records = await self._import_document(request)
+        records, payload_bytes = await self._import_document(request)
+        mapping = parse_mapping(request.query.get("mapping"))
+        if mapping:
+            records, mapping_errors = map_columns(records, mapping)
+        else:
+            mapping_errors = []
+        try:
+            enforce_limits(
+                payload_bytes=payload_bytes,
+                row_count=len(records),
+                max_bytes=self.config.import_max_bytes,
+                max_rows=self.config.import_max_rows,
+            )
+        except ValueError as exc:
+            raise PayloadTooLarge(self.config.import_max_bytes, detail=str(exc)) from exc
         valid, errors = await self._validate_import_rows(admin_model, records)
-        preview = str(request.query.get("preview", "")).lower() in {"1", "true", "yes"}
+        errors = [*mapping_errors, *errors]
+        preview = str(request.query.get("preview") or request.query.get("dry_run", "")).lower() in {
+            "1",
+            "true",
+            "yes",
+        }
         if preview:
-            return JSONResponse({"valid": len(valid), "errors": errors, "rows": [row for row, _ in valid]})
+            # A dry run returns the mapped, validated rows so the wizard can
+            # show exactly what would be written without touching the database.
+            return JSONResponse({
+                "valid": len(valid),
+                "errors": errors,
+                "rows": [record for _, record in valid],
+            })
         allow_partial = str(request.query.get("allow_partial", "")).lower() in {"1", "true", "yes"}
         if errors and not allow_partial:
             return JSONResponse({"imported": 0, "errors": errors, "rolled_back": True}, status_code=422)
@@ -2092,7 +2478,7 @@ class AdminDashboard:
             )
         return await self._import_legacy_rows(request, model_name, admin_model, valid, errors, allow_partial)
 
-    async def _import_document(self, request: Request) -> list:
+    async def _import_document(self, request: Request) -> tuple[list, int]:
         form = (
             await request.form() if "multipart/form-data" in request.headers.get("content-type", "") else None
         )
@@ -2117,7 +2503,7 @@ class AdminDashboard:
             raise BadRequest(f"Invalid import document: {exc}") from exc
         if not isinstance(records, list):
             raise BadRequest("Import document must contain a list of records.")
-        return records
+        return records, len(payload.encode("utf-8"))
 
     async def _validate_import_rows(self, admin_model, records):
         valid, errors = [], []

@@ -45,6 +45,50 @@
     </article>
   </section>
 
+  {% if metrics %}
+  <section class="corporate-panel fx-metrics-panel" aria-label="Metrics">
+    <div class="corporate-panel-header">
+      <div><p class="corporate-kicker">At a glance</p>
+        <h2>Metrics</h2>
+        <p class="corporate-muted">Computed from live data. Hover or focus a chart for its text alternative.</p>
+      </div>
+    </div>
+    <div class="fx-metric-grid">
+      {% for card in metrics %}
+      <article class="fx-metric-card" data-metric-kind="{{ card.kind }}" data-metric-range="{{ card.range }}">
+        <strong class="fx-metric-title">{{ card.title }}</strong>
+        {{ card.svg|safe }}
+        {% if card.description %}<small class="fx-metric-description">{{ card.description }}</small>{% endif %}
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if extension_tools %}
+  <section class="corporate-panel fx-tools-panel" aria-label="Extension tools">
+    <div class="corporate-panel-header">
+      <div><p class="corporate-kicker">Installed extensions</p>
+        <h2>Tools</h2>
+        <p class="corporate-muted">Pages contributed by installed admin extensions.</p>
+      </div>
+      <i class="fas fa-toolbox corporate-panel-icon" aria-hidden="true"></i>
+    </div>
+    <div class="quick-link-list">
+      {% for tool in extension_tools %}
+      <a href="{{ tool.url }}" data-extension-tool="{{ tool.label }}">
+        <i class="fas {{ tool.icon }}" aria-hidden="true"></i>
+        <span>
+          <strong>{{ tool.label }}</strong>
+          {% if tool.description %}<small>{{ tool.description }}</small>{% endif %}
+        </span>
+        <i class="fas fa-arrow-right" aria-hidden="true"></i>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
   <div class="corporate-two-column dashboard-main-grid">
     <section class="corporate-panel">
       <div class="corporate-panel-header">

@@ -1,0 +1,22 @@
+name: AI docs drift check
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  ai-docs-current:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e ".[standard]" pytest pytest-asyncio
+      - name: Generated AI docs must match code
+        run: python scripts/generate_ai_docs.py --check
+      - name: Extension API docs must match code
+        run: python scripts/generate_admin_extension_docs.py --check
+      - name: Docs-as-contract (every documented block executes)
+        run: python -m pytest -o addopts='' tests/docs/test_ai_docs.py tests/docs/test_admin_extensions_docs.py -q

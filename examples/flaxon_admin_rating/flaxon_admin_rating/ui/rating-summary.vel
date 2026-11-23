@@ -1,0 +1,32 @@
+<template>
+  <div class="fx-rating-summary">
+    <p class="fx-rating-average"><strong>{{ data.average_label }}</strong> <span>/ 5</span></p>
+    <p class="fx-rating-total">{{ data.total }} rated records</p>
+    <ul class="fx-rating-bars">
+      <li v-for="bucket in data.buckets" :key="bucket.value">
+        <span class="fx-rating-label">{{ bucket.value }} star</span>
+        <progress value="{{ bucket.count }}" max="{{ data.max_count }}">{{ bucket.count }}</progress>
+        <span class="fx-rating-count">{{ bucket.count }}</span>
+      </li>
+    </ul>
+  </div>
+</template>
+<script lang="ts">
+export default {
+  props: {
+    title: { type: String, default: "Average rating" },
+    description: { type: String, default: "" },
+    data: { type: Object, default: { average: 0, total: 0, buckets: [], max_count: 0 } }
+  }
+};
+</script>
+<style scoped>
+.fx-rating-summary { display: grid; gap: .5rem; }
+.fx-rating-average { font-size: 2rem; margin: 0; color: currentColor; }
+.fx-rating-average span { font-size: 1rem; color: #94a3b8; }
+.fx-rating-total { margin: 0; color: #94a3b8; font-size: .875rem; }
+.fx-rating-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: .25rem; }
+.fx-rating-bars li { display: grid; grid-template-columns: 4.5rem 1fr 2.5rem; align-items: center; gap: .5rem; }
+.fx-rating-label, .fx-rating-count { font-size: .75rem; color: #94a3b8; }
+.fx-rating-bars progress { width: 100%; height: .5rem; }
+</style>

@@ -1,0 +1,22 @@
+{# Progressive enhancement: hide and disable fields whose depends_on rule is unmet. #}
+<script>
+(function () {
+  document.querySelectorAll('[data-depends-on]').forEach(function (field) {
+    var target = field.getAttribute('data-depends-on');
+    var expected = field.getAttribute('data-depends-value');
+    var wrapper = field.closest('.corporate-field, .record-field');
+    function apply() {
+      var source = field.form && field.form.querySelector('[name="' + CSS.escape(target) + '"]');
+      var value = source ? (source.type === 'checkbox' ? String(source.checked) : source.value) : '';
+      var visible = value === expected;
+      if (wrapper) wrapper.hidden = !visible;
+      field.disabled = !visible;
+    }
+    apply();
+    if (field.form) {
+      field.form.addEventListener('change', apply);
+      field.form.addEventListener('input', apply);
+    }
+  });
+}());
+</script>

@@ -6,17 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>{% block title %}{{ dashboard.config.site_title if dashboard else (config.site_title if config else title) }}{% endblock %} - Admin</title>
 
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Vendored Tailwind CSS (offline, no CDN). Built by scripts/vendor_admin_assets.py -->
+    <link rel="stylesheet" href="/static/admin/vendor/tailwind/tailwind.min.css">
 
-    <!-- Alpine.js -->
+    <!-- Alpine.js (vendored) -->
     <script defer src="/static/admin/js/alpine.min.js"></script>
 
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Font Awesome (vendored) -->
+    <link rel="stylesheet" href="/static/admin/vendor/font-awesome/css/all.min.css">
 
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Inter font (vendored, latin subset) -->
+    <link rel="stylesheet" href="/static/admin/vendor/inter/inter.css">
 
     <!-- Admin CSS -->
     <link rel="stylesheet" href="/static/admin/css/admin.css?v=20260916-2">
@@ -27,6 +27,17 @@
     {% endblock %}
 </head>
 <body class="admin-shell">
+
+    {% if dashboard and dashboard.impersonation_banner() %}
+    {% set banner = dashboard.impersonation_banner() %}
+    <div class="fx-impersonation-banner" role="status" data-impersonation-banner>
+        <span>Impersonating <strong>{{ banner.target }}</strong> &middot; signed in as {{ banner.actor }}</span>
+        <form method="post" action="{{ dashboard.url_prefix }}/impersonate/exit" class="fx-impersonation-exit">
+            <input type="hidden" name="_csrf" value="{{ dashboard.csrf_token() }}">
+            <button type="submit">Exit impersonation</button>
+        </form>
+    </div>
+    {% endif %}
 
     <!-- Admin Layout -->
     <div class="admin-app-shell min-h-screen bg-slate-900/90 backdrop-blur-sm text-slate-100" x-data="adminApp()" x-init="init()">
@@ -48,24 +59,24 @@
                     <div class="flex-1 max-w-md mx-4 hidden md:block">
                         <form method="get" action="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/search" class="relative">
                             <input type="search" name="q" placeholder="Search all models..." aria-label="Search all models" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-2 pl-10 text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition">
-                            <i class="fas fa-search absolute left-3 top-2.5 text-slate-400"></i>
+                            <i aria-hidden="true" class="fas fa-search absolute left-3 top-2.5 text-slate-400"></i>
                         </form>
                     </div>
 
                     <!-- Right Actions -->
                     <div class="flex items-center gap-2 sm:gap-3">
                         <button @click="mobileMenuOpen = true" title="Open navigation" aria-label="Open navigation" class="mobile-menu-button p-2 rounded-lg hover:bg-slate-700/50 transition text-slate-400 hover:text-white md:hidden">
-                            <i class="fas fa-bars"></i>
+                            <i aria-hidden="true" class="fas fa-bars"></i>
                         </button>
                         <button @click="toggleNotifications()" title="Notifications" aria-label="Notifications" class="p-2 rounded-lg hover:bg-slate-700/50 transition text-slate-400 hover:text-white relative">
-                            <i class="fas fa-bell"></i>
+                            <i aria-hidden="true" class="fas fa-bell"></i>
                             <span x-show="notifications.length" x-text="notifications.length > 9 ? '9+' : notifications.length" class="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-red-500 rounded-full text-[10px] leading-4 text-white"></span>
                         </button>
                         <button @click="toggleDarkMode()" title="Toggle theme" aria-label="Toggle theme" class="p-2 rounded-lg hover:bg-slate-700/50 transition text-slate-400 hover:text-white">
                             <span class="theme-icon" x-text="darkMode ? '\u2600' : '\u263E'" aria-hidden="true">&#9728;</span>
                         </button>
                         <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/profile" title="Profile" class="p-2 rounded-lg hover:bg-slate-700/50 transition text-slate-400 hover:text-white">
-                            <i class="fas fa-user-circle text-xl"></i>
+                            <i aria-hidden="true" class="fas fa-user-circle text-xl"></i>
                         </a>
                     </div>
                     <div x-show="notificationsOpen" x-cloak @click.outside="notificationsOpen = false" class="absolute right-4 top-14 z-50 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-700 bg-slate-800 shadow-2xl">
@@ -96,32 +107,32 @@
                 <div class="flex items-center justify-between border-b border-slate-700 px-5 py-4">
                     <strong>Admin navigation</strong>
                     <button @click="mobileMenuOpen = false" title="Close navigation" aria-label="Close navigation" class="p-2 text-slate-400 hover:text-white">
-                    <i class="fas fa-xmark"></i>
+                    <i aria-hidden="true" class="fas fa-xmark"></i>
                     </button></div>
                 <nav class="space-y-1 p-4" aria-label="Mobile Admin navigation">
-                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/" class="mobile-menu-link"><i class="fas fa-th-large"></i>Dashboard</a>
+                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/" class="mobile-menu-link"><i aria-hidden="true" class="fas fa-th-large"></i>Dashboard</a>
                     {% set mobile_models = models if models is defined and models else (dashboard.registry.get_all() if dashboard else []) %}
-                    {% for model_item in mobile_models %}{% if not dashboard or dashboard.can_access_model(dashboard.navigation_user(), model_item.get_name()) %}<a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/{{ model_item.get_name() }}" class="mobile-menu-link"><i class="fas fa-table"></i>{{ model_item.get_verbose_name_plural() }}</a>{% endif %}{% endfor %}
-                    {% if dashboard %}{% for custom_view in dashboard.custom_views %}<a href="{{ custom_view.url }}" class="mobile-menu-link"><i class="fas {{ custom_view.icon }}"></i>{{ custom_view.name }}</a>{% endfor %}{% endif %}
-                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/users" class="mobile-menu-link"><i class="fas fa-users"></i>Users</a>
-                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/roles" class="mobile-menu-link"><i class="fas fa-shield-halved"></i>Roles &amp; permissions</a>
-                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/media" class="mobile-menu-link"><i class="fas fa-photo-film"></i>Media</a>
-                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/settings" class="mobile-menu-link"><i class="fas fa-gear"></i>Settings</a>
-                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/activity" class="mobile-menu-link"><i class="fas fa-clock-rotate-left"></i>Activity</a>
-                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/operations" class="mobile-menu-link"><i class="fas fa-heart-pulse"></i>Operations</a>
+                    {% for model_item in mobile_models %}{% if not dashboard or dashboard.can_access_model(dashboard.navigation_user(), model_item.get_name()) %}<a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/{{ model_item.get_name() }}" class="mobile-menu-link"><i aria-hidden="true" class="fas fa-table"></i>{{ model_item.get_verbose_name_plural() }}</a>{% endif %}{% endfor %}
+                    {% if dashboard %}{% for custom_view in dashboard.custom_views %}<a href="{{ custom_view.url }}" class="mobile-menu-link"><i aria-hidden="true" class="fas {{ custom_view.icon }}"></i>{{ custom_view.name }}</a>{% endfor %}{% endif %}
+                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/users" class="mobile-menu-link"><i aria-hidden="true" class="fas fa-users"></i>Users</a>
+                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/roles" class="mobile-menu-link"><i aria-hidden="true" class="fas fa-shield-halved"></i>Roles &amp; permissions</a>
+                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/media" class="mobile-menu-link"><i aria-hidden="true" class="fas fa-photo-film"></i>Media</a>
+                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/settings" class="mobile-menu-link"><i aria-hidden="true" class="fas fa-gear"></i>Settings</a>
+                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/activity" class="mobile-menu-link"><i aria-hidden="true" class="fas fa-clock-rotate-left"></i>Activity</a>
+                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/operations" class="mobile-menu-link"><i aria-hidden="true" class="fas fa-heart-pulse"></i>Operations</a>
                     {% if dashboard and dashboard.control_plane %}
-                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/services" class="mobile-menu-link"><i class="fas fa-diagram-project"></i>Services</a>
+                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/services" class="mobile-menu-link"><i aria-hidden="true" class="fas fa-diagram-project"></i>Services</a>
                     {% endif %}
                     {% if dashboard and dashboard.control_plane %}
-                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/health" class="mobile-menu-link"><i class="fas fa-heart-pulse"></i>Fleet health</a>
+                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/health" class="mobile-menu-link"><i aria-hidden="true" class="fas fa-heart-pulse"></i>Fleet health</a>
                     {% endif %}
                     {% if dashboard and dashboard.control_plane %}
-                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/notifications" class="mobile-menu-link"><i class="fas fa-bell"></i>Notifications</a>
+                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/notifications" class="mobile-menu-link"><i aria-hidden="true" class="fas fa-bell"></i>Notifications</a>
                     {% endif %}
-                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/profile" class="mobile-menu-link"><i class="fas fa-user"></i>Profile</a>
-                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/logout" class="mobile-menu-link text-red-400"><i class="fas fa-right-from-bracket"></i>Log out</a>
+                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/profile" class="mobile-menu-link"><i aria-hidden="true" class="fas fa-user"></i>Profile</a>
+                    <a href="{{ dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') }}/logout" class="mobile-menu-link text-red-400"><i aria-hidden="true" class="fas fa-right-from-bracket"></i>Log out</a>
                     {% if dashboard and dashboard.app._flaxon_cms is defined %}
-                    <a href="{{ dashboard.app._flaxon_cms.url_prefix }}/" class="mobile-menu-link"><i class="fas fa-pen-to-square"></i>CMS</a>{% endif %}
+                    <a href="{{ dashboard.app._flaxon_cms.url_prefix }}/" class="mobile-menu-link"><i aria-hidden="true" class="fas fa-pen-to-square"></i>CMS</a>{% endif %}
                 </nav>
             </aside>
         </div>
@@ -130,15 +141,15 @@
         {% set base_prefix = dashboard.url_prefix if dashboard else (url_prefix if url_prefix else '/admin') %}
         <div class="fixed bottom-0 left-0 right-0 bg-slate-800/90 backdrop-blur-sm border-t border-slate-700/50 z-40 md:hidden flex justify-around items-center h-16 px-2">
             <a href="{{ base_prefix }}/" class="flex flex-col items-center text-slate-400 hover:text-white transition py-1 px-3 rounded-lg hover:bg-slate-700/50">
-                <i class="fas fa-th-large text-lg"></i>
+                <i aria-hidden="true" class="fas fa-th-large text-lg"></i>
                 <span class="text-[10px] mt-0.5">Dashboard</span>
             </a>
             <a href="{{ base_prefix }}/search" class="flex flex-col items-center text-slate-400 hover:text-white transition py-1 px-3 rounded-lg hover:bg-slate-700/50">
-                <i class="fas fa-search text-lg"></i>
+                <i aria-hidden="true" class="fas fa-search text-lg"></i>
                 <span class="text-[10px] mt-0.5">Search</span>
             </a>
             <button @click="toggleNotifications()" class="flex flex-col items-center text-slate-400 hover:text-white transition py-1 px-3 rounded-lg hover:bg-slate-700/50" aria-label="Alerts">
-                <i class="fas fa-bell text-lg"></i>
+                <i aria-hidden="true" class="fas fa-bell text-lg"></i>
                 <span class="text-[10px] mt-0.5">Alerts</span>
             </button>
         </div>
@@ -151,36 +162,36 @@
                     <p class="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-3">Navigation</p>
                     <div class="space-y-1">
                         <a href="{{ base_prefix }}/" class="flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition">
-                            <i class="fas fa-th-large w-5"></i>
+                            <i aria-hidden="true" class="fas fa-th-large w-5"></i>
                             <span>Dashboard</span>
                         </a>
                         {% set active_models = models if models is defined and models else (dashboard.registry.get_all() if dashboard else []) %}
                         {% for model_item in active_models %}
                         <a href="{{ base_prefix }}/{{ model_item.get_name() }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition">
-                            <i class="fas fa-table w-5"></i>
+                            <i aria-hidden="true" class="fas fa-table w-5"></i>
                             <span>{{ model_item.get_verbose_name_plural() }}</span>
                         </a>
                         {% endfor %}
                         {% if dashboard %}{% for custom_view in dashboard.custom_views %}
                         <a href="{{ custom_view.url }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition">
-                        <i class="fas {{ custom_view.icon }} w-5"></i>
+                        <i aria-hidden="true" class="fas {{ custom_view.icon }} w-5"></i>
                         <span>{{ custom_view.name }}</span>
                          </a>
                          {% endfor %}
                          {% endif %}
-                        <a href="{{ base_prefix }}/users" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas fa-users w-5"></i><span>Users</span></a>
-                        <a href="{{ base_prefix }}/roles" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas fa-shield-halved w-5"></i><span>Roles</span></a>
-                        <a href="{{ base_prefix }}/media" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas fa-photo-film w-5"></i><span>Media</span></a>
-                        <a href="{{ base_prefix }}/settings" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas fa-gear w-5"></i><span>Settings</span></a>
-                        <a href="{{ base_prefix }}/activity" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas fa-clock-rotate-left w-5"></i><span>Activity</span></a>
-                        <a href="{{ base_prefix }}/operations" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas fa-heart-pulse w-5"></i><span>Operations</span></a>
+                        <a href="{{ base_prefix }}/users" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i aria-hidden="true" class="fas fa-users w-5"></i><span>Users</span></a>
+                        <a href="{{ base_prefix }}/roles" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i aria-hidden="true" class="fas fa-shield-halved w-5"></i><span>Roles</span></a>
+                        <a href="{{ base_prefix }}/media" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i aria-hidden="true" class="fas fa-photo-film w-5"></i><span>Media</span></a>
+                        <a href="{{ base_prefix }}/settings" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i aria-hidden="true" class="fas fa-gear w-5"></i><span>Settings</span></a>
+                        <a href="{{ base_prefix }}/activity" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i aria-hidden="true" class="fas fa-clock-rotate-left w-5"></i><span>Activity</span></a>
+                        <a href="{{ base_prefix }}/operations" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i aria-hidden="true" class="fas fa-heart-pulse w-5"></i><span>Operations</span></a>
                     {% if dashboard and dashboard.control_plane %}
-                        <a href="{{ base_prefix }}/services" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas fa-diagram-project w-5"></i><span>Services</span></a>
+                        <a href="{{ base_prefix }}/services" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i aria-hidden="true" class="fas fa-diagram-project w-5"></i><span>Services</span></a>
                     {% endif %}
                     {% if dashboard and dashboard.control_plane %}
-                        <a href="{{ base_prefix }}/health" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i class="fas fa-heart-pulse w-5"></i><span>Fleet health</span></a>
+                        <a href="{{ base_prefix }}/health" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/30 transition"><i aria-hidden="true" class="fas fa-heart-pulse w-5"></i><span>Fleet health</span></a>
                     {% endif %}
-                        <a href="{{ base_prefix }}/logout" class="flex items-center gap-3 px-3 py-2 rounded-lg text-red-400 hover:bg-red-500/10 transition"><i class="fas fa-right-from-bracket w-5"></i><span>Log out</span></a>
+                        <a href="{{ base_prefix }}/logout" class="flex items-center gap-3 px-3 py-2 rounded-lg text-red-400 hover:bg-red-500/10 transition"><i aria-hidden="true" class="fas fa-right-from-bracket w-5"></i><span>Log out</span></a>
                     </div>
                 </div>
             </aside>
@@ -246,5 +257,72 @@
         }
 
     </script>
+    {% if dashboard %}
+    <div id="fx-palette" class="fx-palette" hidden role="dialog" aria-modal="true" aria-label="Command palette">
+        <div class="fx-palette-panel">
+            <input id="fx-palette-input" type="search" placeholder="Search models and records..." aria-label="Search models and records" autocomplete="off">
+            <ul id="fx-palette-results" class="fx-palette-results" role="listbox" aria-label="Results"></ul>
+            <p class="fx-palette-hint">Ctrl/Cmd+K to open &middot; Esc to close</p>
+        </div>
+    </div>
+    <script>
+        (function () {
+            var dialog = document.getElementById('fx-palette');
+            if (!dialog) { return; }
+            var input = document.getElementById('fx-palette-input');
+            var list = document.getElementById('fx-palette-results');
+            var base = '{{ dashboard.url_prefix }}';
+            function render(payload) {
+                list.innerHTML = '';
+                var items = (payload.models || []).map(function (model) {
+                    return { label: model.label, url: model.url, kind: 'Model' };
+                }).concat((payload.records || []).map(function (record) {
+                    return { label: record.title + ' (' + record.label + ')', url: record.url, kind: 'Record' };
+                }));
+                items.forEach(function (item) {
+                    var li = document.createElement('li');
+                    li.setAttribute('role', 'option');
+                    var a = document.createElement('a');
+                    a.href = item.url;
+                    a.textContent = item.label;
+                    var badge = document.createElement('span');
+                    badge.className = 'fx-palette-kind';
+                    badge.textContent = item.kind;
+                    li.appendChild(a);
+                    li.appendChild(badge);
+                    list.appendChild(li);
+                });
+            }
+            function search() {
+                fetch(base + '/search/palette?q=' + encodeURIComponent(input.value), { credentials: 'same-origin' })
+                    .then(function (response) { return response.ok ? response.json() : { models: [], records: [] }; })
+                    .then(render)
+                    .catch(function () { render({ models: [], records: [] }); });
+            }
+            function open() {
+                dialog.hidden = false;
+                input.focus();
+                search();
+            }
+            function close() { dialog.hidden = true; }
+            document.addEventListener('keydown', function (event) {
+                if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+                    event.preventDefault();
+                    if (dialog.hidden) { open(); } else { close(); }
+                } else if (event.key === 'Escape' && !dialog.hidden) {
+                    close();
+                }
+            });
+            dialog.addEventListener('click', function (event) {
+                if (event.target === dialog) { close(); }
+            });
+            input.addEventListener('input', search);
+        })();
+    </script>
+    {% endif %}
+    {% if dashboard and dashboard.extension_bundle_url %}
+    <!-- Teloce admin extensions: compiled locally, no CDN or Node.js required. -->
+    <script type="module" src="{{ dashboard.extension_bundle_url }}"></script>
+    {% endif %}
 </body>
 </html>

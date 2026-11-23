@@ -1,0 +1,50 @@
+{
+  "name": "@fortawesome/fontawesome-free",
+  "version": "6.6.0",
+  "license": "OFL-1.1 (icons) / MIT (CSS/JS)",
+  "source": "https://registry.npmjs.org/@fortawesome/fontawesome-free/-/fontawesome-free-6.6.0.tgz",
+  "npm_integrity": "sha512-60G28ke/sXdtS9KZCpZSHHkCbdsOGEhIUGlwq6yhY74UpTiToIh8np7A8yphhM4BWsvNFtIvLpi4co+h9Mr9Ow==",
+  "retrieved": "2026-11-21",
+  "files": {
+    "css/all.min.css": {
+      "sha256": "e5e202e3c899507992952533f57b634722b69b34241d271963559d31aa33ef81",
+      "bytes": 96518
+    },
+    "LICENSE.txt": {
+      "sha256": "9b914eae88817d63b576eab5aafde7068c7a1abae125d7cdfb034f1da43a9afc",
+      "bytes": 7427
+    },
+    "webfonts/fa-brands-400.ttf": {
+      "sha256": "bc844b5b02d3f3adabb514de4e0c0208252d3123413bd03f6287fa446acee859",
+      "bytes": 209376
+    },
+    "webfonts/fa-regular-400.ttf": {
+      "sha256": "64f9fb623681f112261e9a2f97826782439f3925dea8f44a57d1e4db95ba6cfd",
+      "bytes": 67976
+    },
+    "webfonts/fa-solid-900.ttf": {
+      "sha256": "31f099c13f6e4ba05f1b471bf170cb5493249474222917372de3ca5cf29e6a1a",
+      "bytes": 423676
+    },
+    "webfonts/fa-v4compatibility.ttf": {
+      "sha256": "a6274a12fd3f5f1ea05fc9b4677959b31fd101fdac4f0d09c17159c414d36d23",
+      "bytes": 10836
+    },
+    "webfonts/fa-brands-400.woff2": {
+      "sha256": "c411f11975d26eb04cd2aa3c071181d4b18e489f1fb97060d4176a3531dfb36e",
+      "bytes": 118072
+    },
+    "webfonts/fa-regular-400.woff2": {
+      "sha256": "c732f106e91bc618767fbac8e2c7b27e5c736d477b2bb4fb83f597a43198c33c",
+      "bytes": 25464
+    },
+    "webfonts/fa-solid-900.woff2": {
+      "sha256": "1f0189e087fcefbf654fad74a3a06668b782c01353a61d5c0b7f0bf23e33c020",
+      "bytes": 157192
+    },
+    "webfonts/fa-v4compatibility.woff2": {
+      "sha256": "2aca24b35bd41474dcc5e7fb5f11ec43fa06e3ac1d0035ad41108fa6b30b0871",
+      "bytes": 4800
+    }
+  }
+}

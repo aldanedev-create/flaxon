@@ -87,16 +87,16 @@ class Worker:
             task.completed_at = datetime.now()
 
     def _handle_shutdown(self) -> None:
-        self.shutdown()
+        # Signal callbacks are synchronous: schedule the async drain on the loop.
+        self._shutdown_task = asyncio.create_task(self._graceful_shutdown())
 
     def shutdown(self) -> None:
-        """Cancel consumers and notify the waiting worker."""
+        """Signal consumers to stop accepting new work (in-flight work is drained)."""
         self._running = False
-        for worker_task in self._worker_tasks:
-            worker_task.cancel()
-        self._shutdown_event.set()
 
     async def _graceful_shutdown(self) -> None:
+        """Stop accepting new work, then let in-flight tasks finish before cancelling."""
+        self._running = False
         try:
             await asyncio.wait_for(
                 asyncio.gather(*self._worker_tasks, return_exceptions=True),
@@ -105,13 +105,13 @@ class Worker:
         except TimeoutError:
             for task in self._worker_tasks:
                 task.cancel()
+            await asyncio.gather(*self._worker_tasks, return_exceptions=True)
 
         self._shutdown_event.set()
 
     async def stop(self) -> None:
-        """Shut down and await consumer cleanup."""
-        self.shutdown()
-        await asyncio.gather(*self._worker_tasks, return_exceptions=True)
+        """Shut down gracefully: drain in-flight tasks, then await consumer cleanup."""
+        await self._graceful_shutdown()
 
     def is_running(self) -> bool:
         """Return whether this worker is accepting tasks."""

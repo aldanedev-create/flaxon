@@ -2,6 +2,67 @@
 
 ## Unreleased
 
+### Phase 6 — Docs upgrade and AI docs
+
+- **Docs restructured by intent:** `docs/tutorial-ladder.md` teaches five rungs (goal, code, run, check, recap) and `docs/cookbook.md` covers approve action, CSV import, revenue chart and custom field. Every Python block in both, plus the seven `docs/ai/recipes/`, is executed by `tests/docs/test_ai_docs.py` (docs-as-contract).
+- **AI docs generated from code, CI-checked for drift:** `scripts/generate_ai_docs.py` emits `llms.txt` (index + verified key facts), version-stamped `llms-full.txt`, root `AGENTS.md` (setup, gates, conventions, never-do), `docs/ai/pitfalls.md` (8 do/don't rows, each checked against live code) and `docs/ai/api-reference.md` (from `__all__` + signatures + docstrings). `--check` fails on stale output; `.github/workflows/ai-docs.yml` runs it on every push/PR. Signatures are normalised so generation is deterministic.
+- **Automated llms.txt agent check:** `scripts/check_llms_agent.py` holds 10 verifiable Flaxon tasks and an answer key. A fresh agent given **only** `llms.txt` initially scored **0/10** (0%); after the index carried the verified key facts inline it scored **10/10** (100%). Both numbers are reported honestly; the harness supports `--answers FILE` and `--self-test`.
+- **Docs index test stays green:** every new Markdown page is linked from `docs/index.md`.
+
+### Phase 5 — Teloce extension points
+
+- **Admin extensions are installed packages, not forks.** A distribution named `flaxon-admin-*` exposes an `AdminExtension` in the `flaxon.admin` entry-point group; the dashboard discovers it, compiles its `.vel` components with `teloce-py` and registers its fields, cards, pages and tools. No Node.js, npm, bundler or CDN is involved at build or run time. Other entry points in the group are ignored with a warning, and `AdminConfig(enable_extensions=False, disabled_extensions=(...), extensions=[...])` controls discovery.
+- **Four contribution points:** `TeloceField` (a normal `Field` plus a component and an HTML fallback), `TeloceCard` (data calculated in Python/SQL, rendered by a component), `ExtensionPage` (mounted through `add_view`, so permissions and CSRF still apply) and `Tool` (a dashboard shortcut). `model_registered()` lets an extension add per-model cards when resources are registered after startup.
+- **Server-rendered first, enhanced in the browser.** Cards and pages are rendered on the server; every mount point carries escaped props. Components are served as same-origin ES modules from `<admin>/extensions/assets/<name>.js`, with an `ETag` and `304` support, only to signed-in users with `admin.view_dashboard`.
+- **The example plugin is a real package.** `examples/flaxon_admin_rating` (`flaxon-admin-rating`) ships a 1–5 star `RatingField`, an average/distribution `RatingCard`, a `/admin/ratings` page, a dashboard tool and an `admin.view_ratings` permission, plus a runnable app. A test builds its wheel, installs it into a fresh venv and asserts the extension appears in the admin.
+- **Docs:** `docs/guides/admin-extensions.md` (a custom field in ~20 lines, cards/pages/tools, packaging, limits), `docs/api/admin-extensions.md` generated from `__all__` + signatures + docstrings by `scripts/generate_admin_extension_docs.py --check`, and a real-browser test that logs in, checks the card, opens the page, clicks a star and submits the form with no console errors or external requests.
+- **Known limit (documented):** Teloce's static renderer interpolates text and `v-for` but does not evaluate dynamic attribute bindings; form fields therefore render a plain fallback control until the component mounts.
+- **Discovery and explicit `include` are idempotent:** an extension found via entry point and also listed in `AdminConfig(extensions=[...])` is registered once (name-deduplicated in `ExtensionRegistry.load`); a regression test covers the collision.
+
+### Phase 4 — Filters, lenses, discovery and safety
+
+- **Class-based filters** (`SelectFilter`, `BooleanFilter`, `DateRangeFilter`) render a filter panel and keep all state in the URL. ORM-backed admins filter in SQL (`_flaxon_filters` Q objects); legacy in-memory admins use `apply_python_filters`. Legacy `list_filter` is untouched.
+- **Lenses** give a resource a named alternate index (`?lens=`) with its own query and columns; unknown names return 400.
+- **Saved views** store a per-user query string and apply by redirect, so the URL stays canonical. Views are namespaced by username — one user cannot read or delete another's (IDOR tested).
+- **Command palette** (`Ctrl`/`Cmd`+`K`) searches models and readable records via `/admin/search/palette`, never returning records denied by a `view` policy.
+- **Duplicate record** (`POST /admin/<model>/<id>/duplicate`) copies a record with a fresh primary key behind CSRF and the `create` policy.
+- **CSV import wizard**: column mapping (`mapping`), dry run (`dry_run`/`preview`) returning the mapped rows, per-row errors with rollback, and size/row caps (`import_max_rows`, `import_max_bytes`, 413 on breach). CSV export is formula-injection-safe.
+- **Per-resource policies** (`view_any`, `view`, `create`, `update`, `delete`, `restore`, `force_delete`) are deny-only: unconfigured actions fall through to the permission layer, so a policy can only tighten access. Record-level `view` denial returns 403 on direct object access.
+- **Impersonation** is opt-in (`AdminConfig(allow_impersonation=True)`), requires `admin.impersonate`, refuses superusers and self, is session-bound, shows a banner with one-click exit, and audits both start and stop.
+- Guide: `docs/guides/admin-filters-and-safety.md` (every Python block executed by `tests/docs/test_admin_phase4_docs.py`). Real-browser test captures `assets/readme/admin-filters.png` and `assets/readme/admin-palette.png`.
+
+### Phase 3 — Class-based admin actions
+
+- **A reusable `Action` class** bundles a label, prompt fields, a confirmation message, a `single`/`bulk`/`standalone` scope, `can_run()` authorization, optional background execution, one of four result types (`message`, `redirect`, `download`, `danger`) and a full immutable audit-log entry. `dashboard.register_action(action, model=...)` is additive: legacy `register(..., actions={...})` callables and CMS `ContentType.register_action` are untouched.
+- **Two shipped examples:** `ApproveOrders` (bulk) reports failures per record; `ExportCsv` downloads injection-safe CSV (formula prefixes are escaped). Both work end to end behind CSRF protection, with unauthorized users getting 403 and no side effects.
+- **Safety:** bulk size is capped by `AdminConfig(action_bulk_limit=...)`, prompt values are validated before any work, and background actions are enqueued onto the existing durable job system (`dashboard.run_action_job`). Mutation checks confirm the authorization, bulk-cap and CSV-escaping tests fail when those guards are removed.
+- The bulk-action dropdown now shows each action's human-readable label and uses its `confirmation` text in the browser dialog.
+- Guide: `docs/guides/admin-actions.md`; every Python block is executed by `tests/docs/test_admin_actions_docs.py`. A real-browser test captures `assets/readme/admin-actions.png`.
+
+### Phase 2 — Metrics and dashboard cards
+
+- **Five SQL-backed metric cards:** `Value`, `Trend`, `Partition`, `Progress` and `Table`. Each class implements `calculate(request)` (aggregated in SQL with Tortoise `count`/`annotate`/`group_by`, never a Python row loop) and `render()` (inline SVG). A row-count test proves query count stays constant as rows grow; a mutation check confirms the SQL-aggregate assertion fails if computation is replaced by a Python loop.
+- **Ranges:** `30d`, `60d`, `mtd`, `qtd`, `ytd` and `custom` resolve to concrete UTC bounds.
+- **TTL caching with invalidation:** `cached_calculate()` caches for `ttl` seconds (default 60); `dashboard.invalidate_metrics(prefix=None)` refreshes cards. Invalidation and expiry are tested with an injectable clock.
+- **Placement and authorization:** `dashboard.register_metric(metric, placement="dashboard" | "<model>")` places a card on the index or a model's change list. Every card defaults to `admin.view_dashboard` and is hidden (with no calculation) for unauthorized users.
+- **Charts are offline and accessible:** inline SVG uses `currentColor` for theme awareness, contains no scripts or remote URLs, and carries `role="img"`, `<title>` and `<desc>`. All five render from real seeded data under Playwright against a running uvicorn server; the screenshot in `assets/readme/admin-metrics.png` is captured from that app.
+- Guide: `docs/guides/admin-metrics.md`; every Python block is executed by `tests/docs/test_admin_metrics_docs.py`.
+
+### Phase 1 — declarative Resource and Field API
+
+- **A model becomes a full admin in under ten lines.** `class CustomerResource(Resource): model = Customer; fields = [Text("name").searchable(), Email("email")]` registered with `dashboard.register(CustomerResource)` produces the same routes and options as the legacy `register(Model, **options)` call. The legacy API and `ContentType.register_action` are untouched.
+- **24 field types** (`Text`, `Textarea`, `Number`, `Boolean`, `Select`, `Badge`, `Date`, `DateTime`, `Email`, `URL`, `Password`, `Image`, `File`, `Markdown`, `Code`, `JSON`, `KeyValue`, `Tags`, `Slug`, `Color`, `Currency`, `BelongsTo`, `HasMany`, `ManyToMany`) with fluent `sortable()`, `searchable()`, `filterable()`, `readonly()`, `rules()`, `help()`, `show_on_index/detail/form()` and `depends_on()` options.
+- **Server-side validation reuses `flaxon.validation`** field objects, so admin rules and API rules behave identically. Output is HTML-escaped; Markdown is sanitized with Flaxon's existing `Sanitizer`.
+- Relations shown on the index are loaded with `select_related`/`prefetch_related`; a query-count test proves the statement count stays bounded. Form labels, help text and `depends_on` controls are keyboard accessible (verified in a real browser).
+- Guide: `docs/guides/admin-resources.md`; every Python block is executed by `tests/docs/test_admin_resources_docs.py`.
+
+### Phase 0 — production audit and offline admin assets
+
+- **The admin no longer loads assets from CDNs.** `base.html`, `cms.html` and `login.html` used the Tailwind Play CDN, Font Awesome (cdnjs) and Google Fonts. They now ship pinned, locally vendored copies under `src/flaxon/admin/static/admin/vendor/` with a `MANIFEST.json` (npm integrity + SHA-256 + license) per package. `scripts/vendor_admin_assets.py` rebuilds them (`--check` verifies every hash). The audit is in `docs/internal/production-audit.md`.
+- **Security/correctness fixes from the audit**, each with a regression test that was confirmed to fail before the fix: the distributed rate limiter now requests an atomic Redis transaction; `FileUpload` enforces its `max_size`/`max_files` caps and `ImageValidator` rejects SVG by default (`allow_svg=True` opts in); static reads and sync tasks no longer block the event loop; log formatters redact secrets/PII; `timeout_graceful_shutdown` reaches uvicorn; worker shutdown drains in-flight tasks; `Stream.json_lines`/`sse` build valid responses; a `trusted_proxy_count` option makes proxy-IP selection position-based rather than spoofable.
+- Decorative Font Awesome icons in admin templates are now `aria-hidden="true"`, so vendoring the icon CSS does not change buttons' accessible names.
+- Audit items deliberately deferred (documented, not claimed fixed): app-wide CSRF defaults, task idempotency, health/metrics default wiring, and streaming admin exports.
+
 ### WebSocket production hardening
 
 - **`flaxon[standard]` could not serve WebSockets.** Plain Uvicorn has no WebSocket implementation, so every handshake got HTTP 404. `standard`, `fullstack` and `server` now include `websockets`.

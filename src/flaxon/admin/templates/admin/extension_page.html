@@ -1,0 +1,26 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="corporate-page extension-page" data-extension-page="{{ page.name }}">
+  <header class="corporate-header">
+    <div>
+      <p class="admin-eyebrow">{{ page.category }}</p>
+      <h1>{{ title }}</h1>
+      {% if page.description %}<p class="corporate-subtitle">{{ page.description }}</p>{% endif %}
+    </div>
+    <div class="corporate-actions">
+      <a class="corporate-button corporate-button-muted" href="{{ dashboard.url_prefix }}">
+        <i class="fas fa-arrow-left" aria-hidden="true"></i>
+        <span>Back to dashboard</span>
+      </a>
+    </div>
+  </header>
+  <section class="corporate-panel">
+    <div class="fx-teloce-page"
+         data-teloce-component="{{ component }}"
+         data-teloce-props="{{ component_props }}">
+      {{ component_body | safe }}
+    </div>
+  </section>
+</div>
+{% endblock %}

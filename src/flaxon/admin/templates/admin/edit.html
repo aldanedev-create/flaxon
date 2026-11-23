@@ -43,7 +43,8 @@
           {% for field in form_fields %}
           {% set field_name = field|string %}
         {% for group, names in model.fieldsets.items() %}{% if field_name == names[0] %}<h3>{{ group }}</h3>{% endif %}{% endfor %}
-          {% set field_key = field_name|lower %}
+          {% set field_key = field_name|lower|replace('_', '-') %}
+          {% set field_label = form_schema[field_name].get('label') if (form_schema is defined and field_name in form_schema and form_schema[field_name].get('label')) else field_name|replace('_', ' ')|title %}
           {% set current_value = field_values.get(field_name, '') %}
           {% set raw_value = field_raw_values.get(field_name) %}
           {% set is_readonly = field_name in readonly or field_key == 'id' %}
@@ -54,35 +55,35 @@
           {% set is_datetime = 'datetime' in field_key or field_key.endswith('_at') or field_key.endswith('_on') %}
           {% set is_date = field_key == 'date' or field_key.endswith('_date') %}
           <div class="corporate-field record-field {% if is_long or is_json %}record-field-wide{% endif %}{% if is_readonly %} is-readonly{% endif %}">
-            <div class="edit-field-label"><label for="edit-{{ field_key }}">{{ field_name|replace('_', ' ')|title }}</label>{% if is_readonly %}<span class="corporate-badge corporate-badge-neutral">Read-only</span>{% endif %}</div>
+            <div class="edit-field-label"><label for="field-{{ field_key }}">{{ field_label }}</label>{% if is_readonly %}<span class="corporate-badge corporate-badge-neutral">Read-only</span>{% endif %}</div>
 
             {% if field_name in form_schema %}
             {% set schema = form_schema[field_name] %}
             {% include "admin/orm_field.html" %}
         {% if field_errors is defined and field_name in field_errors %}<small role="alert">{{ field_errors[field_name] }}</small>{% endif %}
             {% elif is_readonly %}
-            <div class="edit-readonly-value" id="edit-{{ field_key }}">{{ current_value or 'Not set' }}</div>
+            <div class="edit-readonly-value" id="field-{{ field_key }}">{{ current_value or 'Not set' }}</div>
             {% elif is_boolean %}
             <input type="hidden" name="{{ field_name }}" value="false" data-boolean-fallback="{{ field_name }}">
-            <label class="corporate-checkbox edit-boolean-control" for="edit-{{ field_key }}"><input id="edit-{{ field_key }}" type="checkbox" name="{{ field_name }}" value="true" data-boolean-field="{{ field_name }}"{% if raw_value is true or raw_value in [1, '1', 'true', 'True', 'yes', 'on'] %} checked{% endif %}><span>{% if raw_value is true or raw_value in [1, 'true', 'True', 'yes', 'on'] %}Enabled{% else %}Disabled{% endif %}</span></label>
+            <label class="corporate-checkbox edit-boolean-control" for="field-{{ field_key }}"><input id="field-{{ field_key }}" type="checkbox" name="{{ field_name }}" value="true" data-boolean-field="{{ field_name }}"{% if raw_value is true or raw_value in [1, '1', 'true', 'True', 'yes', 'on'] %} checked{% endif %}><span>{% if raw_value is true or raw_value in [1, 'true', 'True', 'yes', 'on'] %}Enabled{% else %}Disabled{% endif %}</span></label>
             {% elif is_long or is_json %}
-            <textarea id="edit-{{ field_key }}" name="{{ field_name }}" rows="8" data-editor-field{% if is_json %} data-json-field{% endif %} placeholder="Enter {{ field_name|replace('_', ' ') }}...">{{ current_value }}</textarea>
+            <textarea id="field-{{ field_key }}" name="{{ field_name }}" rows="8" data-editor-field{% if is_json %} data-json-field{% endif %} placeholder="Enter {{ field_name|replace('_', ' ') }}...">{{ current_value }}</textarea>
             {% if is_json %}<small>Enter valid JSON. Structured values are validated in the browser and again by your application.</small>{% else %}<small data-counter-for="{{ field_name }}">{{ current_value|length }} characters</small>{% endif %}
             {% elif is_number %}
-            <input id="edit-{{ field_key }}" name="{{ field_name }}" type="number" value="{{ current_value }}" step="{% if field_key in ['price', 'amount', 'cost', 'rate'] %}0.01{% else %}1{% endif %}" inputmode="decimal">
+            <input id="field-{{ field_key }}" name="{{ field_name }}" type="number" value="{{ current_value }}" step="{% if field_key in ['price', 'amount', 'cost', 'rate'] %}0.01{% else %}1{% endif %}" inputmode="decimal">
             <small>Use a numeric value. The model adapter remains authoritative for business validation.</small>
             {% elif is_datetime %}
-            <input id="edit-{{ field_key }}" name="{{ field_name }}" type="datetime-local" value="{{ current_value[:16] }}">
+            <input id="field-{{ field_key }}" name="{{ field_name }}" type="datetime-local" value="{{ current_value[:16] }}">
             <small>Stored value: {{ current_value or 'Not set' }}</small>
             {% elif is_date %}
-            <input id="edit-{{ field_key }}" name="{{ field_name }}" type="date" value="{{ current_value[:10] }}">
+            <input id="field-{{ field_key }}" name="{{ field_name }}" type="date" value="{{ current_value[:10] }}">
             {% elif 'email' in field_key %}
-            <input id="edit-{{ field_key }}" name="{{ field_name }}" type="email" value="{{ current_value }}" autocomplete="email">
+            <input id="field-{{ field_key }}" name="{{ field_name }}" type="email" value="{{ current_value }}" autocomplete="email">
             {% elif 'url' in field_key or 'link' in field_key %}
-            <input id="edit-{{ field_key }}" name="{{ field_name }}" type="url" value="{{ current_value }}" inputmode="url">
+            <input id="field-{{ field_key }}" name="{{ field_name }}" type="url" value="{{ current_value }}" inputmode="url">
             {% if current_value %}<a class="edit-field-link" href="{{ current_value }}" target="_blank" rel="noreferrer">Open current URL <i class="fas fa-arrow-up-right-from-square"></i></a>{% endif %}
             {% else %}
-            <input id="edit-{{ field_key }}" name="{{ field_name }}" type="text" value="{{ current_value }}">
+            <input id="field-{{ field_key }}" name="{{ field_name }}" type="text" value="{{ current_value }}">
             {% endif %}
 
             {% if not is_readonly and field_key in ['image', 'image_url', 'hero_image', 'thumbnail', 'avatar'] and current_value %}<div class="edit-image-preview"><img src="{{ current_value }}" alt="Current {{ field_name|replace('_', ' ') }}" loading="lazy"><span>Current media</span></div>{% endif %}
@@ -181,5 +182,5 @@
   });
 }());
 </script>
-{% include "admin/relationship_script.html" %}
+{% include "admin/depends_on_script.html" %}{% include "admin/relationship_script.html" %}
 {% endblock %}

@@ -1,0 +1,42 @@
+<template>
+  <fieldset class="fx-rating" :data-field="name">
+    <legend>{{ label }}</legend>
+    <div class="fx-rating-stars" role="radiogroup" :aria-label="label">
+      <label v-for="n in stars" :key="n" class="fx-rating-star" :data-active="n <= value">
+        <input type="radio" :name="name" :value="n" :checked="n == value" @change="select(n)" :required="required">
+        <span aria-hidden="true">★</span>
+        <span class="fx-rating-sr">{{ n }} of {{ max }}</span>
+      </label>
+    </div>
+    <p class="fx-rating-value" role="status">{{ value }} / {{ max }}</p>
+  </fieldset>
+</template>
+<script lang="ts">
+export default {
+  props: {
+    name: { type: String, required: true },
+    label: { type: String, default: "Rating" },
+    value: { type: Number, default: 0 },
+    max: { type: Number, default: 5 },
+    stars: { type: Array, default: [1, 2, 3, 4, 5] },
+    required: { type: Boolean, default: false }
+  },
+  methods: {
+    select(n: number) {
+      this.value = n;
+      this.$emit("change", n);
+    }
+  }
+};
+</script>
+<style scoped>
+.fx-rating { border: 0; margin: 0; padding: 0; }
+.fx-rating legend { font-weight: 600; margin-bottom: .25rem; }
+.fx-rating-stars { display: flex; gap: .25rem; }
+.fx-rating-star { cursor: pointer; color: #64748b; font-size: 1.5rem; line-height: 1; }
+.fx-rating-star[data-active="true"] { color: #f59e0b; }
+.fx-rating-star input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.fx-rating-star input:focus-visible + span { outline: 2px solid #38bdf8; outline-offset: 2px; }
+.fx-rating-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.fx-rating-value { color: #94a3b8; font-size: .875rem; margin-top: .25rem; }
+</style>

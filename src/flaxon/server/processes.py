@@ -39,6 +39,7 @@ class WorkerProcess:
             reload=False,
             workers=1,
             loop="asyncio",
+            timeout_graceful_shutdown=config.timeout_graceful_shutdown,
         )
         server = uvicorn.Server(uvicorn_config)
 

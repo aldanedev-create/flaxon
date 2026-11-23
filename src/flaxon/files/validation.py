@@ -72,31 +72,40 @@ class FileValidator:
 class ImageValidator(FileValidator):
     """Image validator implementation for the files subsystem."""
 
+    # SVG is deliberately excluded from the defaults: unlike raster formats it can
+    # carry active script, and Flaxon has no SVG sanitizer. Opt in with allow_svg=True
+    # only when the file is sanitized/trusted before being served.
     IMAGE_MIME_TYPES: ClassVar[Any] = {
         "image/jpeg",
         "image/png",
         "image/gif",
         "image/webp",
-        "image/svg+xml",
         "image/bmp",
         "image/tiff",
     }
 
-    IMAGE_EXTENSIONS: ClassVar[Any] = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp", ".tiff"}
+    IMAGE_EXTENSIONS: ClassVar[Any] = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff"}
 
-    def __init__(
+    def __init__(  # noqa: PLR0917 - preserve existing positional API
         self,
         max_size: int | None = 10 * 1024 * 1024,
         max_width: int | None = None,
         max_height: int | None = None,
         min_width: int | None = None,
         min_height: int | None = None,
+        allow_svg: bool = False,
         **kwargs: Any,
     ) -> None:
+        mime_types = set(self.IMAGE_MIME_TYPES)
+        extensions = set(self.IMAGE_EXTENSIONS)
+        if allow_svg:
+            mime_types.add("image/svg+xml")
+            extensions.add(".svg")
+            # Document the trust requirement in the allowlist so operators notice it.
         super().__init__(
             max_size=max_size,
-            allowed_extensions=list(self.IMAGE_EXTENSIONS),
-            allowed_mime_types=list(self.IMAGE_MIME_TYPES),
+            allowed_extensions=list(extensions),
+            allowed_mime_types=list(mime_types),
             **kwargs,
         )
         self.max_width = max_width

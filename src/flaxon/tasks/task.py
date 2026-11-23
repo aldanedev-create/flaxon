@@ -75,14 +75,10 @@ class Task:
                     )
                 else:
                     result = await self.func(*args, **kwargs)
-            elif self.timeout:
-                # FIX (E501): Split long line across multiple lines
-                result = await asyncio.wait_for(
-                    asyncio.to_thread(self.func, *args, **kwargs),
-                    timeout=self.timeout,
-                )
             else:
-                result = self.func(*args, **kwargs)
+                # A synchronous callable blocks the event loop if run inline.
+                # Always offload it to a worker thread; apply the timeout when set.
+                result = await asyncio.to_thread(self.func, *args, **kwargs)
 
             self.status = TaskStatus.COMPLETED
             self.completed_at = datetime.now()

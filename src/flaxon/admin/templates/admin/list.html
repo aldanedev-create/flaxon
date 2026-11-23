@@ -26,6 +26,83 @@
         </div>
     </div>
 
+    {% if metrics %}
+    <section class="fx-metrics-panel" aria-label="Model metrics">
+        <div class="fx-metric-grid">
+            {% for card in metrics %}
+            <article class="fx-metric-card" data-metric-kind="{{ card.kind }}" data-metric-range="{{ card.range }}">
+                <strong class="fx-metric-title">{{ card.title }}</strong>
+                {{ card.svg|safe }}
+                {% if card.description %}<small class="fx-metric-description">{{ card.description }}</small>{% endif %}
+            </article>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if lenses %}
+    <nav class="fx-lens-tabs" aria-label="Lenses">
+        <a href="{{ prefix }}/{{ model.get_name() }}" class="fx-lens{% if not active_lens %} is-active{% endif %}">All</a>
+        {% for lens in lenses %}
+        <a href="{{ prefix }}/{{ model.get_name() }}?lens={{ lens.name }}" class="fx-lens{% if lens.active %} is-active{% endif %}">{{ lens.label }}</a>
+        {% endfor %}
+    </nav>
+    {% endif %}
+
+    {% if filters %}
+    <form method="get" action="{{ prefix }}/{{ model.get_name() }}" class="fx-filter-panel" aria-label="Filters">
+        {% if active_lens %}<input type="hidden" name="lens" value="{{ active_lens }}">{% endif %}
+        <input type="hidden" name="q" value="{{ query }}">
+        {% for filter in filters %}
+        <label class="fx-filter">
+            <span>{{ filter.label }}</span>
+            {% if filter.kind == 'select' %}
+            <select name="{{ filter.parameter }}">
+                <option value="">All</option>
+                {% for choice in filter.choices %}
+                <option value="{{ choice.value }}"{% if filter.value == choice.value %} selected{% endif %}>{{ choice.label }}</option>
+                {% endfor %}
+            </select>
+            {% elif filter.kind == 'boolean' %}
+            <select name="{{ filter.parameter }}">
+                <option value="">All</option>
+                <option value="true"{% if filter.value is sameas true %} selected{% endif %}>Yes</option>
+                <option value="false"{% if filter.value is sameas false %} selected{% endif %}>No</option>
+            </select>
+            {% elif filter.kind == 'date_range' %}
+            <span class="fx-filter-range">
+                <input type="date" name="{{ filter.parameter_from }}" value="{{ filter.value_from }}" aria-label="{{ filter.label }} from">
+                <input type="date" name="{{ filter.parameter_to }}" value="{{ filter.value_to }}" aria-label="{{ filter.label }} to">
+            </span>
+            {% else %}
+            <input type="text" name="{{ filter.parameter }}" value="{{ filter.value or '' }}">
+            {% endif %}
+        </label>
+        {% endfor %}
+        <button type="submit" class="fx-filter-apply">Apply</button>
+        <a href="{{ prefix }}/{{ model.get_name() }}" class="fx-filter-reset">Reset</a>
+    </form>
+    {% endif %}
+
+    {% if saved_views or filters or lenses %}
+    <div class="fx-saved-views" aria-label="Saved views">
+        <form method="get" action="{{ prefix }}/{{ model.get_name() }}" class="fx-saved-view-picker">
+            <select name="view" onchange="if(this.value){window.location.href=this.value;}">
+                <option value="">Saved views...</option>
+                {% for view in saved_views %}
+                <option value="{{ prefix }}/{{ model.get_name() }}/saved-views/{{ view.slug }}">{{ view.name }}</option>
+                {% endfor %}
+            </select>
+        </form>
+        <form method="post" action="{{ prefix }}/{{ model.get_name() }}/saved-views" class="fx-saved-view-save">
+            <input type="hidden" name="_csrf" value="{{ dashboard.csrf_token() }}">
+            <input type="hidden" name="query" value="{{ query_string }}">
+            <input name="name" placeholder="Save current view as..." aria-label="Saved view name">
+            <button type="submit">Save view</button>
+        </form>
+    </div>
+    {% endif %}
+
     <!-- Filters -->
     <div class="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl p-4">
         <div class="flex flex-col sm:flex-row gap-3">
@@ -49,14 +126,14 @@
     </div>
 
     {% if can_delete or actions %}
-    <form id="bulk-form" method="post" action="{{ prefix }}/{{ model.get_name() }}/actions/delete" onsubmit="return confirm('Apply this action to the selected records?')" class="flex items-center gap-2">
+    <form id="bulk-form" method="post" action="{{ prefix }}/{{ model.get_name() }}/actions/delete" onsubmit="var sel=this.querySelector('select[name=action]');var msg=sel?(sel.selectedOptions[0]?.dataset.confirm||''):'';return confirm(msg||'Apply this action to the selected records?')" class="flex items-center gap-2">
         <input type="hidden" name="_csrf" value="{{ dashboard.csrf_token() }}">
         <select name="action" onchange="this.form.action='{{ prefix }}/{{ model.get_name() }}/actions/' + this.value" class="bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm">
             {% if can_delete %}
-            <option value="delete">Delete selected</option>
+            <option value="delete" data-confirm="Delete the selected records?">Delete selected</option>
             {% endif %}
             {% for name, action in actions.items() %}
-            <option value="{{ name }}">{{ name|title }}</option>
+            <option value="{{ name }}" {% if action is defined and action.confirmation is defined and action.confirmation %}data-confirm="{{ action.confirmation }}"{% endif %}>{{ action.get_label() if action is defined and action.get_label is defined else name|title }}</option>
             {% endfor %}
         </select>
         <button class="px-3 py-2 bg-slate-700 rounded text-sm">Apply</button>
@@ -72,7 +149,7 @@
                         <th class="px-4 py-3"></th>
                         {% for field in list_display %}
                         <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                            <a href="{{ prefix }}/{{ model.get_name() }}?q={{ query }}{% for filter_field in list_filter or [] %}&filter_{{ filter_field }}={{ request.query.get('filter_' + filter_field, '') }}{% endfor %}&order_by={{ field }}">{{ field|replace('_', ' ')|title }}</a>
+                            <a href="{{ prefix }}/{{ model.get_name() }}?q={{ query }}{% for filter_field in list_filter or [] %}&filter_{{ filter_field }}={{ request.query.get('filter_' + filter_field, '') }}{% endfor %}&order_by={{ field }}{% if active_lens %}&lens={{ active_lens }}{% endif %}">{{ field|replace('_', ' ')|title }}</a>
                         </th>
                         {% endfor %}
                         <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
@@ -93,6 +170,11 @@
                                 <a href="{{ prefix }}/{{ model.get_name() }}/{{ item_id }}" class="p-1.5 rounded-lg hover:bg-slate-700/50 transition text-slate-400 hover:text-white">
                                     <i class="fas fa-eye text-xs"></i>
                                 </a>
+                                {% if can_add %}<form action="{{ prefix }}/{{ model.get_name() }}/{{ item_id }}/duplicate" method="POST" class="inline"><input type="hidden" name="_csrf" value="{{ dashboard.csrf_token() }}">
+                                    <button type="submit" title="Duplicate" aria-label="Duplicate" class="p-1.5 rounded-lg hover:bg-slate-700/50 transition text-slate-400 hover:text-white">
+                                        <i class="fas fa-copy text-xs"></i>
+                                    </button>
+                                </form>{% endif %}
                                 {% if can_change %}<a href="{{ prefix }}/{{ model.get_name() }}/{{ item_id }}/edit" class="p-1.5 rounded-lg hover:bg-slate-700/50 transition text-slate-400 hover:text-white">
                                     <i class="fas fa-edit text-xs"></i>
                                 </a>{% endif %}

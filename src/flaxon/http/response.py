@@ -104,11 +104,12 @@ class StreamingResponse(Response):
         content: AsyncIterable[bytes] | Iterable[bytes],
         status_code: int = 200,
         headers: dict[str, str] | None = None,
+        media_type: str | None = None,
     ) -> None:
         self.content = content
         self.status_code = status_code
         self.headers = Headers(headers or {})
-        self.headers.setdefault("content-type", self.media_type)
+        self.headers.setdefault("content-type", media_type or self.media_type)
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
         """Handle the supplied call using this object's configured behavior."""

@@ -1,0 +1,27 @@
+{# Teloce component field. A plain control keeps the form usable before the
+   extension bundle mounts (and without JavaScript); Teloce replaces it with the
+   component's own markup once mounted. #}
+{% set described_by = ('help-' ~ field_key) if schema.get('help_text') else none %}
+<div class="fx-teloce-field"
+     data-teloce-component="{{ schema.component }}"
+     data-teloce-props="{{ schema.component_props }}"
+     data-teloce-value="{{ current_value }}">
+  {% if schema.get('fallback') == 'select' %}
+  <select id="{{ field_id }}" name="{{ field_name }}"
+          {% if described_by %}aria-describedby="{{ described_by }}"{% endif %}
+          {% if schema.required %}required{% endif %}>
+    <option value="">Not rated</option>
+    {% for value, label in schema.get('fallback_choices', []) %}
+    <option value="{{ value }}"{% if current_value|string == value %} selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  {% elif schema.get('fallback') == 'number' %}
+  <input id="{{ field_id }}" name="{{ field_name }}" type="number" value="{{ current_value }}"
+         {% if described_by %}aria-describedby="{{ described_by }}"{% endif %}
+         {% if schema.required %}required{% endif %}>
+  {% else %}
+  <input id="{{ field_id }}" name="{{ field_name }}" type="text" value="{{ current_value }}"
+         {% if described_by %}aria-describedby="{{ described_by }}"{% endif %}
+         {% if schema.required %}required{% endif %}>
+  {% endif %}
+</div>

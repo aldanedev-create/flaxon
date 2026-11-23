@@ -1,0 +1,23 @@
+{
+  "name": "tailwindcss",
+  "version": "3.4.17",
+  "license": "MIT",
+  "source": "https://registry.npmjs.org/tailwindcss/-/tailwindcss-3.4.17.tgz",
+  "npm_integrity": "sha512-w33E2aCvSDP0tW9RZuNXadXlkHXqFzSkQew/aIa2i/Sj8fThxwovwlXHSPXTbAHwEIhBFXAedUhP2tueAKP8Og==",
+  "retrieved": "2026-11-21",
+  "build": "npx tailwindcss --minify (standalone CLI, content-scanned from admin templates)",
+  "files": {
+    "LICENSE": {
+      "sha256": "60e0b68c0f35c078eef3a5d29419d0b03ff84ec1df9c3f9d6e39a519a5ae7985",
+      "bytes": 1071
+    },
+    "package.json": {
+      "sha256": "56330837214a14ffcf0faba46f0f94fb23209778f5d4cc0a2bed7d775108c8d1",
+      "bytes": 3430
+    },
+    "tailwind.min.css": {
+      "sha256": "fb2e59fcee55db0b5c37516245a91fe6acd5dbe5d645bc67112975718659d525",
+      "bytes": 21723
+    }
+  }
+}

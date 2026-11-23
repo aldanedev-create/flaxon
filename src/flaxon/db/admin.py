@@ -314,7 +314,9 @@ class _TortoiseAdminAdapter:
         return schema
 
     @classmethod
-    async def query(cls, q=None, page=1, per_page=25, query_params=None):
+    async def query(  # noqa: C901, PLR0912 - query assembly
+        cls, q=None, page=1, per_page=25, query_params=None, _flaxon_filters=None
+    ):
         query = await cls.visible_query()
         params = query_params or {}
         if q and cls._search:
@@ -326,6 +328,9 @@ class _TortoiseAdminAdapter:
             value = params.get(f"filter_{name}")
             if value not in (None, ""):
                 query = query.filter(**{name: value})
+        # Class-based filters and lenses arrive as pre-built Q objects.
+        for condition in _flaxon_filters or []:
+            query = query.filter(condition)
         ordering = params.get("order_by")
         if ordering:
             if ordering.lstrip("-") not in cls._columns:
@@ -335,6 +340,15 @@ class _TortoiseAdminAdapter:
             query = query.order_by(*cls._options["ordering"])
         else:
             query = query.order_by(cls._model._meta.pk_attr)
+        resource = getattr(cls, "_resource", None)
+        if resource is not None:
+            available = set(cls._model._meta.fields_map)
+            select = [n for n in resource.select_related_names() if n in available]
+            prefetch = [n for n in resource.prefetch_related_names() if n in available]
+            if select:
+                query = query.select_related(*select)
+            if prefetch:
+                query = query.prefetch_related(*prefetch)
         context = admin_context.get()
         read_hook = cls._options.get("can_view")
         if read_hook and context:
@@ -562,6 +576,7 @@ def model_adapter(model: type[Model], options: dict[str, Any]):
             "admin_options": options,
             "registry": None,
             "_model": model,
+            "_resource": options.get("resource"),
             "_columns": columns,
             "_relations": relations,
             "_readonly": readonly,

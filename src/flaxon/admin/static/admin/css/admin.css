@@ -670,3 +670,35 @@ body.admin-shell, body.cms-shell {
 .admin-table{width:100%;border-collapse:collapse;font-size:.875rem}.admin-table th{background:rgba(15,23,42,.6);padding:.75rem 1rem;text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8}.admin-table td{border-top:1px solid rgba(71,85,105,.38);padding:.9rem 1rem;color:#dbeafe}.admin-table td small{display:block;color:#64748b;font-size:.72rem;margin-top:.15rem}.admin-table tr:hover td{background:rgba(30,41,59,.35)}
 .admin-panel label{display:grid;gap:.35rem;color:#cbd5e1;font-size:.8rem;font-weight:600}.admin-panel label input{width:100%;border:1px solid rgba(100,116,139,.6);border-radius:.5rem;background:rgba(15,23,42,.8);padding:.62rem .7rem;color:#f8fafc;font:inherit;font-weight:400}.admin-panel label input:focus{outline:2px solid rgba(56,189,248,.45);outline-offset:1px}
 .admin-stat{border:1px solid rgba(71,85,105,.55);border-radius:.75rem;background:rgba(15,23,42,.58);padding:1rem 1.1rem}.admin-stat span,.admin-stat small{display:block;color:#94a3b8;font-size:.75rem}.admin-stat strong{display:block;margin:.4rem 0;font-size:1.6rem;color:#f8fafc}.empty-state{padding:2.5rem 1rem;text-align:center;color:#94a3b8}.status-pill{display:inline-flex;border-radius:999px;padding:.2rem .55rem;font-size:.7rem;font-weight:700;text-transform:capitalize;background:rgba(100,116,139,.24);color:#cbd5e1}.status-healthy,.status-ok,.status-ready{background:rgba(34,197,94,.16);color:#86efac}.status-failed,.status-error,.status-down{background:rgba(239,68,68,.16);color:#fca5a5}
+/* Phase 2 metric cards. Charts use currentColor so they inherit the active
+   theme (the base template defaults to the dark palette). No JS, no CDN. */
+.fx-metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: .85rem; }
+.fx-metric-card { display: grid; gap: .35rem; min-width: 0; padding: .9rem 1rem; border: 1px solid var(--admin-border); border-radius: 9px; background: var(--admin-surface-muted); }
+.fx-metric-title { display: block; color: var(--admin-text); font-size: .78rem; letter-spacing: .02em; }
+.fx-metric-description { display: block; color: var(--admin-muted); font-size: .68rem; }
+.fx-metric { display: block; width: 100%; max-width: 320px; height: auto; overflow: visible; color: var(--admin-text); }
+.fx-metric text { font-family: inherit; }
+
+/* Phase 4: filters, lenses, saved views, command palette, impersonation. */
+.fx-lens-tabs { display: flex; flex-wrap: wrap; gap: .4rem; }
+.fx-lens { padding: .35rem .75rem; border: 1px solid var(--admin-border); border-radius: 999px; color: var(--admin-muted); font-size: .78rem; }
+.fx-lens.is-active { background: var(--admin-surface-muted); color: var(--admin-text); border-color: var(--admin-accent, #38bdf8); }
+.fx-filter-panel { display: flex; flex-wrap: wrap; align-items: end; gap: .6rem; padding: .75rem; border: 1px solid var(--admin-border); border-radius: 9px; background: var(--admin-surface-muted); }
+.fx-filter { display: grid; gap: .2rem; font-size: .72rem; color: var(--admin-muted); }
+.fx-filter select, .fx-filter input { padding: .35rem .5rem; border: 1px solid var(--admin-border); border-radius: 6px; background: transparent; color: var(--admin-text); }
+.fx-filter-range { display: flex; gap: .3rem; }
+.fx-filter-apply, .fx-filter-reset { padding: .4rem .7rem; border: 1px solid var(--admin-border); border-radius: 6px; font-size: .75rem; }
+.fx-saved-views { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.fx-saved-view-save { display: flex; gap: .4rem; }
+.fx-saved-view-save input { padding: .35rem .5rem; border: 1px solid var(--admin-border); border-radius: 6px; background: transparent; color: var(--admin-text); font-size: .75rem; }
+.fx-impersonation-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .75rem; padding: .5rem 1rem; background: #7c2d12; color: #ffedd5; font-size: .8rem; }
+.fx-impersonation-exit button { padding: .25rem .6rem; border-radius: 6px; background: #ffedd5; color: #7c2d12; font-size: .75rem; font-weight: 600; }
+.fx-palette { position: fixed; inset: 0; z-index: 80; display: grid; place-items: start center; padding-top: 12vh; background: rgba(2, 6, 23, .72); }
+.fx-palette[hidden] { display: none; }
+.fx-palette-panel { width: min(640px, 92vw); padding: 1rem; border: 1px solid var(--admin-border); border-radius: 12px; background: var(--admin-surface, #0f172a); box-shadow: 0 24px 64px rgba(0, 0, 0, .45); }
+.fx-palette-panel input { width: 100%; padding: .6rem .75rem; border: 1px solid var(--admin-border); border-radius: 8px; background: transparent; color: var(--admin-text); }
+.fx-palette-results { margin-top: .5rem; max-height: 45vh; overflow: auto; }
+.fx-palette-results li { display: flex; justify-content: space-between; gap: .5rem; padding: .4rem .5rem; border-radius: 6px; font-size: .82rem; }
+.fx-palette-results li:hover { background: var(--admin-surface-muted); }
+.fx-palette-kind { color: var(--admin-muted); font-size: .68rem; text-transform: uppercase; }
+.fx-palette-hint { margin-top: .5rem; color: var(--admin-muted); font-size: .68rem; }

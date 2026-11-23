@@ -33,12 +33,13 @@
         {% for field in form_fields %}
         {% set field_name = field|string %}
         {% for group, names in model.fieldsets.items() %}{% if field_name == names[0] %}<h3>{{ group }}</h3>{% endif %}{% endfor %}
-        {% set field_key = field_name|lower %}
+        {% set field_key = field_name|lower|replace('_', '-') %}
+        {% set field_label = form_schema[field_name].get('label') if (form_schema is defined and field_name in form_schema and form_schema[field_name].get('label')) else field_name|replace('_', ' ')|title %}
         {% set is_readonly = (readonly_fields is defined and field_name in readonly_fields) or field_key == 'id' %}
         {% set is_long = field_key in ['description', 'content', 'body', 'notes', 'excerpt', 'summary'] %}
         {% set is_json = 'json' in field_key or field_key in ['metadata', 'settings', 'relationship', 'relationships', 'repeater', 'items'] %}
-        <label class="corporate-field record-field {% if is_long or is_json %}record-field-wide{% endif %}">
-        <span>{{ field_name|replace('_', ' ')|title }}{% if field_key in ['name', 'title', 'slug', 'email'] %}<b>*</b>
+        <label for="field-{{ field_key }}" class="corporate-field record-field {% if is_long or is_json %}record-field-wide{% endif %}">
+        <span>{{ field_label }}{% if field_key in ['name', 'title', 'slug', 'email'] %}<b>*</b>
           {% endif %}
         </span>
         {% if field_name in form_schema %}
@@ -111,5 +112,5 @@
 {% endblock %}
 {% block extra_scripts %}<script>
 document.querySelectorAll('[data-json-field]').forEach(field => field.addEventListener('blur', () => { if (!field.value.trim()) { field.setCustomValidity(''); return; } try { JSON.parse(field.value); field.setCustomValidity(''); } catch (_) { field.setCustomValidity('Enter valid JSON before saving.'); } }));
-</script>{% include "admin/relationship_script.html" %}
+</script>{% include "admin/depends_on_script.html" %}{% include "admin/relationship_script.html" %}
 {% endblock %}

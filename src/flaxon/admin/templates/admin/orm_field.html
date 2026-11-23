@@ -1,30 +1,42 @@
 {# Typed ORM fields; legacy custom models retain their existing templates. #}
+{# field_key, field_name, current_value and schema come from the including view. #}
+{% set field_id = 'field-' ~ field_key %}
+{% set help_id = 'help-' ~ field_key %}
+{% set described_by = help_id if schema.get('help_text') else none %}
+{% set dependent = schema.get('depends_on') %}
+{% set depend_attrs = (' data-depends-on="' ~ dependent[0] ~ '" data-depends-value="' ~ dependent[1] ~ '"') if dependent else '' %}
 {% if is_readonly %}
-<input name="{{ field_name }}" value="{{ current_value }}" readonly>
-{% elif schema.widget is defined and schema.widget %}
+<input id="{{ field_id }}" name="{{ field_name }}" value="{{ current_value }}" readonly>
+{% elif schema.get('widget') %}
 {% include schema.widget %}
 {% elif schema.kind in ['autocomplete', 'autocomplete-many'] %}
 {% if schema.kind == 'autocomplete-many' %}<input type="hidden" name="{{ field_name }}" value="{{ current_value or '[]' }}" data-related-many>{% endif %}
 <span data-related-picker>
-<input type="search" aria-label="Search related records" data-related-search data-url="{{ prefix }}/{{ model.get_name() }}/relationships/{{ field_name }}">
-<select {% if schema.kind == "autocomplete-many" %}multiple{% else %}name="{{ field_name }}"{% endif %} data-related-results{% if schema.required %} required{% endif %}><option value="{{ current_value }}">{{ current_value or 'Select a record' }}</option></select>
+<input id="{{ field_id }}" type="search" aria-label="Search related records" data-related-search data-url="{{ prefix }}/{{ model.get_name() }}/relationships/{{ field_name }}">
+<select id="{{ field_id }}-select" {% if schema.kind == "autocomplete-many" %}multiple{% else %}name="{{ field_name }}"{% endif %} data-related-results{% if schema.required %} required{% endif %}><option value="{{ current_value }}">{{ current_value or 'Select a record' }}</option></select>
 <button type="button" data-related-more hidden>More results</button><small role="status" data-related-status></small>
 </span>
 {% elif schema.kind == 'many' %}
 <input type="hidden" name="{{ field_name }}" value="{{ current_value or '[]' }}" data-many-value>
-<select multiple aria-label="Related records" data-many-picker>
-{% for value, label in schema.choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+<select id="{{ field_id }}" multiple aria-label="Related records" data-many-picker{{ depend_attrs | safe }}>
+{% for value, label in schema.choices %}<option value="{{ value }}"{% if current_value|string == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
 </select>
 {% elif schema.kind == 'checkbox' %}
 <input type="hidden" name="{{ field_name }}" value="false">
-<input type="checkbox" name="{{ field_name }}" value="true"{% if current_value|string|lower in ['true', '1'] %} checked{% endif %}>
-{% elif schema.kind == 'textarea' %}
-<textarea name="{{ field_name }}" rows="6"{% if schema.required %} required{% endif %}>{{ current_value }}</textarea>
+<input id="{{ field_id }}" type="checkbox" name="{{ field_name }}" value="true"{% if current_value|string|lower in ['true', '1'] %} checked{% endif %}>
+{% elif schema.kind == 'badge' %}
+<select id="{{ field_id }}" name="{{ field_name }}"{% if described_by %} aria-describedby="{{ described_by }}"{% endif %}{% if schema.required %} required{% endif %}{{ depend_attrs | safe }}>
+<option value="">Choose…</option>
+{% for value, label in schema.choices %}<option value="{{ value }}"{% if current_value|string == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+</select>
+{% elif schema.kind in ['textarea', 'markdown', 'code', 'json', 'key_value', 'tag', 'file'] %}
+<textarea id="{{ field_id }}" name="{{ field_name }}" rows="6"{% if described_by %} aria-describedby="{{ described_by }}"{% endif %}{% if schema.required %} required{% endif %}{{ depend_attrs | safe }}{% if schema.kind in ['json', 'key_value'] %} data-json-field{% endif %}>{{ current_value }}</textarea>
 {% elif schema.kind == 'select' %}
-<select name="{{ field_name }}"{% if schema.required %} required{% endif %}>
+<select id="{{ field_id }}" name="{{ field_name }}"{% if described_by %} aria-describedby="{{ described_by }}"{% endif %}{% if schema.required %} required{% endif %}{{ depend_attrs | safe }}>
 <option value="">Select a related record</option>
 {% for value, label in schema.choices %}<option value="{{ value }}"{% if current_value|string == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
 </select>
 {% else %}
-<input name="{{ field_name }}" type="{{ schema.kind }}" value="{{ (current_value|string|replace(' ', 'T'))[:16] if schema.kind == 'datetime-local' else current_value }}"{% if schema.required %} required{% endif %}{% if schema.max_length %} maxlength="{{ schema.max_length }}"{% endif %}{% if schema.kind == 'number' %} step="any"{% endif %}>
+<input id="{{ field_id }}" name="{{ field_name }}" type="{{ schema.kind }}" value="{{ (current_value|string|replace(' ', 'T'))[:16] if schema.kind == 'datetime-local' else current_value }}"{% if described_by %} aria-describedby="{{ described_by }}"{% endif %}{% if schema.required %} required{% endif %}{% if schema.get('max_length') %} maxlength="{{ schema.get('max_length') }}"{% endif %}{% if schema.kind == 'number' %} step="any"{% endif %}{{ depend_attrs | safe }}>
 {% endif %}
+{% if schema.get('help_text') %}<small id="{{ help_id }}" class="corporate-help">{{ schema.get('help_text') }}</small>{% endif %}

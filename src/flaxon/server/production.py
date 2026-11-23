@@ -55,6 +55,7 @@ class ProductionServer:
                 reload=False,
                 workers=1,
                 loop="asyncio",
+                timeout_graceful_shutdown=self.config.timeout_graceful_shutdown,
             )
             server = uvicorn.Server(config)
 

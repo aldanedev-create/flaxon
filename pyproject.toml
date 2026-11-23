@@ -213,6 +213,7 @@ flaxon = [
     "cli/starters/**/*.tmpl",
     "admin/templates/**/*.html",
     "admin/static/**/*",
+    "admin/static/admin/vendor/**/*",
     "openapi/assets/redoc/*",
     "openapi/assets/swagger_ui/*",
 ]
