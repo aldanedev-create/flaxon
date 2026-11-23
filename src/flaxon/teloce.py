@@ -430,6 +430,9 @@ class Teloce:
     {router_import}
     {plugin_import}
     {plugin_mount}
+    if (window.use && window.use.ready) {{
+      try {{ await window.use.ready; }} catch (error) {{ console.error("Teloce-NPM packages did not load:", error); }}
+    }}
     const context = JSON.parse(document.getElementById("__FLAXON_TELOCE_DATA__").textContent);
     window.__FLAXON_TELOCE__ = {"hydrate" if rendered is not None else "mount"}("#app", context);
     {router_mount}
